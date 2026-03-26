@@ -1,4 +1,8 @@
 import mammoth from "mammoth";
+// Import from the lib path to bypass pdf-parse's index.js test-file loading at startup
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse: (buffer: Buffer, options?: Record<string, unknown>) => Promise<{ text: string; numpages: number }> =
+  require("pdf-parse/lib/pdf-parse.js");
 
 export async function extractTextFromDocx(buffer: Buffer): Promise<string> {
   const result = await mammoth.extractRawText({ buffer });
@@ -6,12 +10,12 @@ export async function extractTextFromDocx(buffer: Buffer): Promise<string> {
 }
 
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-  // pdf-parse handles Node.js compatibility (DOMMatrix, canvas polyfills etc.)
-  const pdfParse = (await import("pdf-parse")).default;
   const data = await pdfParse(buffer);
   const text = data.text?.trim();
   if (!text || text.length < 20) {
-    throw new Error("Could not extract readable text from this PDF. Try a DOCX version instead.");
+    throw new Error(
+      "Could not extract readable text from this PDF. Try converting to DOCX or paste the text manually.",
+    );
   }
   return text;
 }
@@ -28,7 +32,8 @@ export async function extractTextFromFile(
   }
 
   if (
-    mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    mimetype ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
     mimetype === "application/msword" ||
     ext === "docx" ||
     ext === "doc"
