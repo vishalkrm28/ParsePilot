@@ -197,12 +197,21 @@ export function SubscriptionCard() {
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
                   <span>
-                    {subscriptionStatus === "canceled" ? "Access until" : "Renews"}{" "}
+                    {subscriptionStatus === "canceled"
+                      ? "Access until"
+                      : subscriptionStatus === "trialing"
+                        ? "Trial ends"
+                        : "Renews"}{" "}
                     <span className="font-medium text-foreground">
                       {format(new Date(currentPeriodEnd), "MMMM d, yyyy")}
                     </span>
                   </span>
                 </div>
+              )}
+              {subscriptionStatus === "trialing" && (
+                <p className="text-xs text-muted-foreground rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 leading-relaxed">
+                  You will be charged automatically after the 7-day trial unless you cancel before it ends.
+                </p>
               )}
             </div>
           )}

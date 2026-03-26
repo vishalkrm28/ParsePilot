@@ -5,11 +5,9 @@ import { Button } from "@/components/Button";
 import { motion } from "framer-motion";
 
 export default function BillingSuccess() {
-  // Clear any stale query-cache so the next /billing or dashboard fetch
-  // picks up the updated subscription status once the webhook has fired.
   useEffect(() => {
-    // Give the webhook a moment to land before the user hits the dashboard
-    // (this is cosmetic — actual access is gated by the webhook).
+    // Cosmetic delay note: actual Pro access comes from the webhook, not this page.
+    // No state is mutated here — the webhook is the source of truth.
   }, []);
 
   return (
@@ -34,12 +32,18 @@ export default function BillingSuccess() {
             ParsePilot Pro
           </div>
           <h1 className="text-3xl font-bold tracking-tight">
-            You're all set!
+            Your 7-day free trial has started
           </h1>
           <p className="text-muted-foreground">
-            Your subscription is being activated. It can take a few seconds —
-            refresh your dashboard if Pro features aren't showing yet.
+            Pro features are being activated now. It can take a few seconds —
+            refresh your dashboard if they aren't showing yet.
           </p>
+        </div>
+
+        {/* Trial notice */}
+        <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 px-4 py-3 text-sm text-muted-foreground text-left">
+          You will be charged automatically after the 7-day trial unless you cancel before it ends.
+          You can cancel at any time from <span className="font-medium text-foreground">Settings → Billing</span>.
         </div>
 
         {/* CTA */}
@@ -54,7 +58,7 @@ export default function BillingSuccess() {
 
         {/* Small print */}
         <p className="text-xs text-muted-foreground">
-          You'll receive a receipt from Stripe at your email address.
+          You'll receive a confirmation from Stripe at your email address.
         </p>
       </motion.div>
     </div>

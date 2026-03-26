@@ -168,6 +168,59 @@ lib/
 
 ---
 
+## Free trial
+
+ParsePilot Pro starts with a **7-day free trial** for all new subscribers.
+
+### How it works
+
+1. User clicks **Start 7-day free trial** → Stripe Checkout opens.
+2. User enters card details (required by Stripe, not charged yet).
+3. Stripe creates the subscription with status `trialing` and fires `customer.subscription.created`.
+4. The webhook handler sets `subscriptionStatus = "trialing"` in the DB → user immediately has Pro access.
+5. After 7 days, Stripe automatically charges the card, fires `invoice.paid` + `customer.subscription.updated` (status → `active`), and the webhook updates the DB.
+6. If the user cancels before day 7, Stripe fires `customer.subscription.deleted` → webhook sets status to `canceled` → Pro access revoked.
+
+### Access rules
+
+| Stripe status | Pro access |
+|--------------|-----------|
+| `trialing` | ✓ Full Pro access |
+| `active` | ✓ Full Pro access |
+| `past_due` | ✗ Access revoked |
+| `canceled` | ✗ Access revoked |
+| `incomplete` | ✗ Access revoked |
+
+### How to test the trial (Stripe Test Mode)
+
+```bash
+# 1. Use a Stripe test card that succeeds immediately:
+#    Card: 4242 4242 4242 4242  |  Exp: any future date  |  CVC: any 3 digits
+
+# 2. Trigger trial end manually with the Stripe CLI:
+stripe subscriptions update <sub_id> --trial-end=now
+# This immediately bills the card and fires customer.subscription.updated (status → active)
+
+# 3. Simulate a failed payment after trial:
+#    Use card: 4000 0000 0000 0341 in Checkout.
+#    Stripe will mark invoice as payment_failed; the webhook logs the failure.
+
+# 4. Replay any missed webhook events from the Stripe Dashboard → Events tab.
+```
+
+### How webhook events affect trial access
+
+| Event | What happens |
+|-------|-------------|
+| `customer.subscription.created` (status=trialing) | `subscriptionStatus` set to `trialing` → Pro granted |
+| `customer.subscription.updated` (status=active) | Trial ended, payment taken → Pro continues |
+| `customer.subscription.updated` (status=canceled) | User cancelled → Pro revoked |
+| `invoice.paid` | Logged; period end updated if needed |
+| `invoice.payment_failed` | Logged with attempt count and next retry time |
+| `customer.subscription.deleted` | `subscriptionStatus` set to `canceled` → Pro revoked |
+
+---
+
 ## Free vs Pro tiers
 
 | Feature | Free | Pro |

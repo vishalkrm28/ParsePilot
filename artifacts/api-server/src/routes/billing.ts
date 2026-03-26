@@ -96,6 +96,10 @@ router.post("/billing/checkout", async (req, res) => {
       allow_promotion_codes: true,
       subscription_data: {
         metadata: { userId },
+        // 7-day free trial — Stripe sets status to "trialing" until trial_end.
+        // Access is granted by the webhook when status becomes "trialing" or "active";
+        // it is NEVER granted from this redirect URL.
+        trial_period_days: 7,
       },
     });
 
