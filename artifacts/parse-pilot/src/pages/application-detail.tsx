@@ -35,6 +35,7 @@ import { useBillingStatus } from "@/hooks/use-billing-status";
 import { LockedPreviewCard } from "@/components/results/locked-preview-card";
 import { BlurredLockedSection } from "@/components/results/blurred-locked-section";
 import { UpgradeCTACard } from "@/components/results/upgrade-cta-card";
+import { UpgradeButton } from "@/components/billing/upgrade-button";
 
 // ─── Analysis progress steps shown during loading ─────────────────────────────
 
@@ -117,68 +118,83 @@ function LockedCoverLetterSection() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Left column: controls greyed out */}
-      <div className="lg:col-span-1 space-y-6">
+      <div className="lg:col-span-1 space-y-4">
         <Card>
-          <CardContent className="p-6 space-y-6">
+          <CardContent className="p-6 space-y-5">
             <div>
-              <h3 className="font-bold text-lg mb-2">Tone</h3>
-              <div className="space-y-2 opacity-40 pointer-events-none select-none" aria-hidden="true">
-                {(["professional", "enthusiastic", "concise"] as const).map((t) => (
-                  <label
-                    key={t}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-border"
-                  >
-                    <div className="w-4 h-4 rounded-full border-2 border-muted-foreground/40" />
-                    <div>
-                      <span className="capitalize font-medium text-sm block">{t}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {t === "professional" && "Formal, polished, measured"}
-                        {t === "enthusiastic" && "Warm, energetic, excited"}
-                        {t === "concise" && "Brief, direct, 3 paragraphs"}
-                      </span>
-                    </div>
-                  </label>
-                ))}
-              </div>
+              <h3 className="font-bold text-lg mb-1">Cover Letter</h3>
+              <p className="text-sm text-muted-foreground">
+                Pro generates a personalized letter matched to your tailored CV and this job description.
+              </p>
+            </div>
+
+            <div className="space-y-2 opacity-40 pointer-events-none select-none" aria-hidden="true">
+              {(["professional", "enthusiastic", "concise"] as const).map((t) => (
+                <label key={t} className="flex items-center gap-3 p-3 rounded-lg border border-border">
+                  <div className="w-4 h-4 rounded-full border-2 border-muted-foreground/40" />
+                  <div>
+                    <span className="capitalize font-medium text-sm block">{t}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {t === "professional" && "Formal, polished, measured"}
+                      {t === "enthusiastic" && "Warm, energetic, excited"}
+                      {t === "concise" && "Brief, direct, 3 paragraphs"}
+                    </span>
+                  </div>
+                </label>
+              ))}
             </div>
 
             <Button
-              className="w-full h-12 opacity-50 cursor-not-allowed"
+              className="w-full h-11 opacity-50 cursor-not-allowed"
               disabled
               aria-disabled="true"
               aria-label="Generate cover letter — available on ParsePilot Pro"
             >
-              <Lock className="w-5 h-5 mr-2" />
+              <Lock className="w-4 h-4 mr-2" />
               Generate Letter
             </Button>
-            <p className="text-xs text-center text-muted-foreground">Available on ParsePilot Pro</p>
           </CardContent>
         </Card>
+
+        {/* CTA placement 2 — cover letter upgrade (left column) */}
+        <UpgradeCTACard
+          headline="Generate a cover letter"
+          variant="cover"
+          ctaLabel="Try Pro free for 7 days"
+        />
       </div>
 
-      {/* Right column: blurred preview + upgrade CTA */}
-      <div className="lg:col-span-2 space-y-4">
-        <Card className="overflow-hidden">
+      {/* Right column: teaser + blurred preview */}
+      <div className="lg:col-span-2">
+        <Card className="overflow-hidden h-full min-h-[400px]">
           <div className="bg-muted px-4 py-3 border-b border-border flex justify-between items-center rounded-t-2xl">
             <span className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
               <Lock className="w-3.5 h-3.5" aria-hidden="true" />
-              Cover Letter — Preview only
+              Cover Letter — Pro feature
             </span>
           </div>
+
+          {/* Visible teaser — 1–2 lines of what a cover letter would open with */}
+          <div className="px-6 pt-5 pb-0 font-serif text-sm space-y-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Generated letter preview
+            </p>
+            <p className="text-foreground/60 leading-relaxed italic select-none">
+              Dear Hiring Manager,
+            </p>
+            <p className="text-foreground/50 leading-relaxed italic select-none line-clamp-2">
+              I am writing to express my strong interest in this role. Having spent{" "}
+              <span className="blur-[3px]">several years building expertise in the exact areas</span>{" "}
+              outlined in the job description…
+            </p>
+          </div>
+
+          {/* Blurred rest of the letter */}
           <BlurredLockedSection
-            label="Cover letter locked"
-            lineCount={14}
-            lineWidths={["85%", "100%", "92%", "78%", "100%", "88%", "72%", "100%", "95%", "80%", "100%", "65%", "88%", "50%"]}
+            lineCount={12}
+            lineWidths={["88%", "100%", "75%", "100%", "92%", "80%", "100%", "68%", "95%", "82%", "100%", "55%"]}
           />
         </Card>
-
-        {/* CTA placement 2 — cover letter upgrade */}
-        <UpgradeCTACard
-          headline="Generate a tailored cover letter"
-          description="ParsePilot Pro writes a personalized cover letter that matches your optimized resume and the job description."
-          variant="cover"
-          ctaLabel="Start 7-day Pro trial"
-        />
       </div>
     </div>
   );
@@ -425,6 +441,23 @@ export default function ApplicationDetail() {
           {!isPro && <LockedExportBar />}
         </div>
       </div>
+
+      {/* ── Above-fold nudge bar — free users after analysis ────────── */}
+      {isLockedForFree && (
+        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-5 py-3.5 rounded-xl bg-gradient-to-r from-violet-50 to-indigo-50/60 border border-violet-200/80">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" aria-hidden="true" />
+            <p className="text-sm font-medium text-foreground">
+              Your optimized resume is ready —{" "}
+              <span className="text-violet-600 font-semibold">preview below</span>
+            </p>
+          </div>
+          <UpgradeButton
+            label="Unlock the full version →"
+            className="shrink-0 h-8 px-4 text-xs font-semibold"
+          />
+        </div>
+      )}
 
       {/* ── Tab Bar ─────────────────────────────────────────────────────── */}
       <div className="flex space-x-1 border-b border-border mb-8 overflow-x-auto pb-[1px]">
@@ -986,6 +1019,19 @@ export default function ApplicationDetail() {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* ── Bottom-of-page CTA — shown after tab content for free users ── */}
+      {isLockedForFree && (
+        <div className="mt-12">
+          <UpgradeCTACard
+            dark
+            headline="Your tailored resume is ready to use"
+            description="Unlock the full rewrite, export it to DOCX or PDF, and generate a matching cover letter — all included in ParsePilot Pro."
+            variant="bottom"
+            ctaLabel="Start your 7-day free trial"
+          />
+        </div>
+      )}
     </AppLayout>
   );
 }
