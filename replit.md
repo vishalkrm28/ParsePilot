@@ -87,9 +87,12 @@ artifacts-monorepo/
 - `DELETE /api/applications/:id` — delete application
 - `POST /api/applications/:id/analyze` — AI CV analysis
 - `POST /api/applications/:id/cover-letter` — AI cover letter generation
+- `PATCH /api/applications/:id/tailored-cv` — save edited tailored CV text
+- `PATCH /api/applications/:id/cover-letter-save` — save edited cover letter text
 - `POST /api/upload-cv` — multipart file upload (PDF/DOCX/DOC/TXT, max 10MB) → extracts text AND parses structured JSON with AI (non-fatal; returns parsedCv: null on parse failure)
 - `POST /api/parse-cv` — parse raw CV text into structured JSON using OpenAI Responses API (Zod-validated body: `{ rawText: string }`)
-- `GET  /api/export/application/:id/docx` — download DOCX
+- `GET  /api/export/application/:id/docx` — download DOCX (CV or cover letter via `?type=cover`); marks status as "exported"
+- `GET  /api/export/application/:id/pdf` — returns print-optimized HTML with auto-print trigger (CV or cover letter via `?type=cover`); use `?noprint` to suppress auto-print
 - `GET  /api/healthz` — health check
 
 ## Database Schema (Drizzle/PostgreSQL)

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db, applicationsTable } from "@workspace/db";
 import {
   CreateApplicationBody,
@@ -26,7 +26,7 @@ router.get("/applications", async (req, res) => {
       .select()
       .from(applicationsTable)
       .where(eq(applicationsTable.userId, userId))
-      .orderBy(applicationsTable.createdAt);
+      .orderBy(desc(applicationsTable.createdAt));
     res.json(apps);
   } catch (err) {
     logger.error({ err }, "Failed to list applications");

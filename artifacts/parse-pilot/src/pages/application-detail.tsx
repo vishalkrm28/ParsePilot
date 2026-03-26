@@ -243,7 +243,7 @@ export default function ApplicationDetail() {
           </p>
         </div>
 
-        <div className="flex gap-3 w-full lg:w-auto">
+        <div className="flex flex-wrap gap-2 w-full lg:w-auto">
           {/* Re-analyze always accessible */}
           <Button
             variant="outline"
@@ -263,18 +263,20 @@ export default function ApplicationDetail() {
             className="flex-1 lg:flex-none gap-2 bg-card"
             onClick={() => window.open(`/api/export/application/${id}/docx`, "_blank")}
             disabled={needsAnalysis}
+            title="Download tailored CV as DOCX"
           >
             <Download className="w-4 h-4" />
-            DOCX
+            CV.docx
           </Button>
           <Button
             variant="outline"
             className="flex-1 lg:flex-none gap-2 bg-card"
             onClick={() => window.open(`/api/export/application/${id}/pdf`, "_blank")}
             disabled={needsAnalysis}
+            title="Print or save tailored CV as PDF"
           >
             <Download className="w-4 h-4" />
-            PDF
+            CV.pdf
           </Button>
         </div>
       </div>
@@ -723,14 +725,14 @@ export default function ApplicationDetail() {
                 {/* Cover letter output — editable */}
                 <div className="lg:col-span-2">
                   <Card className="h-full min-h-[500px] flex flex-col">
-                    <div className="bg-muted px-6 py-3 border-b border-border flex justify-between items-center rounded-t-2xl">
+                    <div className="bg-muted px-4 py-3 border-b border-border flex flex-wrap justify-between items-center gap-2 rounded-t-2xl">
                       <span className="text-sm font-semibold text-muted-foreground">
                         Cover Letter
                         {coverDirty && (
                           <span className="ml-2 text-amber-600 font-bold">· Unsaved changes</span>
                         )}
                       </span>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         {coverDirty && (
                           <Button
                             variant="ghost"
@@ -756,14 +758,35 @@ export default function ApplicationDetail() {
                             Save
                           </Button>
                         )}
-                        {app.coverLetterText && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => navigator.clipboard.writeText(currentCoverText)}
-                          >
-                            Copy
-                          </Button>
+                        {app.coverLetterText && !coverDirty && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={() => navigator.clipboard.writeText(currentCoverText)}
+                            >
+                              Copy
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={() => window.open(`/api/export/application/${id}/docx?type=cover`, "_blank")}
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              .docx
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={() => window.open(`/api/export/application/${id}/pdf?type=cover`, "_blank")}
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              .pdf
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
