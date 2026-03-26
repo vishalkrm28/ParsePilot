@@ -100,6 +100,16 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
       );
       break;
 
+    // Fired when an async payment method (bank transfer, SEPA, etc.) settles.
+    // For card payments this typically fires alongside checkout.session.completed,
+    // so this handler is a safety net to activate unlocks that arrived with
+    // payment_status != "paid" on the checkout event.
+    case "payment_intent.succeeded":
+      await safeHandle("payment_intent.succeeded", () =>
+        onPaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent),
+      );
+      break;
+
     default:
       logger.debug({ type: event.type }, "Unhandled Stripe event type — ignored");
   }
@@ -398,6 +408,44 @@ async function onUnlockCheckoutCompleted(session: Stripe.Checkout.Session): Prom
   logger.info(
     { userId, applicationId, sessionId: session.id, amountTotal, paymentStatus },
     "One-time unlock purchase recorded",
+  );
+}
+
+// ─── payment_intent.succeeded ─────────────────────────────────────────────────
+// Activates unlock purchases that were inserted with status != "paid".
+// This covers async payment methods (BACS, SEPA, etc.) where
+// checkout.session.completed fires before the payment actually settles.
+// We look up the row by stripePaymentIntentId and promote it to status "paid".
+// This is a no-op for card payments (already "paid" from checkout event).
+
+async function onPaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent): Promise<void> {
+  // Only act if a pending unlock row exists for this payment intent
+  const [existing] = await db
+    .select({ id: unlockPurchasesTable.id, status: unlockPurchasesTable.status })
+    .from(unlockPurchasesTable)
+    .where(eq(unlockPurchasesTable.stripePaymentIntentId, paymentIntent.id))
+    .limit(1);
+
+  if (!existing) {
+    // Not an unlock payment — nothing to do (subscriptions handled elsewhere)
+    logger.debug({ paymentIntentId: paymentIntent.id }, "payment_intent.succeeded: no unlock row found — ignored");
+    return;
+  }
+
+  if (existing.status === "paid") {
+    // Already activated — idempotent, nothing to update
+    logger.debug({ paymentIntentId: paymentIntent.id }, "payment_intent.succeeded: unlock already paid — skipped");
+    return;
+  }
+
+  await db
+    .update(unlockPurchasesTable)
+    .set({ status: "paid", updatedAt: new Date() })
+    .where(eq(unlockPurchasesTable.id, existing.id));
+
+  logger.info(
+    { paymentIntentId: paymentIntent.id, unlockId: existing.id },
+    "One-time unlock activated via payment_intent.succeeded (async payment settlement)",
   );
 }
 

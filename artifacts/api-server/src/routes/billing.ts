@@ -6,7 +6,7 @@ import type Stripe from "stripe";
 import { getStripe } from "../lib/stripe.js";
 import { logger } from "../lib/logger.js";
 import { getUserCredits, FREE_CREDIT_ALLOWANCE, PRO_CREDIT_ALLOWANCE } from "../lib/credits.js";
-import { subscriptionIsActive } from "../lib/billing.js";
+import { subscriptionIsActive, hasUnlockedResult } from "../lib/billing.js";
 
 /**
  * Extract a structured log context from a Stripe SDK error so we get
@@ -242,6 +242,19 @@ router.post("/billing/unlock", async (req, res) => {
     }
     if (app.userId !== userId) {
       res.status(403).json({ error: "Access denied", code: "FORBIDDEN" });
+      return;
+    }
+
+    // ── Double-purchase guard ──────────────────────────────────────────────
+    // Prevent charging the user a second time if the webhook has already
+    // recorded a paid unlock for this result. Handles the race condition
+    // where a webhook-delayed user clicks "Unlock" again on the success page.
+    const alreadyUnlocked = await hasUnlockedResult(userId, applicationId);
+    if (alreadyUnlocked) {
+      res.status(409).json({
+        error: "This result is already unlocked. Refresh the page to see your full resume.",
+        code: "ALREADY_UNLOCKED",
+      });
       return;
     }
 

@@ -397,7 +397,7 @@ export default function ApplicationDetail() {
       count: app.missingInfoQuestions?.length || 0,
     },
     { id: "suggestions", label: "Suggestions", icon: Lightbulb, count: app.sectionSuggestions?.length || 0 },
-    { id: "cover", label: "Cover Letter", icon: PenTool, locked: !isPro },
+    { id: "cover", label: "Cover Letter", icon: PenTool, locked: !isPro && !(isUnlockedResult && !!app.coverLetterText) },
   ];
 
   return (
@@ -927,9 +927,77 @@ export default function ApplicationDetail() {
             {/* ── TAB: COVER LETTER ────────────────────────────────────── */}
             {activeTab === "cover" && (
               <>
-                {/* CTA placement 2 — locked cover letter tab for free users */}
-                {!isPro ? (
+                {/* CTA placement 2 — cover letter tab gating
+                 *  • Pro user              → full UI with generate + edit
+                 *  • Unlock user + existing cover letter → read-only view + export
+                 *  • Free / no unlock      → locked upgrade card
+                 */}
+                {(!isPro && !(isUnlockedResult && app.coverLetterText)) ? (
                   <LockedCoverLetterSection />
+                ) : (isUnlockedResult && !isPro) ? (
+                  /* ── Read-only cover letter for one-time unlock users ── */
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-1">
+                      <Card>
+                        <CardContent className="p-6 space-y-4">
+                          <div>
+                            <h3 className="font-bold text-lg mb-1">Cover Letter</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Included with your one-time unlock — copy or export below.
+                            </p>
+                          </div>
+                          <div className="rounded-lg bg-muted/50 border border-border p-3 space-y-1">
+                            <p className="text-sm font-medium text-foreground">Want to regenerate?</p>
+                            <p className="text-xs text-muted-foreground">
+                              Regenerating cover letters with different tones requires Pro.
+                            </p>
+                          </div>
+                          <UpgradeButton label="Start Pro — 7 days free" className="w-full" />
+                          <p className="text-center text-[11px] text-muted-foreground">
+                            7-day trial · No card charged today
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                    <div className="lg:col-span-2">
+                      <Card className="h-full min-h-[500px] flex flex-col">
+                        <div className="bg-muted px-4 py-3 border-b border-border flex flex-wrap justify-between items-center gap-2 rounded-t-2xl">
+                          <span className="text-sm font-semibold text-muted-foreground">Cover Letter</span>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={() => navigator.clipboard.writeText(app.coverLetterText ?? "")}
+                            >
+                              Copy
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={() => window.open(`/api/export/application/${id}/docx?type=cover`, "_blank")}
+                            >
+                              <Download className="w-3.5 h-3.5" />.docx
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={() => window.open(`/api/export/application/${id}/pdf?type=cover`, "_blank")}
+                            >
+                              <Download className="w-3.5 h-3.5" />.pdf
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex-1 p-5 overflow-auto">
+                          <pre className="text-sm font-mono whitespace-pre-wrap leading-relaxed">
+                            {app.coverLetterText}
+                          </pre>
+                        </div>
+                      </Card>
+                    </div>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Controls */}
