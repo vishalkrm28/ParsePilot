@@ -210,7 +210,7 @@ export function SubscriptionCard() {
               )}
               {subscriptionStatus === "trialing" && (
                 <p className="text-xs text-muted-foreground rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 leading-relaxed">
-                  You will be charged automatically after the 7-day trial unless you cancel before it ends.
+                  You will be charged automatically when your trial ends unless you cancel before then.
                 </p>
               )}
             </div>

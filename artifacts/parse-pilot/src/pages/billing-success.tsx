@@ -32,7 +32,7 @@ export default function BillingSuccess() {
             ParsePilot Pro
           </div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Your 7-day free trial has started
+            Welcome to ParsePilot Pro
           </h1>
           <p className="text-muted-foreground">
             Pro features are being activated now. It can take a few seconds —
@@ -42,7 +42,6 @@ export default function BillingSuccess() {
 
         {/* Trial notice */}
         <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 px-4 py-3 text-sm text-muted-foreground text-left">
-          You will be charged automatically after the 7-day trial unless you cancel before it ends.
           You can cancel at any time from <span className="font-medium text-foreground">Settings → Billing</span>.
         </div>
 

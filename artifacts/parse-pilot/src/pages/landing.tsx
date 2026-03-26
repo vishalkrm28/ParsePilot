@@ -90,8 +90,8 @@ const faqs: { q: string; a: string }[] = [
     a: "Free users get 3 credits to use any time. Each CV optimization or cover letter generation costs 1 credit. Exports are always free. Pro users get 100 credits per billing period, which reset automatically at the start of each new period.",
   },
   {
-    q: "Can I cancel during the 7-day trial?",
-    a: "Yes, at any time. If you cancel before the trial ends, you won't be charged. You can manage or cancel your subscription from Settings → Billing at any point.",
+    q: "Can I cancel my Pro subscription?",
+    a: "Yes, at any time. You won't be charged for the next billing period after you cancel. You can manage or cancel your subscription from Settings → Billing at any point.",
   },
   {
     q: "Can I edit the generated resume before downloading?",

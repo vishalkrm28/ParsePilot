@@ -162,7 +162,7 @@ function LockedCoverLetterSection() {
         <UpgradeCTACard
           headline="Generate a cover letter"
           variant="cover"
-          ctaLabel="Try Pro free for 7 days"
+          ctaLabel="Get Pro — $12/mo"
         />
       </div>
 
