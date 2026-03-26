@@ -1,0 +1,221 @@
+import { useEffect, useState } from "react";
+import { Sparkles, Crown, Calendar, Loader2, CheckCircle2, Circle } from "lucide-react";
+import { Card, CardContent } from "@/components/Card";
+import { Badge } from "@/components/Badge";
+import { UpgradeButton } from "./upgrade-button";
+import { ManageBillingButton } from "./manage-billing-button";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+
+interface BillingStatus {
+  isPro: boolean;
+  subscriptionStatus: string | null;
+  subscriptionPriceId: string | null;
+  currentPeriodEnd: string | null;
+  hasCustomer: boolean;
+}
+
+const FREE_FEATURES = [
+  "Upload & parse your CV",
+  "Paste job descriptions",
+  "AI keyword analysis",
+  "1 saved application",
+];
+
+const PRO_FEATURES = [
+  "Everything in Free",
+  "ATS-optimised tailored CVs",
+  "Missing info questions",
+  "Section suggestions",
+  "Cover letter generation",
+  "DOCX & PDF export",
+  "Unlimited applications",
+];
+
+function PlanFeature({ text, included }: { text: string; included: boolean }) {
+  return (
+    <li className={cn("flex items-center gap-2.5 text-sm", included ? "text-foreground" : "text-muted-foreground")}>
+      {included ? (
+        <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+      ) : (
+        <Circle className="w-4 h-4 text-muted-foreground/30 flex-shrink-0" />
+      )}
+      {text}
+    </li>
+  );
+}
+
+export function SubscriptionCard() {
+  const [status, setStatus] = useState<BillingStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/billing/status", { credentials: "include" })
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load billing status");
+        return r.json() as Promise<BillingStatus>;
+      })
+      .then(setStatus)
+      .catch((err) => setError(err instanceof Error ? err.message : "Unknown error"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-16">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error || !status) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          Could not load billing information. Please refresh the page.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const { isPro, subscriptionStatus, currentPeriodEnd } = status;
+
+  const statusLabel: Record<string, string> = {
+    active: "Active",
+    trialing: "Trial",
+    past_due: "Past Due",
+    canceled: "Cancelled",
+    incomplete: "Incomplete",
+    paused: "Paused",
+  };
+
+  const statusColors: Record<string, string> = {
+    active: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+    trialing: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+    past_due: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+    canceled: "bg-muted text-muted-foreground border-muted-foreground/20",
+    incomplete: "bg-muted text-muted-foreground border-muted-foreground/20",
+    paused: "bg-muted text-muted-foreground border-muted-foreground/20",
+  };
+
+  return (
+    <div className="grid gap-5 sm:grid-cols-2">
+      {/* ── Free plan card ─────────────────────────── */}
+      <Card className={cn("relative", !isPro && "ring-2 ring-primary ring-offset-2 ring-offset-background")}>
+        <CardContent className="p-6 flex flex-col gap-5">
+          {!isPro && (
+            <span className="absolute -top-3 left-4 bg-primary text-primary-foreground text-xs font-semibold px-3 py-0.5 rounded-full">
+              Current plan
+            </span>
+          )}
+
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                Free
+              </p>
+              <p className="text-3xl font-bold">$0</p>
+              <p className="text-sm text-muted-foreground mt-0.5">forever</p>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-muted-foreground" />
+            </div>
+          </div>
+
+          <ul className="space-y-2.5">
+            {FREE_FEATURES.map((f) => (
+              <PlanFeature key={f} text={f} included={true} />
+            ))}
+          </ul>
+
+          <div className="mt-auto pt-2">
+            {!isPro ? (
+              <p className="text-xs text-muted-foreground text-center">Your current plan</p>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center">Included in your Pro plan</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Pro plan card ──────────────────────────── */}
+      <Card
+        className={cn(
+          "relative overflow-hidden",
+          isPro && "ring-2 ring-violet-500 ring-offset-2 ring-offset-background",
+        )}
+      >
+        {/* Gradient header stripe */}
+        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-violet-500 to-indigo-500" />
+
+        <CardContent className="p-6 flex flex-col gap-5">
+          {isPro && (
+            <span className="absolute -top-3 left-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-semibold px-3 py-0.5 rounded-full">
+              Current plan
+            </span>
+          )}
+
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-violet-500 mb-1">
+                Pro
+              </p>
+              <p className="text-3xl font-bold">$X</p>
+              <p className="text-sm text-muted-foreground mt-0.5">per month</p>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/10 to-indigo-500/10 flex items-center justify-center">
+              <Crown className="w-5 h-5 text-violet-500" />
+            </div>
+          </div>
+
+          <ul className="space-y-2.5">
+            {PRO_FEATURES.map((f) => (
+              <PlanFeature key={f} text={f} included={true} />
+            ))}
+          </ul>
+
+          {/* Status + billing date */}
+          {isPro && (
+            <div className="space-y-2 pt-1">
+              {subscriptionStatus && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Status:</span>
+                  <Badge
+                    className={cn(
+                      "text-xs border",
+                      statusColors[subscriptionStatus] ?? statusColors.canceled,
+                    )}
+                  >
+                    {statusLabel[subscriptionStatus] ?? subscriptionStatus}
+                  </Badge>
+                </div>
+              )}
+              {currentPeriodEnd && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>
+                    {subscriptionStatus === "canceled" ? "Access until" : "Renews"}{" "}
+                    <span className="font-medium text-foreground">
+                      {format(new Date(currentPeriodEnd), "MMMM d, yyyy")}
+                    </span>
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-auto pt-2">
+            {isPro ? (
+              <ManageBillingButton className="w-full" />
+            ) : (
+              <UpgradeButton className="w-full" />
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

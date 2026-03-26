@@ -91,4 +91,100 @@ router.post("/billing/checkout", async (req, res) => {
   }
 });
 
+// ─── GET /billing/status ──────────────────────────────────────────────────────
+// Returns the authenticated user's subscription info for the settings UI.
+
+router.get("/billing/status", async (req, res) => {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required", code: "UNAUTHENTICATED" });
+    return;
+  }
+
+  try {
+    const [dbUser] = await db
+      .select({
+        stripeCustomerId: usersTable.stripeCustomerId,
+        stripeSubscriptionId: usersTable.stripeSubscriptionId,
+        subscriptionStatus: usersTable.subscriptionStatus,
+        subscriptionPriceId: usersTable.subscriptionPriceId,
+        currentPeriodEnd: usersTable.currentPeriodEnd,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user.id))
+      .limit(1);
+
+    if (!dbUser) {
+      res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+      return;
+    }
+
+    const isPro =
+      (dbUser.subscriptionStatus === "active" || dbUser.subscriptionStatus === "trialing") &&
+      (!dbUser.currentPeriodEnd || dbUser.currentPeriodEnd > new Date());
+
+    res.json({
+      isPro,
+      subscriptionStatus: dbUser.subscriptionStatus ?? null,
+      subscriptionPriceId: dbUser.subscriptionPriceId ?? null,
+      currentPeriodEnd: dbUser.currentPeriodEnd?.toISOString() ?? null,
+      hasCustomer: !!dbUser.stripeCustomerId,
+    });
+  } catch (err) {
+    logger.error({ err }, "Failed to fetch billing status");
+    res.status(500).json({ error: "Could not load billing status", code: "DB_ERROR" });
+  }
+});
+
+// ─── POST /billing/portal ─────────────────────────────────────────────────────
+// Creates a Stripe Customer Portal session so the user can manage their
+// subscription (cancel, change plan, update payment method, view invoices).
+
+router.post("/billing/portal", async (req, res) => {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required", code: "UNAUTHENTICATED" });
+    return;
+  }
+
+  try {
+    const [dbUser] = await db
+      .select({ stripeCustomerId: usersTable.stripeCustomerId })
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user.id))
+      .limit(1);
+
+    if (!dbUser) {
+      res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+      return;
+    }
+
+    if (!dbUser.stripeCustomerId) {
+      res.status(400).json({
+        error: "No billing account found. Upgrade to Pro first.",
+        code: "NO_CUSTOMER",
+      });
+      return;
+    }
+
+    const returnUrl =
+      process.env.STRIPE_CUSTOMER_PORTAL_RETURN_URL ??
+      (req.headers.origin ? `${req.headers.origin}/settings` : "");
+
+    if (!returnUrl) {
+      logger.error("Could not determine portal return URL");
+      res.status(500).json({ error: "Portal return URL not configured", code: "CONFIG_ERROR" });
+      return;
+    }
+
+    const session = await getStripe().billingPortal.sessions.create({
+      customer: dbUser.stripeCustomerId,
+      return_url: returnUrl,
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    logger.error({ err }, "Failed to create Stripe portal session");
+    res.status(500).json({ error: "Could not open billing portal. Please try again.", code: "PORTAL_ERROR" });
+  }
+});
+
 export default router;

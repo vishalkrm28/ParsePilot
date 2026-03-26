@@ -6,12 +6,14 @@ import {
   Sparkles,
   LogOut,
   ChevronRight,
+  Settings2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/new", label: "New Application", icon: FilePlus2 },
+  { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 
 function UserAvatar({ name, imageUrl }: { name: string; imageUrl?: string | null }) {
