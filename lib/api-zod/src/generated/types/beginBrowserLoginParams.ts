@@ -6,6 +6,6 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export type ListApplicationsParams = {
-  userId: string;
+export type BeginBrowserLoginParams = {
+  returnTo?: string;
 };

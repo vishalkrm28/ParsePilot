@@ -5,7 +5,8 @@
  * ParsePilot AI API specification
  * OpenAPI spec version: 0.2.0
  */
+import type { AuthUser } from "./authUser";
 
-export type ListApplicationsParams = {
-  userId: string;
-};
+export interface AuthUserEnvelope {
+  user: AuthUser | null;
+}

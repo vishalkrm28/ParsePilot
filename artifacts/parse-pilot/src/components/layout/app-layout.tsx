@@ -1,40 +1,53 @@
 import { Sidebar } from "./sidebar";
-import { Menu } from "lucide-react";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { Menu, Sparkles } from "lucide-react";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row">
-      {/* Mobile Header */}
-      <div className="md:hidden h-16 border-b border-border bg-card flex items-center px-4 justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-            <span className="text-white font-bold text-sm">P</span>
-          </div>
-          <span className="font-display font-bold text-lg">ParsePilot</span>
-        </div>
-        <button 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 text-foreground"
-        >
-          <Menu className="w-6 h-6" />
-        </button>
+    <div className="min-h-screen bg-background flex">
+      {/* Desktop sidebar */}
+      <div className="hidden md:flex">
+        <Sidebar />
       </div>
 
-      <Sidebar />
-
-      {/* Main Content Area */}
-      <main className="flex-1 md:pl-72 flex flex-col min-h-screen relative">
-        {/* Subtle background gradient mesh */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-background to-background -z-10" />
-        
-        <div className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
-          {children}
+      {/* Mobile overlay sidebar */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
+          <div className="relative z-10 flex">
+            <Sidebar />
+          </div>
         </div>
-      </main>
+      )}
+
+      {/* Content area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Mobile header */}
+        <header className="md:hidden sticky top-0 z-40 bg-background border-b border-border flex items-center justify-between px-4 h-14">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded bg-primary flex items-center justify-center">
+              <Sparkles className="w-3.5 h-3.5 text-primary-foreground" />
+            </div>
+            <span className="text-sm font-bold">ParsePilot AI</span>
+          </div>
+          <div className="w-9" /> {/* spacer */}
+        </header>
+
+        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-8">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

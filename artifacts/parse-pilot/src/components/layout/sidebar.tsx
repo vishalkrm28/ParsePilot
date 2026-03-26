@@ -1,65 +1,124 @@
 import { Link, useLocation } from "wouter";
+import { useAuth } from "@workspace/replit-auth-web";
+import {
+  LayoutDashboard,
+  FilePlus2,
+  Sparkles,
+  LogOut,
+  ChevronRight,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, FileText, Settings, Sparkles } from "lucide-react";
-import { Button } from "@/components/Button";
+
+const navItems = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/new", label: "New Application", icon: FilePlus2 },
+];
+
+function UserAvatar({ name, imageUrl }: { name: string; imageUrl?: string | null }) {
+  if (imageUrl) {
+    return (
+      <img
+        src={imageUrl}
+        alt={name}
+        className="w-9 h-9 rounded-full object-cover ring-2 ring-primary/20 flex-shrink-0"
+      />
+    );
+  }
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  return (
+    <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold ring-2 ring-primary/20 flex-shrink-0">
+      {initials}
+    </div>
+  );
+}
 
 export function Sidebar() {
   const [location] = useLocation();
+  const { user, logout } = useAuth();
 
-  const navItems = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/new", label: "New Application", icon: FileText },
-  ];
+  const displayName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+    user?.email?.split("@")[0] ||
+    "User";
 
   return (
-    <div className="flex h-screen w-72 flex-col bg-sidebar border-r border-sidebar-border text-sidebar-foreground shadow-2xl z-10 hidden md:flex fixed left-0 top-0">
-      <div className="flex h-20 items-center px-8 border-b border-sidebar-border">
-        <Link href="/" className="flex items-center gap-3 transition-transform hover:scale-105 active:scale-95">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
-            <Sparkles className="w-5 h-5 text-white" />
+    <aside className="w-64 min-h-screen flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
+      {/* Brand */}
+      <div className="px-5 py-5 border-b border-sidebar-border">
+        <Link href="/">
+          <div className="flex items-center gap-2.5 cursor-pointer">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-sm">
+              <Sparkles className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <span className="text-base font-bold tracking-tight text-sidebar-foreground">
+              ParsePilot AI
+            </span>
           </div>
-          <span className="font-display font-bold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
-            ParsePilot AI
-          </span>
         </Link>
       </div>
-      
-      <div className="flex-1 py-8 px-4 flex flex-col gap-2">
-        <div className="px-4 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2">
+
+      {/* Navigation */}
+      <nav className="flex-1 px-3 py-4 space-y-0.5">
+        <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
           Menu
-        </div>
-        {navItems.map((item) => {
-          const isActive = location === item.href || (location.startsWith('/applications/') && item.href === '/');
+        </p>
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const isActive =
+            location === href || (href === "/" && location === "/dashboard");
           return (
-            <Link key={item.href} href={item.href}>
-              <Button
-                variant="sidebar"
+            <Link key={href} href={href}>
+              <div
                 className={cn(
-                  "w-full justify-start gap-4 px-4 py-6 font-medium text-base rounded-xl transition-all duration-300",
-                  isActive 
-                    ? "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary border border-primary/20 shadow-inner" 
-                    : "text-sidebar-foreground/70 hover:text-white hover:bg-sidebar-accent"
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors group",
+                  isActive
+                    ? "bg-primary/15 text-primary"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
                 )}
               >
-                <item.icon className={cn("w-5 h-5", isActive ? "text-primary" : "")} />
-                {item.label}
-              </Button>
+                <Icon
+                  className={cn(
+                    "w-4 h-4 flex-shrink-0",
+                    isActive
+                      ? "text-primary"
+                      : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground",
+                  )}
+                />
+                <span className="flex-1">{label}</span>
+                {isActive && (
+                  <ChevronRight className="w-3.5 h-3.5 text-primary/60" />
+                )}
+              </div>
             </Link>
           );
         })}
-      </div>
-      
-      <div className="p-6 border-t border-sidebar-border">
-        <div className="flex items-center gap-4 bg-sidebar-accent/50 p-4 rounded-xl border border-sidebar-accent">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold">
-            U
+      </nav>
+
+      {/* User footer */}
+      <div className="px-3 py-4 border-t border-sidebar-border">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-lg bg-sidebar-accent/50">
+          <UserAvatar name={displayName} imageUrl={user?.profileImageUrl} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-sidebar-foreground truncate">
+              {displayName}
+            </p>
+            {user?.email && (
+              <p className="text-xs text-sidebar-foreground/50 truncate">{user.email}</p>
+            )}
           </div>
-          <div>
-            <p className="text-sm font-semibold text-white">Local User</p>
-            <p className="text-xs text-sidebar-foreground/60">Pro Plan</p>
-          </div>
+          <button
+            onClick={logout}
+            title="Sign out"
+            className="p-1.5 rounded-md text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-border/60 transition-colors flex-shrink-0"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </div>
-    </div>
+    </aside>
   );
 }

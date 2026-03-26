@@ -2,8 +2,9 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-
-// Pages
+import { useAuth } from "@workspace/replit-auth-web";
+import { Loader2 } from "lucide-react";
+import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import NewApplication from "@/pages/new-application";
 import ApplicationDetail from "@/pages/application-detail";
@@ -12,16 +13,35 @@ import NotFound from "@/pages/not-found";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,
-      staleTime: 1000 * 60 * 5, // 5 mins
+      retry: 1,
+      staleTime: 30_000,
     },
   },
 });
 
-function Router() {
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { isLoading, isAuthenticated, login } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Landing />;
+  }
+
+  return <>{children}</>;
+}
+
+function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/dashboard" component={Dashboard} />
       <Route path="/new" component={NewApplication} />
       <Route path="/applications/:id" component={ApplicationDetail} />
       <Route component={NotFound} />
@@ -34,9 +54,11 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
+          <AuthGate>
+            <AppRouter />
+          </AuthGate>
+          <Toaster />
         </WouterRouter>
-        <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
   );

@@ -3,11 +3,10 @@
  * Do not edit manually.
  * Api
  * ParsePilot AI API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import type { AnalyzeApplicationBodyConfirmedAnswers } from "./analyzeApplicationBodyConfirmedAnswers";
 
 export interface AnalyzeApplicationBody {
-  /** User's answers to missing info questions from previous analysis */
   confirmedAnswers?: AnalyzeApplicationBodyConfirmedAnswers;
 }

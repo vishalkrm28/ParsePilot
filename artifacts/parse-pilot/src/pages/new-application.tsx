@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useLocalAuth } from "@/hooks/use-local-auth";
+import { useAuth } from "@workspace/replit-auth-web";
 import { useCreateApplication, useUploadCv } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent } from "@/components/Card";
@@ -12,7 +12,7 @@ import { UploadCloud, File, Loader2, Sparkles, AlertCircle, FileText } from "luc
 import { useToast } from "@/hooks/use-toast";
 
 export default function NewApplication() {
-  const { userId } = useLocalAuth();
+  const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   
@@ -59,7 +59,7 @@ export default function NewApplication() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userId) return;
+    if (!user?.id) return;
 
     if (!cvText.trim() || !jobTitle.trim() || !company.trim() || !jobDescription.trim()) {
       toast({
@@ -73,7 +73,7 @@ export default function NewApplication() {
     try {
       const app = await createMutation.mutateAsync({
         data: {
-          userId,
+          userId: user!.id,
           jobTitle,
           company,
           jobDescription,

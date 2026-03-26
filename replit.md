@@ -16,6 +16,7 @@ ParsePilot AI is a production-ready SaaS web app that helps users tailor their C
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec in lib/api-spec)
 - **AI**: OpenAI via Replit AI Integrations proxy (gpt-5.2)
+- **Auth**: Replit Auth (OIDC) — `@workspace/replit-auth-web` on the frontend, `lib/auth.ts` + `authMiddleware.ts` on the server
 - **File parsing**: mammoth (DOCX), pdfjs-dist (PDF)
 - **File export**: docx (DOCX generation)
 - **Build**: esbuild (CJS bundle for API server)
@@ -27,19 +28,22 @@ artifacts-monorepo/
 ├── artifacts/
 │   ├── api-server/         # Express API server
 │   │   └── src/
-│   │       ├── routes/     # health.ts, applications.ts, upload.ts, export.ts
+│   │       ├── lib/        # auth.ts (OIDC), logger.ts
+│   │       ├── middlewares/ # authMiddleware.ts
+│   │       ├── routes/     # health.ts, auth.ts, applications.ts, upload.ts, export.ts
 │   │       └── services/   # ai.ts, fileParser.ts, exporter.ts
 │   └── parse-pilot/        # React + Vite frontend (served at /)
 │       └── src/
-│           ├── pages/      # dashboard.tsx, new-application.tsx, application-detail.tsx
+│           ├── pages/      # landing.tsx, dashboard.tsx, new-application.tsx, application-detail.tsx
 │           ├── components/ # Button, Card, Badge, Input, Textarea, layout/
-│           └── hooks/      # use-local-auth.ts, use-toast.ts
+│           └── hooks/      # use-toast.ts
 ├── lib/
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
 │   ├── api-zod/            # Generated Zod schemas from OpenAPI
+│   ├── replit-auth-web/    # useAuth() hook for browser auth
 │   ├── db/                 # Drizzle ORM schema + DB connection
-│   │   └── src/schema/     # applications.ts
+│   │   └── src/schema/     # applications.ts, auth.ts (sessions, users)
 │   └── integrations-openai-ai-server/  # Replit AI Integration client
 ├── pnpm-workspace.yaml
 ├── tsconfig.base.json
@@ -48,13 +52,14 @@ artifacts-monorepo/
 
 ## Key Features
 
-1. **CV Upload** - PDF and DOCX file upload with text extraction, or manual paste
-2. **AI Analysis** - GPT-5.2 analyzes CV vs job description, returns ATS-optimized rewrite
-3. **Keyword Match** - Shows match score %, matched/missing keywords as visual chips
-4. **Missing Info** - AI surfaces questions if key info is absent; user can answer and re-analyze
-5. **Cover Letter** - AI generates tone-controlled cover letter (professional/enthusiastic/concise)
-6. **Export** - Download tailored CV or cover letter as DOCX
-7. **Saved Applications** - All applications saved per user (localStorage UUID) with status tracking
+1. **Auth** - Replit OIDC login; landing page for unauthenticated users, dashboard for signed-in users
+2. **CV Upload** - PDF and DOCX file upload with text extraction, or manual paste
+3. **AI Analysis** - GPT-5.2 analyzes CV vs job description, returns ATS-optimized rewrite
+4. **Keyword Match** - Shows match score %, matched/missing keywords as visual chips
+5. **Missing Info** - AI surfaces questions if key info is absent; user can answer and re-analyze
+6. **Cover Letter** - AI generates tone-controlled cover letter (professional/enthusiastic/concise)
+7. **Export** - Download tailored CV or cover letter as DOCX
+8. **Saved Applications** - All applications saved per authenticated user with status tracking
 
 ## Critical Rules (enforced in AI prompts)
 
@@ -65,7 +70,13 @@ artifacts-monorepo/
 
 ## API Routes
 
-- `GET  /api/healthz` — health check
+### Auth
+- `GET  /api/auth/user` — get current auth user (from session)
+- `GET  /api/login` — start OIDC browser login flow
+- `GET  /api/callback` — OIDC callback
+- `GET  /api/logout` — clear session, OIDC logout
+
+### Applications
 - `GET  /api/applications?userId=xxx` — list applications
 - `POST /api/applications` — create application
 - `GET  /api/applications/:id` — get application
@@ -75,12 +86,13 @@ artifacts-monorepo/
 - `POST /api/applications/:id/cover-letter` — AI cover letter generation
 - `POST /api/upload-cv` — multipart file upload + text extraction
 - `GET  /api/export/application/:id/docx` — download DOCX
+- `GET  /api/healthz` — health check
 
 ## Database Schema (Drizzle/PostgreSQL)
 
 ### `applications` table
 - `id` (uuid, PK)
-- `userId` (text) — from localStorage UUID
+- `userId` (text) — Replit user ID from auth session
 - `jobTitle`, `company` (text)
 - `jobDescription` (text)
 - `originalCvText` (text)
@@ -89,6 +101,17 @@ artifacts-monorepo/
 - `keywordMatchScore` (real, nullable)
 - `missingKeywords`, `matchedKeywords`, `missingInfoQuestions` (jsonb arrays)
 - `status` (enum: draft | analyzed | exported)
+- `createdAt`, `updatedAt` (timestamptz)
+
+### `sessions` table
+- `id` (text, PK) — session token
+- `userId` (text)
+- `expiresAt` (timestamptz)
+- `createdAt` (timestamptz)
+
+### `users` table
+- `id` (text, PK) — Replit user ID
+- `email`, `firstName`, `lastName`, `profileImageUrl` (text, nullable)
 - `createdAt`, `updatedAt` (timestamptz)
 
 ## Running Locally
@@ -107,6 +130,6 @@ pnpm --filter @workspace/db run push
 pnpm --filter @workspace/api-spec run codegen
 ```
 
-## Auth
+## Vite Config Note
 
-No authentication required in the current version. A UUID is generated on first visit and persisted in localStorage as `parsepilot_user_id`. This scopes all data to the browser session. Adding Replit Auth is the natural next step for multi-device support.
+`artifacts/parse-pilot/vite.config.ts` has `fs.allow` set to include the workspace root's `lib/` and `node_modules/` directories so that workspace packages (e.g. `@workspace/replit-auth-web`) can be resolved by Vite in development.

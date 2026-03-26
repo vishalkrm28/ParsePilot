@@ -3,16 +3,84 @@
  * Do not edit manually.
  * Api
  * ParsePilot AI API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import * as zod from "zod";
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
+});
+
+/**
+ * @summary Get the currently authenticated user
+ */
+export const GetCurrentAuthUserHeader = zod.object({
+  Authorization: zod.string().optional(),
+});
+
+export const GetCurrentAuthUserResponse = zod.object({
+  user: zod.union([
+    zod.object({
+      id: zod.string(),
+      email: zod.string().nullish(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      profileImageUrl: zod.string().nullish(),
+    }),
+    zod.null(),
+  ]),
+});
+
+/**
+ * @summary Start the browser OIDC login flow
+ */
+export const BeginBrowserLoginQueryParams = zod.object({
+  returnTo: zod.coerce.string().optional(),
+});
+
+/**
+ * @summary Complete the browser OIDC login flow
+ */
+export const HandleBrowserLoginCallbackQueryParams = zod.object({
+  code: zod.coerce.string().optional(),
+  state: zod.coerce.string().optional(),
+  iss: zod.coerce.string().url().optional(),
+});
+
+/**
+ * @summary Clear the session and begin OIDC logout
+ */
+export const LogoutBrowserSessionHeader = zod.object({
+  Authorization: zod.string().optional(),
+});
+
+/**
+ * @summary Exchange a mobile OIDC code for a session token
+ */
+export const ExchangeMobileAuthorizationCodeBody = zod.object({
+  code: zod.string(),
+  code_verifier: zod.string(),
+  redirect_uri: zod.string().url(),
+  state: zod.string(),
+  nonce: zod.string().optional(),
+});
+
+export const ExchangeMobileAuthorizationCodeResponse = zod.object({
+  token: zod.string(),
+});
+
+/**
+ * @summary Delete a mobile session token
+ */
+export const LogoutMobileSessionHeader = zod.object({
+  Authorization: zod.string().optional(),
+});
+
+export const LogoutMobileSessionResponse = zod.object({
+  success: zod.boolean(),
 });
 
 /**
@@ -124,19 +192,14 @@ export const DeleteApplicationParams = zod.object({
 });
 
 /**
- * @summary Analyze CV against job description and return ATS-optimized result
+ * @summary Analyze CV against job description
  */
 export const AnalyzeApplicationParams = zod.object({
   id: zod.coerce.string(),
 });
 
 export const AnalyzeApplicationBody = zod.object({
-  confirmedAnswers: zod
-    .record(zod.string(), zod.string())
-    .optional()
-    .describe(
-      "User's answers to missing info questions from previous analysis",
-    ),
+  confirmedAnswers: zod.record(zod.string(), zod.string()).optional(),
 });
 
 export const AnalyzeApplicationResponse = zod.object({
@@ -169,7 +232,7 @@ export const GenerateCoverLetterResponse = zod.object({
 });
 
 /**
- * @summary Parse uploaded CV text (after file upload)
+ * @summary Parse uploaded CV text
  */
 export const ParseCvBody = zod.object({
   rawText: zod.string(),

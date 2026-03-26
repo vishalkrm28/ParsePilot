@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * ParsePilot AI API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export * from "./analysisResult";
@@ -11,12 +11,20 @@ export * from "./analyzeApplicationBody";
 export * from "./analyzeApplicationBodyConfirmedAnswers";
 export * from "./application";
 export * from "./applicationStatus";
+export * from "./authorizationSessionHeaderParameter";
+export * from "./authUser";
+export * from "./authUserEnvelope";
+export * from "./beginBrowserLoginParams";
 export * from "./coverLetterResult";
 export * from "./createApplicationBody";
 export * from "./generateCoverLetterBody";
 export * from "./generateCoverLetterBodyTone";
+export * from "./handleBrowserLoginCallbackParams";
 export * from "./healthStatus";
 export * from "./listApplicationsParams";
+export * from "./logoutSuccess";
+export * from "./mobileTokenExchangeRequest";
+export * from "./mobileTokenExchangeSuccess";
 export * from "./parseCvBody";
 export * from "./parseCvResult";
 export * from "./updateApplicationBody";

@@ -3,10 +3,38 @@
  * Do not edit manually.
  * Api
  * ParsePilot AI API specification
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 export interface HealthStatus {
   status: string;
+}
+
+export interface AuthUser {
+  id: string;
+  email?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  profileImageUrl?: string | null;
+}
+
+export interface AuthUserEnvelope {
+  user: AuthUser | null;
+}
+
+export interface MobileTokenExchangeRequest {
+  code: string;
+  code_verifier: string;
+  redirect_uri: string;
+  state: string;
+  nonce?: string;
+}
+
+export interface MobileTokenExchangeSuccess {
+  token: string;
+}
+
+export interface LogoutSuccess {
+  success: boolean;
 }
 
 export type ApplicationStatus =
@@ -67,13 +95,9 @@ export interface UpdateApplicationBody {
   status?: UpdateApplicationBodyStatus;
 }
 
-/**
- * User's answers to missing info questions from previous analysis
- */
 export type AnalyzeApplicationBodyConfirmedAnswers = { [key: string]: string };
 
 export interface AnalyzeApplicationBody {
-  /** User's answers to missing info questions from previous analysis */
   confirmedAnswers?: AnalyzeApplicationBodyConfirmedAnswers;
 }
 
@@ -118,6 +142,18 @@ export interface UploadCvResult {
   fileName: string;
   fileSize: number;
 }
+
+export type AuthorizationSessionHeaderParameter = string;
+
+export type BeginBrowserLoginParams = {
+  returnTo?: string;
+};
+
+export type HandleBrowserLoginCallbackParams = {
+  code?: string;
+  state?: string;
+  iss?: string;
+};
 
 export type ListApplicationsParams = {
   userId: string;
