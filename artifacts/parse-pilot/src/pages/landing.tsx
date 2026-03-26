@@ -413,10 +413,11 @@ export default function Landing() {
 
           {/* Pro card */}
           <div className="relative bg-card border-2 border-violet-500 rounded-2xl p-7 flex flex-col">
-            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-violet-500 to-indigo-500" />
-            <span className="absolute -top-3 right-5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-              Most popular
-            </span>
+            <div className="flex justify-center mb-5 -mt-1">
+              <span className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-bold px-3.5 py-1 rounded-full shadow-sm">
+                Most popular
+              </span>
+            </div>
 
             <div className="flex items-center gap-2 mb-1">
               <Crown className="w-4 h-4 text-violet-500" />
