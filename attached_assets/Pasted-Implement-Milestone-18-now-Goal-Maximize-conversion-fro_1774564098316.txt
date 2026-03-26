@@ -1,0 +1,233 @@
+Implement Milestone 18 now.
+
+Goal:
+Maximize conversion from free users to paid users ($4 unlock and Pro subscription) by improving the preview experience, locked sections, and CTA placement in ParsePilot.
+
+Context:
+- Backend already restricts full output for free users
+- One-time unlock ($4) is implemented
+- Subscription (Pro) is implemented
+- This milestone focuses on conversion optimization (UI + UX + copy)
+
+Core strategy:
+The free preview must:
+- demonstrate intelligence and value
+- create curiosity and urgency
+- hide the most valuable output
+- push users toward unlocking
+
+------------------------------------
+
+1. Improve preview content structure
+
+Update the results page for free users to show:
+
+A. Match Score (top section)
+- large, visual, prominent
+- e.g. “Match Score: 72%”
+- add supporting line:
+  “Your CV partially matches this role. Improvements can increase your chances.”
+
+B. Matched Keywords
+- show 5–8 keywords
+- clean chips or tags UI
+
+C. Missing Keywords (VERY IMPORTANT)
+- show 5–8 missing keywords
+- visually highlight (different color)
+- add line:
+  “These are critical for this job description”
+
+D. Missing Input Suggestions
+- show 2–3 strong insights:
+  - “You are missing measurable impact”
+  - “No mention of ERP tools like SAP”
+  - “Summary is too generic for this role”
+
+------------------------------------
+
+2. High-impact preview hook (CRITICAL)
+
+Add a section:
+
+“Optimized Summary Preview”
+
+Show:
+- first 1–2 lines of generated summary
+
+Example:
+“Operations specialist with strong experience in vendor coordination, logistics planning, and cross-functional execution…”
+
+Then:
+- truncate
+- add blur/gradient fade
+- add label:
+  “Full summary locked”
+
+------------------------------------
+
+3. Resume rewrite preview (conversion driver)
+
+Add section:
+
+“Experience Rewrite”
+
+Show:
+- 1 fully visible strong bullet
+- 2–3 blurred bullets below
+
+Example:
+
+✔ Visible:
+“Reduced delivery delays by coordinating cross-functional logistics teams across multiple regions.”
+
+🔒 Locked:
+[blurred lines]
+
+Add label:
+“Full resume rewrite locked”
+
+------------------------------------
+
+4. Cover letter teaser
+
+Add section:
+
+“Cover Letter Preview”
+
+Show:
+- 1 short paragraph preview
+- rest blurred
+
+Add label:
+“Full cover letter locked”
+
+------------------------------------
+
+5. Strong CTA system (MOST IMPORTANT)
+
+Add PRIMARY CTA (above fold, near summary):
+
+🔓 Unlock full resume — $4  
+Subtext:
+“No subscription. Instant access.”
+
+Add SECONDARY CTA:
+
+🚀 Go Pro — $15/month  
+Subtext:
+“Best for multiple applications”
+
+------------------------------------
+
+6. CTA placement rules
+
+You must place CTAs in 3 places:
+
+1. Near summary preview (top)
+2. Near locked resume section
+3. Near bottom of page
+
+------------------------------------
+
+7. Value reinforcement (important)
+
+Add small value bullets near CTA:
+
+Unlock includes:
+- Full optimized resume
+- Cover letter
+- Copy & edit access
+- PDF/DOCX export
+
+------------------------------------
+
+8. Reduce friction
+
+Ensure:
+- unlock button is instant and clear
+- no confusion about what user gets
+- no hidden pricing
+- no forced subscription
+
+------------------------------------
+
+9. Clean UI design
+
+Requirements:
+- premium SaaS look
+- spacing and hierarchy
+- no clutter
+- consistent typography
+- smooth transitions
+- subtle blur effects (not aggressive)
+
+------------------------------------
+
+10. Plan-aware rendering
+
+Ensure:
+- free users see preview + locked UI
+- unlocked users see full content
+- Pro users see full content
+- do not duplicate UI logic unnecessarily
+
+------------------------------------
+
+11. Copywriting rules
+
+Use:
+- confident, simple language
+- no hype
+- no “AI buzzwords”
+- focus on outcomes
+
+Good examples:
+- “Unlock full resume”
+- “See the complete rewrite”
+- “Improve your match instantly”
+
+Avoid:
+- generic phrases like “premium features”
+- spammy urgency
+
+------------------------------------
+
+12. Add trust reinforcement
+
+Add small text:
+
+- “No fake experience added”
+- “ATS-friendly formatting”
+- “Edit before export”
+
+------------------------------------
+
+13. README update
+
+Briefly document:
+- preview vs full access behavior
+- unlock flow
+- CTA strategy
+
+------------------------------------
+
+Rules:
+- do not expose full premium content to free users
+- backend remains source of truth
+- frontend is for conversion, not security
+- keep code clean and modular
+- reuse existing components where possible
+
+------------------------------------
+
+After implementation:
+
+1. Show exact files changed
+2. Show final free user UI structure
+3. Show CTA placements clearly
+4. List top 5 conversion weaknesses
+5. Improve the top 3 immediately
+6. Suggest A/B test ideas for:
+   - $3 vs $4 vs $5 pricing
+   - CTA copy variations

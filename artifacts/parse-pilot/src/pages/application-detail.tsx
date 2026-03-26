@@ -37,6 +37,7 @@ import { BlurredLockedSection } from "@/components/results/blurred-locked-sectio
 import { UpgradeCTACard } from "@/components/results/upgrade-cta-card";
 import { UpgradeButton } from "@/components/billing/upgrade-button";
 import { UnlockButton } from "@/components/billing/unlock-button";
+import { FreeResultsView } from "@/components/results/free-results-view";
 
 // ─── Analysis progress steps shown during loading ─────────────────────────────
 
@@ -465,34 +466,6 @@ export default function ApplicationDetail() {
         </div>
       </div>
 
-      {/* ── Above-fold nudge bar — free users after analysis ────────── */}
-      {isLockedForFree && (
-        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-5 py-3.5 rounded-xl bg-gradient-to-r from-violet-50 to-indigo-50/60 border border-violet-200/80">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" aria-hidden="true" />
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                Your optimized resume is ready
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Unlock this result for $4, or start Pro free for 7 days
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <UnlockButton
-              applicationId={id!}
-              label="Unlock — $4"
-              className="h-8 px-4 text-xs font-semibold"
-            />
-            <UpgradeButton
-              label="Start Pro free"
-              className="h-8 px-4 text-xs font-semibold"
-            />
-          </div>
-        </div>
-      )}
-
       {/* ── Identity mismatch warning ─────────────────────────────────── */}
       <AnimatePresence>
         {identityWarning?.show && (
@@ -529,6 +502,16 @@ export default function ApplicationDetail() {
         )}
       </AnimatePresence>
 
+      {isLockedForFree && freePreview ? (
+        <FreeResultsView
+          app={app}
+          freePreview={freePreview}
+          applicationId={id!}
+          onReanalyze={handleAnalyze}
+          isAnalyzing={analyzeMutation.isPending}
+        />
+      ) : (
+        <>
       {/* ── Tab Bar ─────────────────────────────────────────────────────── */}
       <div className="flex space-x-1 border-b border-border mb-8 overflow-x-auto pb-[1px]">
         {tabs.map((tab) => {
@@ -1158,18 +1141,7 @@ export default function ApplicationDetail() {
         </AnimatePresence>
       </div>
 
-      {/* ── Bottom-of-page CTA — shown after tab content for free users ── */}
-      {isLockedForFree && (
-        <div className="mt-12">
-          <UpgradeCTACard
-            dark
-            headline="Your tailored resume is ready to use"
-            description="Start Pro and get unlimited results, cover letters, and DOCX/PDF export — or unlock just this one for $4."
-            variant="bottom"
-            ctaLabel="Start your 7-day free trial"
-            applicationId={id!}
-          />
-        </div>
+        </>
       )}
     </AppLayout>
   );

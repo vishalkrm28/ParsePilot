@@ -341,6 +341,44 @@ Allow free users to pay $4 once to unlock the full tailored CV + DOCX/PDF export
 - Dashboard (`dashboard.tsx`) — shows violet upgrade banner + "Upgrade for More" button when free user has ≥ 1 app
 - Application detail (`application-detail.tsx`) — compact ProGate replaces export buttons; full ProGate covers Cover Letter tab
 
+## Milestone 18 — Free-User Conversion Optimization
+
+### Goal
+Maximize conversion from free users to paid users ($4 unlock or Pro subscription) by replacing the generic locked tab view with a dedicated, scrollable preview experience.
+
+### Preview vs Full Access
+
+| Content | Free user | One-time unlock | Pro |
+|---|---|---|---|
+| Match score + all keywords | Full | Full | Full |
+| AI insights / suggestions | Full | Full | Full |
+| Summary preview (truncated, gradient-faded) | Preview | Full | Full |
+| First experience bullet | Preview | Full | Full |
+| Full tailored CV text | — | Full | Full |
+| Cover letter teaser (static blurred) | Teaser | Full (if generated) | Full |
+| Cover letter generation | — | — | Full |
+| DOCX / PDF export | — | Full (this result) | All results |
+
+### Unlock flow
+1. Free user analyzes → server runs analysis, returns `freePreview` (stripped `tailoredCvText`)
+2. `isLockedForFree = !isPro && !isUnlockedResult && status==="analyzed" && !tailoredCvText && !!freePreview`
+3. When `isLockedForFree`: render `FreeResultsView` (full-page conversion experience)
+4. When Pro or unlocked: render tab bar + tab content as normal
+
+### CTA placement strategy (FreeResultsView)
+- **CTA-1** (top): compact inline banner immediately after the match score card — shows both $4 unlock and "Start Pro free" without friction
+- **CTA-2** (middle): full conversion block after the summary/experience previews — price, what's included, trust signals, no-subscription note
+- **CTA-3** (bottom): dark gradient `UpgradeCTACard` banner with `applicationId` (shows Pro primary + $4 unlock secondary)
+
+### New files
+- `artifacts/parse-pilot/src/components/results/free-results-view.tsx` — the full free-user conversion page
+
+### CTA copy rules
+- Primary: "Unlock now — $4" / "Unlock — $4" (one-time, no subscription)
+- Secondary: "Start Pro free" / "Try free →" (7-day trial)
+- Trust signals: "No fake experience added · ATS-friendly formatting · Edit before export"
+- No hype language or AI buzzwords
+
 ## Vite Config Note
 
 `artifacts/parse-pilot/vite.config.ts` has `fs.allow` set to include the workspace root's `lib/` and `node_modules/` directories so that workspace packages (e.g. `@workspace/replit-auth-web`) can be resolved by Vite in development.
