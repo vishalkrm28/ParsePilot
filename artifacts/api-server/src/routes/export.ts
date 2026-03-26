@@ -24,6 +24,12 @@ router.get("/export/application/:id/docx", requirePro, async (req, res) => {
       return;
     }
 
+    // ── Ownership check ───────────────────────────────────────────────────────
+    if (app.userId !== req.user!.id) {
+      res.status(403).json({ error: "Access denied", code: "FORBIDDEN" });
+      return;
+    }
+
     const text = cvType === "cover" ? app.coverLetterText : app.tailoredCvText;
     if (!text) {
       res.status(400).json({
@@ -75,6 +81,12 @@ router.get("/export/application/:id/pdf", requirePro, async (req, res) => {
 
     if (!app) {
       res.status(404).send("<h1>404 — Application not found</h1>");
+      return;
+    }
+
+    // ── Ownership check ───────────────────────────────────────────────────────
+    if (app.userId !== req.user!.id) {
+      res.status(403).send("<h1>403 — Access denied</h1>");
       return;
     }
 

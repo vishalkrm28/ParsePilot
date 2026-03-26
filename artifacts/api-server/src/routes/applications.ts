@@ -20,11 +20,27 @@ const router: IRouter = Router();
 // ─── GET /applications ───────────────────────────────────────────────────────
 
 router.get("/applications", async (req, res) => {
+  // ── Auth gate ──────────────────────────────────────────────────────────────
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required", code: "UNAUTHENTICATED" });
+    return;
+  }
+
   const { userId } = req.query;
   if (!userId || typeof userId !== "string") {
     res.status(400).json({ error: "userId query param is required", code: "MISSING_USER_ID" });
     return;
   }
+
+  // ── Ownership gate ─────────────────────────────────────────────────────────
+  // Only the authenticated user may list their own applications.
+  // This prevents user A from listing user B's applications by passing a
+  // different userId in the query string.
+  if (userId !== req.user.id) {
+    res.status(403).json({ error: "Access denied", code: "FORBIDDEN" });
+    return;
+  }
+
   try {
     const apps = await db
       .select()
@@ -33,9 +49,8 @@ router.get("/applications", async (req, res) => {
       .orderBy(desc(applicationsTable.createdAt));
 
     // Strip premium content from list for free users (same policy as detail GET).
-    // We don't include freePreview in the list — it's only needed in the detail view.
-    const ownerId = req.user?.id;
-    const pro = ownerId ? await isUserPro(ownerId) : false;
+    // freePreview is NOT included in the list — only needed in the detail view.
+    const pro = await isUserPro(req.user.id);
     const safeApps = pro
       ? apps
       : apps.map((a) => ({ ...a, tailoredCvText: null, coverLetterText: null }));
@@ -160,11 +175,41 @@ router.put("/applications/:id", async (req, res) => {
     return;
   }
   try {
+    // ── Ownership check ───────────────────────────────────────────────────────
+    // Fetch the application first so we can verify the requesting user owns it.
+    const [existing] = await db
+      .select({ userId: applicationsTable.userId })
+      .from(applicationsTable)
+      .where(eq(applicationsTable.id, id));
+
+    if (!existing) {
+      res.status(404).json({ error: "Application not found", code: "NOT_FOUND" });
+      return;
+    }
+
+    const requestingUserId = req.user?.id;
+    if (requestingUserId && existing.userId !== requestingUserId) {
+      res.status(403).json({ error: "Access denied", code: "FORBIDDEN" });
+      return;
+    }
+
+    // ── Strip AI-only fields ──────────────────────────────────────────────────
+    // tailoredCvText and coverLetterText are set exclusively by the AI service
+    // (POST /analyze and POST /cover-letter). They must NOT be writable through
+    // this general PUT route — otherwise a free user could inject arbitrary
+    // content by calling PUT directly instead of going through the AI service.
+    const {
+      tailoredCvText: _stripped1,
+      coverLetterText: _stripped2,
+      ...safeUpdate
+    } = parsed.data;
+
     const [app] = await db
       .update(applicationsTable)
-      .set({ ...parsed.data, parsedCvJson: (parsed.data.parsedCvJson as any) ?? undefined, updatedAt: new Date() })
+      .set({ ...safeUpdate, parsedCvJson: (safeUpdate.parsedCvJson as any) ?? undefined, updatedAt: new Date() })
       .where(eq(applicationsTable.id, id))
       .returning();
+
     if (!app) {
       res.status(404).json({ error: "Application not found", code: "NOT_FOUND" });
       return;
@@ -181,6 +226,23 @@ router.put("/applications/:id", async (req, res) => {
 router.delete("/applications/:id", async (req, res) => {
   const { id } = req.params;
   try {
+    // ── Ownership check ───────────────────────────────────────────────────────
+    const [existing] = await db
+      .select({ userId: applicationsTable.userId })
+      .from(applicationsTable)
+      .where(eq(applicationsTable.id, id));
+
+    if (!existing) {
+      res.status(404).json({ error: "Application not found", code: "NOT_FOUND" });
+      return;
+    }
+
+    const requestingUserId = req.user?.id;
+    if (requestingUserId && existing.userId !== requestingUserId) {
+      res.status(403).json({ error: "Access denied", code: "FORBIDDEN" });
+      return;
+    }
+
     await db.delete(applicationsTable).where(eq(applicationsTable.id, id));
     res.status(204).end();
   } catch (err) {
@@ -207,6 +269,21 @@ router.patch("/applications/:id/tailored-cv", requirePro, async (req, res) => {
     return;
   }
   try {
+    // ── Ownership check ───────────────────────────────────────────────────────
+    const [existing] = await db
+      .select({ userId: applicationsTable.userId })
+      .from(applicationsTable)
+      .where(eq(applicationsTable.id, id));
+
+    if (!existing) {
+      res.status(404).json({ error: "Application not found", code: "NOT_FOUND" });
+      return;
+    }
+    if (existing.userId !== req.user!.id) {
+      res.status(403).json({ error: "Access denied", code: "FORBIDDEN" });
+      return;
+    }
+
     const [app] = await db
       .update(applicationsTable)
       .set({ tailoredCvText: parsed.data.tailoredCvText, updatedAt: new Date() })
@@ -241,6 +318,21 @@ router.patch("/applications/:id/cover-letter-save", requirePro, async (req, res)
     return;
   }
   try {
+    // ── Ownership check ───────────────────────────────────────────────────────
+    const [existing] = await db
+      .select({ userId: applicationsTable.userId })
+      .from(applicationsTable)
+      .where(eq(applicationsTable.id, id));
+
+    if (!existing) {
+      res.status(404).json({ error: "Application not found", code: "NOT_FOUND" });
+      return;
+    }
+    if (existing.userId !== req.user!.id) {
+      res.status(403).json({ error: "Access denied", code: "FORBIDDEN" });
+      return;
+    }
+
     const [app] = await db
       .update(applicationsTable)
       .set({ coverLetterText: parsed.data.coverLetterText, updatedAt: new Date() })
@@ -293,6 +385,12 @@ router.post("/applications/:id/analyze", async (req, res) => {
 
     if (!app) {
       res.status(404).json({ error: "Application not found", code: "NOT_FOUND" });
+      return;
+    }
+
+    // ── Ownership check ───────────────────────────────────────────────────────
+    if (ownerUserId && app.userId !== ownerUserId) {
+      res.status(403).json({ error: "Access denied", code: "FORBIDDEN" });
       return;
     }
 
@@ -380,6 +478,12 @@ router.post("/applications/:id/cover-letter", requirePro, async (req, res) => {
 
     if (!app) {
       res.status(404).json({ error: "Application not found", code: "NOT_FOUND" });
+      return;
+    }
+
+    // ── Ownership check ───────────────────────────────────────────────────────
+    if (ownerUserId && app.userId !== ownerUserId) {
+      res.status(403).json({ error: "Access denied", code: "FORBIDDEN" });
       return;
     }
 
