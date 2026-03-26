@@ -6,22 +6,14 @@ export async function extractTextFromDocx(buffer: Buffer): Promise<string> {
 }
 
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const uint8Array = new Uint8Array(buffer);
-  const loadingTask = getDocument({ data: uint8Array });
-  const pdfDoc = await loadingTask.promise;
-
-  let fullText = "";
-  for (let i = 1; i <= pdfDoc.numPages; i++) {
-    const page = await pdfDoc.getPage(i);
-    const textContent = await page.getTextContent();
-    const pageText = textContent.items
-      .map((item: any) => ("str" in item ? item.str : ""))
-      .join(" ");
-    fullText += pageText + "\n";
+  // pdf-parse handles Node.js compatibility (DOMMatrix, canvas polyfills etc.)
+  const pdfParse = (await import("pdf-parse")).default;
+  const data = await pdfParse(buffer);
+  const text = data.text?.trim();
+  if (!text || text.length < 20) {
+    throw new Error("Could not extract readable text from this PDF. Try a DOCX version instead.");
   }
-
-  return fullText.trim();
+  return text;
 }
 
 export async function extractTextFromFile(
@@ -36,8 +28,7 @@ export async function extractTextFromFile(
   }
 
   if (
-    mimetype ===
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
     mimetype === "application/msword" ||
     ext === "docx" ||
     ext === "doc"
