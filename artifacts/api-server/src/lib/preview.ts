@@ -122,6 +122,17 @@ export function applyFreeFilter<T extends {
  */
 export function applyProPass<T extends object>(
   row: T,
-): T & { freePreview: null } {
-  return { ...row, freePreview: null };
+): T & { freePreview: null; isUnlockedResult: false } {
+  return { ...row, freePreview: null, isUnlockedResult: false as const };
+}
+
+/**
+ * Passes through a full row for users who purchased a one-time unlock for
+ * this specific result. Equivalent to Pro access for this single application.
+ * Sets isUnlockedResult: true so the frontend can show unlock-specific UI.
+ */
+export function applyUnlockPass<T extends object>(
+  row: T,
+): T & { freePreview: null; isUnlockedResult: true } {
+  return { ...row, freePreview: null, isUnlockedResult: true as const };
 }

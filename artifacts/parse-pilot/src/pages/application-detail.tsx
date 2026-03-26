@@ -271,8 +271,10 @@ export default function ApplicationDetail() {
 
   const { data: app, isLoading, refetch } = useGetApplication(id);
 
-  // Extra field added by the server-side content gate — not in the generated type
+  // Extra fields added by the server-side content gate — not in the generated type
   const freePreview = (app as any)?.freePreview as FreePreview | null | undefined;
+  // True when this user purchased a one-time unlock for this specific result
+  const isUnlockedResult = ((app as any)?.isUnlockedResult as boolean) ?? false;
 
   const analyzeMutation = useAnalyzeApplication();
   const coverLetterMutation = useGenerateCoverLetter();
@@ -376,7 +378,8 @@ export default function ApplicationDetail() {
 
   // A free user who has run analysis will have status=analyzed but tailoredCvText=null
   // because the server strips it. Distinguish this from "never analyzed".
-  const isLockedForFree = !isPro && app.status === "analyzed" && !app.tailoredCvText && !!freePreview;
+  // isUnlockedResult means they paid for a one-time unlock — treat same as Pro for this result.
+  const isLockedForFree = !isPro && !isUnlockedResult && app.status === "analyzed" && !app.tailoredCvText && !!freePreview;
   const needsAnalysis = app.status === "draft" || (!app.tailoredCvText && !isLockedForFree);
   const currentCvText = editedCv ?? app.tailoredCvText ?? "";
   const currentCoverText = editedCover ?? app.coverLetterText ?? "";
@@ -429,8 +432,8 @@ export default function ApplicationDetail() {
               {needsAnalysis ? "Run Analysis" : "Re-analyze"}
             </Button>
 
-            {/* Export — Pro users get active buttons, free users get disabled + CTA */}
-            {isPro ? (
+            {/* Export — Pro or unlocked users get active buttons, others get disabled + CTA */}
+            {(isPro || isUnlockedResult) ? (
               <>
                 <Button
                   variant="outline"
@@ -456,8 +459,8 @@ export default function ApplicationDetail() {
             ) : null}
           </div>
 
-          {/* CTA placement 3 — export area (free users only) */}
-          {!isPro && <LockedExportBar />}
+          {/* CTA placement 3 — export area (free users without unlock only) */}
+          {!isPro && !isUnlockedResult && <LockedExportBar />}
         </div>
       </div>
 
@@ -591,8 +594,8 @@ export default function ApplicationDetail() {
                     </CardContent>
                   </Card>
                 ) : isLockedForFree && freePreview ? (
-                  /* CTA placement 1 — free user after analysis: locked preview card + upgrade CTA */
-                  <LockedPreviewCard preview={freePreview} />
+                  /* CTA placement 1 — free user after analysis: locked preview card + dual CTA */
+                  <LockedPreviewCard preview={freePreview} applicationId={id!} />
                 ) : needsAnalysis ? (
                   /* Empty state — no analysis yet */
                   <Card className="border-dashed border-2 bg-transparent text-center p-12">

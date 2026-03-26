@@ -1,5 +1,5 @@
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, unlockPurchasesTable } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
 
 /**
  * Returns true if the given Stripe subscription status is considered active.
@@ -32,6 +32,48 @@ export async function isUserPro(userId: string): Promise<boolean> {
   if (user.currentPeriodEnd && user.currentPeriodEnd < new Date()) return false;
 
   return true;
+}
+
+/**
+ * Returns true if the given user has a completed one-time unlock purchase
+ * for the specified application. This is per-result — not account-wide.
+ */
+export async function hasUnlockedResult(
+  userId: string,
+  applicationId: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: unlockPurchasesTable.id })
+    .from(unlockPurchasesTable)
+    .where(
+      and(
+        eq(unlockPurchasesTable.userId, userId),
+        eq(unlockPurchasesTable.applicationId, applicationId),
+        eq(unlockPurchasesTable.status, "paid"),
+      ),
+    )
+    .limit(1);
+  return !!row;
+}
+
+/**
+ * Central access check for full result content.
+ * Returns true if the user may see the full tailored CV and exports for the
+ * given application. This is the single authoritative place for that decision.
+ *
+ *   Pro user          → true  (subscription grants all results)
+ *   One-time unlock   → true  (for that specific application only)
+ *   Free, no unlock   → false
+ */
+export async function userCanAccessFullResult(
+  userId: string,
+  applicationId: string,
+): Promise<boolean> {
+  const [pro, unlocked] = await Promise.all([
+    isUserPro(userId),
+    hasUnlockedResult(userId, applicationId),
+  ]);
+  return pro || unlocked;
 }
 
 /**

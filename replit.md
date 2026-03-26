@@ -251,11 +251,67 @@ Every error in the identity check is caught and logged. The analysis always proc
 }
 ```
 
+## One-Time Result Unlock (Milestone 17)
+
+### Goal
+Allow free users to pay $4 once to unlock the full tailored CV + DOCX/PDF export for a single specific result, without subscribing. This is a low-friction conversion path alongside the Pro subscription.
+
+### Access logic (authoritative — `userCanAccessFullResult()`)
+
+| State | Access |
+|---|---|
+| Pro subscription (active or trialing) | Full access to all results |
+| One-time unlock purchased for this result | Full access for that result only |
+| Free, no unlock | Preview only (summary + first bullet) |
+
+### Unlock scope
+- **Per-result**: each `applicationId` needs its own purchase
+- **Includes**: full `tailoredCvText`, `coverLetterText` (if generated), DOCX + PDF export
+- **Excludes**: generating a new cover letter (credit-gated, Pro only)
+- **Option A** (implemented): export included in the $4 unlock
+
+### Database table: `unlock_purchases`
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | varchar PK | gen_random_uuid() |
+| `user_id` | varchar | FK → `users.id` |
+| `application_id` | uuid | FK → `applications.id` |
+| `stripe_checkout_session_id` | varchar UNIQUE | Idempotency key for webhook |
+| `stripe_payment_intent_id` | varchar UNIQUE | From Stripe session |
+| `amount_paid` | integer | Stripe `amount_total` (cents) |
+| `currency` | varchar | From Stripe session |
+| `status` | varchar | `"paid"` when access is granted |
+| `created_at`, `updated_at` | timestamptz | — |
+
+### Stripe flow
+1. Frontend calls `POST /api/billing/unlock` with `{ applicationId, successUrl, cancelUrl }`
+2. API verifies ownership, creates Stripe Checkout session (`mode: "payment"`) with metadata: `{ userId, applicationId, purchaseType: "one_time_unlock" }`
+3. User pays on Stripe Checkout → redirected to `/billing/unlock-success?application_id=...`
+4. Stripe fires `checkout.session.completed` → webhook dispatches to `onUnlockCheckoutCompleted()` → upserts `unlock_purchases` row with `status: "paid"`
+5. Next `GET /applications/:id` call returns `isUnlockedResult: true` + full `tailoredCvText`
+
+### New env var required
+`STRIPE_PRICE_PARSEPILOT_UNLOCK` — Stripe Price ID for the $4 one-time unlock product. Must be a one-time (non-recurring) price.
+
+### Key files
+- `lib/db/src/schema/unlock.ts` — `unlockPurchasesTable` Drizzle schema
+- `artifacts/api-server/src/lib/billing.ts` — `hasUnlockedResult()`, `userCanAccessFullResult()`
+- `artifacts/api-server/src/lib/preview.ts` — `applyUnlockPass()` (sends full content + `isUnlockedResult: true`)
+- `artifacts/api-server/src/routes/billing.ts` — `POST /billing/unlock`
+- `artifacts/api-server/src/routes/webhook.ts` — `onUnlockCheckoutCompleted()`
+- `artifacts/api-server/src/routes/applications.ts` — GET /:id uses `hasUnlockedResult` alongside `isUserPro`
+- `artifacts/api-server/src/routes/export.ts` — both export routes use `userCanAccessFullResult` (not `requirePro`)
+- `artifacts/parse-pilot/src/components/billing/unlock-button.tsx` — `<UnlockButton applicationId>` component
+- `artifacts/parse-pilot/src/components/results/locked-preview-card.tsx` — dual CTA: unlock ($4) + Pro trial
+- `artifacts/parse-pilot/src/pages/unlock-success.tsx` — success landing page (cosmetic only — no access granted here)
+
 ## Environment Validation
 
 `artifacts/api-server/src/lib/env.ts` — `validateEnv()` runs before `app.listen()` in `index.ts`.
 - Required vars: `PORT`, `DATABASE_URL`, `REPL_ID` — server exits with code 1 if missing
 - Billing vars: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PARSEPILOT_PRO` — all three must be set together; partial config logs a clear warning
+- One-time unlock: `STRIPE_PRICE_PARSEPILOT_UNLOCK` — Stripe Price ID for the $4 one-time result unlock; `POST /billing/unlock` returns 503 if missing
 - Optional vars: `OPENAI_API_KEY`, `STRIPE_CUSTOMER_PORTAL_RETURN_URL` — missing values log actionable hints
 - Startup log includes `billingEnabled` and `aiEnabled` flags
 
@@ -264,7 +320,8 @@ Every error in the identity check is caught and logged. The analysis always proc
 `artifacts/api-server/src/routes/webhook.ts`:
 - Responds `{ received: true }` immediately after signature verification (before processing), so slow DB writes don't cause Stripe retries
 - Each event handler wrapped in `safeHandle()` — a bug in one handler can't crash others
-- Handles: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`
+- Handles: `checkout.session.completed` (subscription AND one-time unlock), `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`
+- `checkout.session.completed` dispatches by `session.metadata.purchaseType`: `one_time_unlock` → `onUnlockCheckoutCompleted()`, else subscription flow
 - `invoice.payment_failed` logs attempt count and next retry time; status downgrade handled by `customer.subscription.updated` from Stripe's dunning system
 - Defensive null-guards on all Stripe object fields throughout
 
@@ -275,8 +332,8 @@ Every error in the identity check is caught and logged. The analysis always proc
 - Gated routes:
   - `POST /api/applications` → free users limited to 1 application (checks count before insert)
   - `POST /api/applications/:id/cover-letter` → Pro only (`requirePro` middleware)
-  - `GET /api/export/application/:id/docx` → Pro only
-  - `GET /api/export/application/:id/pdf` → Pro only
+  - `GET /api/export/application/:id/docx` → Pro OR one-time unlock for that result (`userCanAccessFullResult`)
+  - `GET /api/export/application/:id/pdf` → Pro OR one-time unlock for that result (`userCanAccessFullResult`)
 
 **Frontend (UX)** — no duplicated logic, gates driven by `GET /api/billing/status`:
 - `artifacts/parse-pilot/src/hooks/use-billing-status.ts` — React hook, 30 s cache

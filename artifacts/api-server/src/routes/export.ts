@@ -3,13 +3,18 @@ import { eq } from "drizzle-orm";
 import { db, applicationsTable } from "@workspace/db";
 import { buildDocxBuffer, buildPrintHtml } from "../services/exporter.js";
 import { logger } from "../lib/logger.js";
-import { requirePro } from "../middlewares/requirePro.js";
+import { userCanAccessFullResult } from "../lib/billing.js";
 
 const router: IRouter = Router();
 
-// ─── DOCX Export (Pro only) ───────────────────────────────────────────────────
+// ─── DOCX Export (Pro or one-time unlock) ────────────────────────────────────
 
-router.get("/export/application/:id/docx", requirePro, async (req, res) => {
+router.get("/export/application/:id/docx", async (req, res) => {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required", code: "UNAUTHENTICATED" });
+    return;
+  }
+
   const { id } = req.params;
   const cvType = (req.query.type as string) === "cover" ? "cover" : "cv";
 
@@ -25,8 +30,18 @@ router.get("/export/application/:id/docx", requirePro, async (req, res) => {
     }
 
     // ── Ownership check ───────────────────────────────────────────────────────
-    if (app.userId !== req.user!.id) {
+    if (app.userId !== req.user.id) {
       res.status(403).json({ error: "Access denied", code: "FORBIDDEN" });
+      return;
+    }
+
+    // ── Access gate: Pro subscription OR one-time unlock for this result ──────
+    const canAccess = await userCanAccessFullResult(req.user.id, id);
+    if (!canAccess) {
+      res.status(403).json({
+        error: "Export requires a Pro subscription or a one-time unlock for this result.",
+        code: "PRO_REQUIRED",
+      });
       return;
     }
 
@@ -65,11 +80,16 @@ router.get("/export/application/:id/docx", requirePro, async (req, res) => {
   }
 });
 
-// ─── PDF Export (Pro only) ────────────────────────────────────────────────────
+// ─── PDF Export (Pro or one-time unlock) ─────────────────────────────────────
 // Returns print-optimized HTML that auto-triggers window.print().
 // Users save as PDF from the browser's print dialog.
 
-router.get("/export/application/:id/pdf", requirePro, async (req, res) => {
+router.get("/export/application/:id/pdf", async (req, res) => {
+  if (!req.user) {
+    res.status(401).send("<h1>401 — Authentication required</h1>");
+    return;
+  }
+
   const { id } = req.params;
   const cvType = (req.query.type as string) === "cover" ? "cover" : "cv";
 
@@ -85,8 +105,21 @@ router.get("/export/application/:id/pdf", requirePro, async (req, res) => {
     }
 
     // ── Ownership check ───────────────────────────────────────────────────────
-    if (app.userId !== req.user!.id) {
+    if (app.userId !== req.user.id) {
       res.status(403).send("<h1>403 — Access denied</h1>");
+      return;
+    }
+
+    // ── Access gate: Pro subscription OR one-time unlock for this result ──────
+    const canAccess = await userCanAccessFullResult(req.user.id, id);
+    if (!canAccess) {
+      res.status(403).send(`
+        <html><body style="font-family:sans-serif;padding:2rem">
+          <h2>Export not available</h2>
+          <p>Export requires a Pro subscription or a one-time unlock for this result.</p>
+          <a href="javascript:window.close()">Close</a>
+        </body></html>
+      `);
       return;
     }
 

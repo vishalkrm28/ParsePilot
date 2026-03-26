@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, applicationsTable } from "@workspace/db";
 import { z } from "zod";
 import type Stripe from "stripe";
 import { getStripe } from "../lib/stripe.js";
@@ -190,6 +190,107 @@ router.get("/billing/credits", async (req, res) => {
   } catch (err) {
     logger.error({ err }, "Failed to fetch credit balance");
     res.status(500).json({ error: "Could not load credit balance", code: "DB_ERROR" });
+  }
+});
+
+// ─── POST /billing/unlock ─────────────────────────────────────────────────────
+// Creates a one-time Stripe Checkout session (mode: "payment") so the user can
+// unlock the full tailored CV + exports for a single specific result.
+// Access is NEVER granted here — the webhook is the source of truth.
+
+const UnlockBody = z.object({
+  applicationId: z.string().uuid(),
+  successUrl: z.string().url(),
+  cancelUrl: z.string().url(),
+});
+
+router.post("/billing/unlock", async (req, res) => {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required", code: "UNAUTHENTICATED" });
+    return;
+  }
+
+  const parsed = UnlockBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "applicationId, successUrl and cancelUrl are required", code: "VALIDATION_ERROR" });
+    return;
+  }
+
+  const priceId = process.env.STRIPE_PRICE_PARSEPILOT_UNLOCK;
+  if (!priceId) {
+    logger.error("STRIPE_PRICE_PARSEPILOT_UNLOCK is not configured");
+    res.status(503).json({ error: "One-time unlock is not configured yet", code: "BILLING_NOT_CONFIGURED" });
+    return;
+  }
+
+  const { applicationId, successUrl, cancelUrl } = parsed.data;
+  const userId = req.user.id;
+
+  try {
+    const stripe = getStripe();
+
+    // Verify the application exists and belongs to the requesting user
+    const [app] = await db
+      .select({ id: applicationsTable.id, userId: applicationsTable.userId })
+      .from(applicationsTable)
+      .where(eq(applicationsTable.id, applicationId))
+      .limit(1);
+
+    if (!app) {
+      res.status(404).json({ error: "Application not found", code: "NOT_FOUND" });
+      return;
+    }
+    if (app.userId !== userId) {
+      res.status(403).json({ error: "Access denied", code: "FORBIDDEN" });
+      return;
+    }
+
+    // Get or create Stripe customer
+    const [dbUser] = await db
+      .select({ stripeCustomerId: usersTable.stripeCustomerId, email: usersTable.email })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+
+    if (!dbUser) {
+      res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+      return;
+    }
+
+    let customerId = dbUser.stripeCustomerId;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: dbUser.email ?? undefined,
+        metadata: { userId },
+      });
+      customerId = customer.id;
+      await db
+        .update(usersTable)
+        .set({ stripeCustomerId: customerId })
+        .where(eq(usersTable.id, userId));
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      mode: "payment",
+      line_items: [{ price: priceId, quantity: 1 }],
+      metadata: {
+        userId,
+        applicationId,
+        purchaseType: "one_time_unlock",
+      },
+      success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}&application_id=${applicationId}`,
+      cancel_url: cancelUrl,
+    });
+
+    if (!session.url) {
+      throw new Error("Stripe did not return a checkout URL");
+    }
+
+    res.json({ url: session.url });
+  } catch (err) {
+    logger.error(stripeErrContext(err), "Failed to create Stripe unlock checkout session");
+    res.status(500).json({ error: "Could not start checkout. Please try again.", code: "CHECKOUT_ERROR" });
   }
 });
 

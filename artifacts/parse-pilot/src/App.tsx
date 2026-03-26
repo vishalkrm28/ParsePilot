@@ -10,6 +10,7 @@ import NewApplication from "@/pages/new-application";
 import ApplicationDetail from "@/pages/application-detail";
 import BillingSuccess from "@/pages/billing-success";
 import BillingCancel from "@/pages/billing-cancel";
+import UnlockSuccess from "@/pages/unlock-success";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
@@ -49,6 +50,7 @@ function AppRouter() {
       <Route path="/applications/:id" component={ApplicationDetail} />
       <Route path="/billing/success" component={BillingSuccess} />
       <Route path="/billing/cancel" component={BillingCancel} />
+      <Route path="/billing/unlock-success" component={UnlockSuccess} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>

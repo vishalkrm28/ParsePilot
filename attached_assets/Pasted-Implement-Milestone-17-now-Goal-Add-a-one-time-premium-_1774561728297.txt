@@ -1,0 +1,183 @@
+Implement Milestone 17 now.
+
+Goal:
+Add a one-time premium unlock flow to ParsePilot so a user can pay once to unlock the full premium output for a single result, instead of subscribing.
+
+Business model:
+- Free users see only limited preview output
+- Users can either:
+  1. pay once to unlock one full result
+  2. subscribe to ParsePilot Pro for ongoing access
+- The one-time unlock should feel fast, low-friction, and self-contained
+
+Pricing model:
+- One-time premium unlock = $4
+- Subscription remains separate and should still be presented as the better long-term value
+
+Important product rule:
+A one-time unlock should only unlock the specific result the user is paying for, not the whole account permanently.
+
+What to build:
+
+1. Stripe setup for one-time payment
+- Add support for a one-time Stripe Checkout flow using:
+  - mode: "payment"
+- Use a dedicated Stripe price env var:
+  - STRIPE_PRICE_PARSEPILOT_UNLOCK
+- Keep the existing subscription flow unchanged
+
+2. Database support
+Add a new Prisma model for one-time unlocks, for example:
+
+UnlockPurchase:
+- id
+- userId
+- tailoredVersionId
+- stripeCheckoutSessionId String? @unique
+- stripePaymentIntentId String? @unique
+- amountPaid Int?
+- currency String?
+- status String?
+- createdAt
+- updatedAt
+
+Requirements:
+- one unlock record should correspond to one user + one result
+- this model should be used to determine whether a specific result is unlocked
+- avoid granting broad account-wide access from one unlock purchase
+
+3. Billing helper logic
+Create or extend a reusable helper layer to support:
+- hasUnlockedResult(userId, tailoredVersionId)
+- userCanAccessFullResult(userId, tailoredVersionId)
+- logic should return full access if:
+  - user is Pro
+  - OR user purchased unlock for that specific result
+- keep this centralized and reusable
+
+4. One-time checkout API route
+Create:
+- app/api/billing/unlock/route.ts
+
+Behavior:
+- require auth
+- require tailoredVersionId in request
+- load current user
+- verify the tailoredVersion belongs to the current user
+- create a Stripe Checkout Session with:
+  - mode: "payment"
+  - line_items using STRIPE_PRICE_PARSEPILOT_UNLOCK
+  - success_url pointing to:
+    ${NEXT_PUBLIC_APP_URL}/dashboard/billing/unlock-success?session_id={CHECKOUT_SESSION_ID}
+  - cancel_url pointing to:
+    ${NEXT_PUBLIC_APP_URL}/dashboard/results/[id] or a suitable cancel page
+  - metadata including:
+    - userId
+    - tailoredVersionId
+    - purchaseType = one_time_unlock
+- return session.url as JSON
+
+5. Webhook support for one-time unlocks
+Extend the existing Stripe webhook route to handle the one-time unlock flow.
+
+Requirements:
+- still use raw request body and verified signature
+- continue handling subscription events as before
+- also handle successful one-time unlock payments, specifically from Checkout completion
+- when the event corresponds to purchaseType = one_time_unlock:
+  - create or update UnlockPurchase
+  - store:
+    - userId
+    - tailoredVersionId
+    - stripeCheckoutSessionId
+    - stripePaymentIntentId if available
+    - amountPaid
+    - currency
+    - status
+- do not unlock based on redirect pages
+- webhook-updated DB state remains the source of truth
+
+6. Success page for one-time unlock
+Create:
+- app/dashboard/billing/unlock-success/page.tsx
+
+Behavior:
+- user sees confirmation that the result is being unlocked
+- message should be short and clear
+- do not trust this page as the source of access
+- direct user back to the unlocked result view
+
+7. Result access logic
+Update the result display flow so:
+- Free user without unlock:
+  - still sees limited preview only
+- Free user with unlock for that result:
+  - sees full content for that result
+  - can copy full result
+  - can export that result if you choose to include export in unlock
+- Pro user:
+  - sees full content as usual
+
+Important:
+- one-time unlock should apply only to the purchased result
+- if the user generates a new result later, it should be locked again unless they are Pro or purchase another unlock
+
+8. UI buttons on results page
+For free users on locked result pages, add two clear CTAs:
+- Unlock this result — $4
+- Start Pro trial / Upgrade to Pro
+
+Requirements:
+- one-time unlock CTA should feel instant and low commitment
+- subscription CTA should still be visible as better value for repeated use
+- do not clutter the page
+
+9. Access + export behavior
+Decide and implement one of these approaches clearly:
+Option A:
+- one-time unlock includes:
+  - full content
+  - copy
+  - DOCX/PDF export
+Option B:
+- one-time unlock includes:
+  - full content + copy
+  - export remains Pro-only
+
+Preferred recommendation:
+Use Option A unless there is a strong business reason not to, because the one-time unlock should feel complete and satisfying.
+
+10. Pricing/upgrade messaging
+Update free-plan results page copy to support both conversion paths:
+- Unlock this result for $4
+- No subscription. Instant access.
+- Or start ParsePilot Pro for ongoing access
+
+11. README updates
+Update README with:
+- env var for one-time unlock price
+- one-time unlock flow
+- webhook handling for unlock purchases
+- access logic summary:
+  - Pro = full access
+  - one-time unlock = full access for one result only
+  - Free = preview only
+
+12. Keep code clean
+Rules:
+- do not duplicate billing logic
+- keep result access logic centralized
+- do not expose premium content to unpaid free users
+- do not trust redirect pages for payment status
+- keep naming consistent with ParsePilot
+- keep implementation production-minded and simple
+
+After implementation:
+1. Show exact files changed
+2. Show the Prisma schema changes
+3. Show the final access logic for:
+   - Free
+   - Free + unlocked result
+   - Pro
+4. List top 5 edge cases or abuse risks
+5. Fix the top 3 immediately

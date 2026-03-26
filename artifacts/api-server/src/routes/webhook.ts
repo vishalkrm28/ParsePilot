@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import express from "express";
 import type Stripe from "stripe";
-import { eq } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
+import { db, usersTable, unlockPurchasesTable } from "@workspace/db";
 import { getStripe } from "../lib/stripe.js";
 import { logger } from "../lib/logger.js";
 import { resetProCreditsIfNeeded } from "../lib/credits.js";
@@ -119,10 +119,17 @@ async function safeHandle(eventType: string, fn: () => Promise<void>): Promise<v
 
 // ─── checkout.session.completed ───────────────────────────────────────────────
 // Fired when the user completes the Stripe Checkout form and payment is confirmed.
-// We retrieve the full Subscription object from Stripe so we have accurate
-// status, period end, and price info before writing to the DB.
+// Handles two purchase types:
+//   subscription    → Pro activation (existing flow)
+//   one_time_unlock → Per-result unlock purchase (new Milestone 17 flow)
 
 async function onCheckoutSessionCompleted(session: Stripe.Checkout.Session): Promise<void> {
+  // ── Dispatch by purchase type ──────────────────────────────────────────────
+  if (session.metadata?.purchaseType === "one_time_unlock") {
+    await onUnlockCheckoutCompleted(session);
+    return;
+  }
+
   if (session.mode !== "subscription") {
     logger.debug({ session_id: session.id }, "Ignoring non-subscription checkout session");
     return;
@@ -335,6 +342,63 @@ async function onInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void> {
 
   // If this is the final retry, subscription status will go to "unpaid" or "canceled"
   // via customer.subscription.updated — no manual action needed here.
+}
+
+// ─── one_time_unlock checkout ─────────────────────────────────────────────────
+// Fired when a user completes a one-time $4 unlock payment.
+// Creates (or idempotently updates) an UnlockPurchase row.
+// This is the ONLY place that records a successful unlock — the success redirect
+// page is cosmetic only and must never be trusted as the access gate.
+
+async function onUnlockCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
+  const userId = session.metadata?.userId ?? null;
+  const applicationId = session.metadata?.applicationId ?? null;
+
+  if (!userId || !applicationId) {
+    logger.error(
+      { session_id: session.id, metadata: session.metadata },
+      "one_time_unlock webhook: missing userId or applicationId in metadata — unlock NOT recorded",
+    );
+    return;
+  }
+
+  // Resolve payment intent ID (may be a string or expanded object)
+  const paymentIntentId =
+    typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : (session.payment_intent as Stripe.PaymentIntent | null)?.id ?? null;
+
+  const amountTotal = session.amount_total ?? null;
+  const currency = session.currency ?? null;
+  const paymentStatus = session.payment_status ?? "unpaid";
+
+  // Upsert by stripeCheckoutSessionId — idempotent on duplicate webhook fires
+  await db
+    .insert(unlockPurchasesTable)
+    .values({
+      userId,
+      applicationId,
+      stripeCheckoutSessionId: session.id,
+      stripePaymentIntentId: paymentIntentId,
+      amountPaid: amountTotal,
+      currency,
+      status: paymentStatus,
+    })
+    .onConflictDoUpdate({
+      target: unlockPurchasesTable.stripeCheckoutSessionId,
+      set: {
+        stripePaymentIntentId: paymentIntentId,
+        amountPaid: amountTotal,
+        currency,
+        status: paymentStatus,
+        updatedAt: new Date(),
+      },
+    });
+
+  logger.info(
+    { userId, applicationId, sessionId: session.id, amountTotal, paymentStatus },
+    "One-time unlock purchase recorded",
+  );
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

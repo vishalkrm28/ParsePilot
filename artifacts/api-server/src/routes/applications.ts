@@ -11,9 +11,9 @@ import { z } from "zod";
 import { analyzeCvForJob, generateCoverLetter, parseJobDescription } from "../services/ai.js";
 import { logger } from "../lib/logger.js";
 import { requirePro } from "../middlewares/requirePro.js";
-import { isUserPro } from "../lib/billing.js";
+import { isUserPro, userCanAccessFullResult, hasUnlockedResult } from "../lib/billing.js";
 import { spendCredits, getUserCredits, CREDIT_COSTS } from "../lib/credits.js";
-import { applyFreeFilter, applyProPass } from "../lib/preview.js";
+import { applyFreeFilter, applyProPass, applyUnlockPass } from "../lib/preview.js";
 import {
   extractIdentityFromParsedCv,
   checkAndRecordIdentity,
@@ -152,11 +152,22 @@ router.get("/applications/:id", async (req, res) => {
     }
 
     // ── Content gating ─────────────────────────────────────────────────────
-    // Premium content (full tailored CV, cover letter) is stripped for free
-    // users server-side. The full content is always stored in the DB so Pro
-    // features remain accessible after upgrade — it just isn't sent over the wire.
-    const pro = requestingUserId ? await isUserPro(requestingUserId) : false;
-    const response = pro ? applyProPass(app) : applyFreeFilter(app);
+    // Full content is sent when: (a) the user is Pro, OR (b) they have a
+    // one-time unlock purchase for this specific application.
+    // `userCanAccessFullResult` is the single authoritative check.
+    if (!requestingUserId) {
+      res.json(applyFreeFilter(app));
+      return;
+    }
+    const [pro, unlocked] = await Promise.all([
+      isUserPro(requestingUserId),
+      hasUnlockedResult(requestingUserId, app.id),
+    ]);
+    const response = pro
+      ? applyProPass(app)
+      : unlocked
+        ? applyUnlockPass(app)
+        : applyFreeFilter(app);
 
     res.json(response);
   } catch (err) {

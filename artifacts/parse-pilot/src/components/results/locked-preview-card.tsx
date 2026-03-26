@@ -2,6 +2,7 @@ import { Crown, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/Card";
 import { BlurredLockedSection } from "./blurred-locked-section";
 import { UpgradeButton } from "@/components/billing/upgrade-button";
+import { UnlockButton } from "@/components/billing/unlock-button";
 
 interface FreePreview {
   summaryPreview: string;
@@ -11,6 +12,7 @@ interface FreePreview {
 
 interface LockedPreviewCardProps {
   preview: FreePreview;
+  applicationId: string;
 }
 
 /**
@@ -20,12 +22,12 @@ interface LockedPreviewCardProps {
  *  - Card header: "Your optimized resume is ready" + Pro badge
  *  - Visible: Professional summary preview + first rewritten bullet
  *  - Blurred: placeholder lines for locked sections
- *  - Overlay: in-card CTA — "See the complete rewrite" + trial button
+ *  - Overlay: two CTAs — "Unlock this result — $4" and "Start Pro trial"
  *
  * Security: The full tailored CV is never sent by the server to free users.
  * This component only renders the preview data the server intentionally shared.
  */
-export function LockedPreviewCard({ preview }: LockedPreviewCardProps) {
+export function LockedPreviewCard({ preview, applicationId }: LockedPreviewCardProps) {
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-0">
@@ -36,7 +38,7 @@ export function LockedPreviewCard({ preview }: LockedPreviewCardProps) {
           </span>
           <span className="text-xs text-violet-600 font-semibold bg-violet-50 border border-violet-200 px-2.5 py-1 rounded-full flex items-center gap-1.5 shrink-0">
             <Crown className="w-3 h-3" aria-hidden="true" />
-            Full version on Pro
+            Full version locked
           </span>
         </div>
 
@@ -75,7 +77,7 @@ export function LockedPreviewCard({ preview }: LockedPreviewCardProps) {
             lineWidths={["100%", "92%", "82%", "100%", "72%", "88%", "95%", "65%", "100%", "78%", "88%", "60%", "93%", "74%"]}
           />
 
-          {/* In-card upgrade CTA — floats over the blurred section */}
+          {/* In-card dual-CTA overlay — floats over the blurred section */}
           <div className="absolute inset-0 flex items-end justify-center pb-6 px-4">
             <div className="bg-card/95 backdrop-blur-sm border border-border shadow-xl rounded-2xl p-5 w-full max-w-sm">
               {/* Section count context */}
@@ -84,29 +86,36 @@ export function LockedPreviewCard({ preview }: LockedPreviewCardProps) {
               </p>
 
               {/* Headline */}
-              <h4 className="text-base font-bold text-foreground text-center mb-3 leading-snug">
+              <h4 className="text-base font-bold text-foreground text-center mb-4 leading-snug">
                 See exactly how we rewrote<br />your experience for this role
               </h4>
 
-              {/* Compact feature chips */}
-              <div className="flex flex-wrap justify-center gap-1.5 mb-4">
-                {["Full resume rewrite", "DOCX & PDF export", "Cover letter"].map((chip) => (
-                  <span
-                    key={chip}
-                    className="text-[11px] font-medium px-2.5 py-1 bg-violet-50 border border-violet-200 text-violet-700 rounded-full"
-                  >
-                    {chip}
-                  </span>
-                ))}
+              {/* ── Primary CTA: one-time unlock ── */}
+              <UnlockButton
+                applicationId={applicationId}
+                label="Unlock this result — $4"
+                className="w-full h-10 text-sm mb-2"
+              />
+              <p className="text-[10px] text-muted-foreground text-center mb-3">
+                No subscription. Instant access. Includes DOCX & PDF export.
+              </p>
+
+              {/* Divider */}
+              <div className="flex items-center gap-2 mb-3">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                  or
+                </span>
+                <div className="flex-1 h-px bg-border" />
               </div>
 
-              {/* CTA */}
+              {/* ── Secondary CTA: Pro subscription ── */}
               <UpgradeButton
-                label="Try Pro free for 7 days"
-                className="w-full h-10 text-sm"
+                label="Start Pro — 7 days free"
+                className="w-full h-9 text-sm"
               />
-              <p className="text-[10px] text-muted-foreground text-center mt-2">
-                No card charged for 7 days · Cancel anytime
+              <p className="text-[10px] text-muted-foreground text-center mt-1.5">
+                Unlimited results · Cover letters · Better value for repeat use
               </p>
             </div>
           </div>
