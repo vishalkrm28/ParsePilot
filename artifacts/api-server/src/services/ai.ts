@@ -1,8 +1,9 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
-import type { ParsedCv } from "@workspace/db";
+import type { ParsedCv, ParsedJobDescription } from "@workspace/db";
 import { z } from "zod";
 
-// Local zod schema for AI output validation (uses "zod" not "zod/v4" for esbuild compat)
+// ─── Local Zod schemas (use "zod" not "zod/v4" for esbuild compat) ─────────
+
 const LocalParsedCvSchema = z.object({
   name: z.string().nullable().catch(null),
   email: z.string().nullable().catch(null),
@@ -36,15 +37,47 @@ const LocalParsedCvSchema = z.object({
   languages: z.array(z.string()).catch([]),
 });
 
-// ─── CV Parsing (Responses API) ────────────────────────────────────────────
+const LocalParsedJdSchema = z.object({
+  required_skills: z.array(z.string()).catch([]),
+  preferred_skills: z.array(z.string()).catch([]),
+  required_experience_years: z.number().nullable().catch(null),
+  key_responsibilities: z.array(z.string()).catch([]),
+  must_have: z.array(z.string()).catch([]),
+  nice_to_have: z.array(z.string()).catch([]),
+  job_type: z.enum(["full-time", "part-time", "contract", "internship"]).nullable().catch(null),
+  location_type: z.enum(["remote", "hybrid", "onsite"]).nullable().catch(null),
+});
+
+const AnalysisOutputSchema = z.object({
+  tailoredCvText: z.string().catch(""),
+  keywordMatchScore: z.number().min(0).max(100).catch(0),
+  matchedKeywords: z.array(z.string()).catch([]),
+  missingKeywords: z.array(z.string()).catch([]),
+  missingInfoQuestions: z.array(z.string()).catch([]),
+  sectionSuggestions: z.array(z.string()).catch([]),
+});
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function parseJsonResponse<T>(content: string | null | undefined, label: string): unknown {
+  if (!content) throw new Error(`AI returned empty response for ${label}`);
+  try {
+    return JSON.parse(content);
+  } catch {
+    throw new Error(`AI returned invalid JSON for ${label}`);
+  }
+}
+
+// ─── CV Parsing (Responses API) ──────────────────────────────────────────────
 
 const CV_PARSE_INSTRUCTIONS = `You are a precise CV/resume data extraction engine.
 Extract all structured information from the raw CV text provided.
 Return ONLY valid JSON. Do not include commentary, markdown, or explanation.
 
-RULES:
-- Extract only what is explicitly present in the text — never infer or invent
-- Dates should be in the original format from the CV (e.g. "Jan 2021", "2019-2022", "Present")
+ABSOLUTE RULES — violation is unacceptable:
+- Extract ONLY what is explicitly present in the text — never infer, assume, or invent
+- Never add skills, roles, dates, or achievements not present verbatim
+- Dates must be in the original format from the CV (e.g. "Jan 2021", "2019–2022", "Present")
 - For end_date: use null when the role is current/ongoing
 - bullets: extract each distinct achievement or responsibility as a separate string
 - skills: flat array of all technical and soft skills mentioned
@@ -57,28 +90,12 @@ Return JSON matching this exact schema:
   "email": "string or null",
   "phone": "string or null",
   "location": "string or null",
-  "summary": "string or null — professional summary/objective if present",
-  "work_experience": [
-    {
-      "company": "string",
-      "title": "string",
-      "start_date": "string",
-      "end_date": "string or null",
-      "bullets": ["string", ...]
-    }
-  ],
-  "education": [
-    {
-      "institution": "string",
-      "degree": "string",
-      "field": "string or null",
-      "start_date": "string or null",
-      "end_date": "string or null"
-    }
-  ],
-  "skills": ["string", ...],
-  "certifications": ["string", ...],
-  "languages": ["string", ...]
+  "summary": "string or null",
+  "work_experience": [{"company":"string","title":"string","start_date":"string","end_date":"string|null","bullets":["string"]}],
+  "education": [{"institution":"string","degree":"string","field":"string|null","start_date":"string|null","end_date":"string|null"}],
+  "skills": ["string"],
+  "certifications": ["string"],
+  "languages": ["string"]
 }`;
 
 export async function parseCv(rawText: string): Promise<ParsedCv> {
@@ -99,46 +116,87 @@ export async function parseCv(rawText: string): Promise<ParsedCv> {
     max_output_tokens: 8192,
   });
 
-  const content = response.output_text;
-  if (!content) {
-    throw new Error("AI returned empty response during CV parsing");
-  }
-
-  let raw: unknown;
-  try {
-    raw = JSON.parse(content);
-  } catch {
-    throw new Error("AI returned invalid JSON during CV parsing");
-  }
-
+  const raw = parseJsonResponse(response.output_text, "CV parsing");
   const result = LocalParsedCvSchema.safeParse(raw);
+
   if (!result.success) {
-    // Attempt lenient recovery: fill missing fields with defaults
     return {
-      name: null,
-      email: null,
-      phone: null,
-      location: null,
-      summary: null,
-      work_experience: [],
-      education: [],
-      skills: [],
-      certifications: [],
-      languages: [],
+      name: null, email: null, phone: null, location: null, summary: null,
+      work_experience: [], education: [], skills: [], certifications: [], languages: [],
       ...((raw as Record<string, unknown>) ?? {}),
     } as ParsedCv;
   }
-
   return result.data;
 }
 
-// ─── CV Analysis ────────────────────────────────────────────────────────────
+// ─── Job Description Parsing (Responses API) ─────────────────────────────────
+
+const JD_PARSE_INSTRUCTIONS = `You are a job description analysis engine.
+Extract structured requirements from the job description provided.
+Return ONLY valid JSON. Do not include commentary, markdown, or explanation.
+
+RULES:
+- required_skills: skills explicitly marked as required, must-have, or essential
+- preferred_skills: skills marked as preferred, nice-to-have, bonus, or desirable
+- required_experience_years: extract the minimum years if explicitly stated (e.g. "5+ years" → 5), else null
+- key_responsibilities: the main job duties, condensed to 3–8 clear bullet points
+- must_have: non-negotiable qualifications (education level, specific certs, hard requirements)
+- nice_to_have: desirable but clearly optional qualifications
+- job_type: "full-time" | "part-time" | "contract" | "internship" | null
+- location_type: "remote" | "hybrid" | "onsite" | null
+
+Return JSON matching this exact schema:
+{
+  "required_skills": ["string"],
+  "preferred_skills": ["string"],
+  "required_experience_years": number or null,
+  "key_responsibilities": ["string"],
+  "must_have": ["string"],
+  "nice_to_have": ["string"],
+  "job_type": "full-time" | "part-time" | "contract" | "internship" | null,
+  "location_type": "remote" | "hybrid" | "onsite" | null
+}`;
+
+export async function parseJobDescription(jobDescription: string): Promise<ParsedJobDescription> {
+  if (!jobDescription || jobDescription.trim().length < 20) {
+    throw new Error("Job description is too short to parse");
+  }
+
+  const response = await openai.responses.create({
+    model: "gpt-5.2",
+    instructions: JD_PARSE_INSTRUCTIONS,
+    input: [
+      {
+        role: "user",
+        content: `Extract structured requirements from the following job description and return valid JSON:\n\n${jobDescription.slice(0, 20000)}`,
+      },
+    ],
+    text: { format: { type: "json_object" } },
+    max_output_tokens: 4096,
+  });
+
+  const raw = parseJsonResponse(response.output_text, "JD parsing");
+  const result = LocalParsedJdSchema.safeParse(raw);
+
+  if (!result.success) {
+    return {
+      required_skills: [], preferred_skills: [], required_experience_years: null,
+      key_responsibilities: [], must_have: [], nice_to_have: [],
+      job_type: null, location_type: null,
+      ...((raw as Record<string, unknown>) ?? {}),
+    } as ParsedJobDescription;
+  }
+  return result.data;
+}
+
+// ─── CV Analysis (Responses API) ─────────────────────────────────────────────
 
 export interface AnalysisInput {
   originalCvText: string;
   jobDescription: string;
   jobTitle: string;
   company: string;
+  parsedJd?: ParsedJobDescription | null;
   confirmedAnswers?: Record<string, string>;
 }
 
@@ -151,80 +209,80 @@ export interface AnalysisOutput {
   sectionSuggestions: string[];
 }
 
-const AnalysisOutputSchema = z.object({
-  tailoredCvText: z.string(),
-  keywordMatchScore: z.number().min(0).max(100),
-  matchedKeywords: z.array(z.string()),
-  missingKeywords: z.array(z.string()),
-  missingInfoQuestions: z.array(z.string()),
-  sectionSuggestions: z.array(z.string()),
-});
-
 export async function analyzeCvForJob(input: AnalysisInput): Promise<AnalysisOutput> {
   const confirmedContext =
     input.confirmedAnswers && Object.keys(input.confirmedAnswers).length > 0
-      ? `\n\nThe user has confirmed the following additional information:\n${Object.entries(input.confirmedAnswers)
+      ? `\n\nCANDIDATE-CONFIRMED ADDITIONAL INFORMATION (use this to address missing keywords — only include if the candidate confirmed having this experience):\n${Object.entries(input.confirmedAnswers)
           .map(([q, a]) => `Q: ${q}\nA: ${a}`)
           .join("\n\n")}`
       : "";
 
-  const systemPrompt = `You are an expert ATS (Applicant Tracking System) CV optimizer and career coach.
-Your task is to analyze a candidate's CV against a job description and return a structured JSON response.
+  const parsedJdContext = input.parsedJd
+    ? `\n\nSTRUCTURED JOB REQUIREMENTS (parsed from the job description):
+Required skills: ${input.parsedJd.required_skills.join(", ") || "none specified"}
+Preferred skills: ${input.parsedJd.preferred_skills.join(", ") || "none specified"}
+Must-have qualifications: ${input.parsedJd.must_have.join("; ") || "none specified"}
+Nice-to-have: ${input.parsedJd.nice_to_have.join("; ") || "none specified"}
+Required experience: ${input.parsedJd.required_experience_years != null ? `${input.parsedJd.required_experience_years}+ years` : "not specified"}
+Key responsibilities: ${input.parsedJd.key_responsibilities.join("; ") || "see job description"}`
+    : "";
 
-CRITICAL RULES — you MUST follow these without exception:
-1. NEVER invent, fabricate, or add any information not present in the original CV
-2. NEVER add fake job experience, skills, tools, degrees, certifications, or achievements
-3. ONLY rewrite, reorder, and rephrase existing content from the CV to better match the job description
-4. If critical information is missing (e.g., years of experience in a required skill), add it to missingInfoQuestions
-5. Keep all dates, company names, job titles, and metrics exactly as they appear in the original CV
-6. The tailored CV must be ATS-friendly: use standard section headings, avoid tables/columns/graphics in text
+  const SYSTEM_PROMPT = `You are an elite ATS (Applicant Tracking System) CV optimization expert and senior career coach.
+Your task: analyze a candidate's CV against a job description and return a structured JSON response.
 
-Return ONLY valid JSON matching this exact schema:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ABSOLUTE RULES — VIOLATION IS GROUNDS FOR FAILURE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. NEVER invent, fabricate, hallucinate, or add ANY information not explicitly present in the original CV
+2. NEVER add fake job titles, companies, employment dates, degrees, certifications, skills, tools, or metrics
+3. NEVER embellish or upgrade job titles (e.g. do NOT change "Engineer" to "Senior Engineer")
+4. NEVER add years of experience to a skill unless it is stated in the original CV
+5. NEVER include skill claims that are not in the original CV, even if they are common for the role
+6. ONLY rewrite, reorder, and rephrase existing content to better match the job description's language
+7. Keep all dates, company names, job titles, and metrics EXACTLY as they appear in the original CV
+8. Missing information → add a question to missingInfoQuestions INSTEAD of inventing content
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ATS FORMATTING RULES for tailoredCvText:
+- Use plain text only — no tables, columns, borders, or graphics
+- Standard section headings: PROFESSIONAL SUMMARY, WORK EXPERIENCE, EDUCATION, SKILLS, CERTIFICATIONS
+- Each job: Company | Title | Date range, followed by bullet points starting with strong action verbs
+- Bullet points: quantified achievements preferred (keep existing numbers, do NOT invent them)
+- One blank line between sections
+
+Return ONLY valid JSON matching this schema:
 {
-  "tailoredCvText": "string - ATS-optimized CV text using only information from the original CV",
-  "keywordMatchScore": "number 0-100 - percentage of important job keywords present in the original CV",
-  "matchedKeywords": ["array of keywords from the job description that appear in the CV"],
-  "missingKeywords": ["array of important keywords from the job that are NOT in the CV"],
-  "missingInfoQuestions": ["array of questions to ask the candidate about information that would strengthen their application but is absent from their CV"],
-  "sectionSuggestions": ["array of specific suggestions for improving the CV structure/content based only on what IS in the CV"]
+  "tailoredCvText": "complete ATS-formatted CV using ONLY original CV content",
+  "keywordMatchScore": 0–100,
+  "matchedKeywords": ["keywords from JD present in the CV"],
+  "missingKeywords": ["important JD keywords absent from CV"],
+  "missingInfoQuestions": ["specific questions about absent experience that would strengthen the application"],
+  "sectionSuggestions": ["concrete structural improvements to the CV — only based on existing content"]
 }`;
 
-  const userPrompt = `JOB TITLE: ${input.jobTitle}
+  const USER_PROMPT = `JOB TITLE: ${input.jobTitle}
 COMPANY: ${input.company}
 
 JOB DESCRIPTION:
-${input.jobDescription}
+${input.jobDescription}${parsedJdContext}
 
-ORIGINAL CV:
+ORIGINAL CV (source of truth — do not add anything not in this document):
 ${input.originalCvText}${confirmedContext}
 
-Analyze the CV against the job description and return the JSON response.`;
+Analyze the CV against the job description. Return JSON.`;
 
-  const response = await openai.chat.completions.create({
+  const response = await openai.responses.create({
     model: "gpt-5.2",
-    max_completion_tokens: 8192,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    response_format: { type: "json_object" },
+    instructions: SYSTEM_PROMPT,
+    input: [{ role: "user", content: USER_PROMPT }],
+    text: { format: { type: "json_object" } },
+    max_output_tokens: 8192,
   });
 
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error("No response from AI");
-  }
-
-  let raw: unknown;
-  try {
-    raw = JSON.parse(content);
-  } catch {
-    throw new Error("AI returned invalid JSON during analysis");
-  }
-
+  const raw = parseJsonResponse(response.output_text, "CV analysis");
   const result = AnalysisOutputSchema.safeParse(raw);
+
   if (!result.success) {
-    // lenient fallback
     const r = raw as Record<string, unknown>;
     return {
       tailoredCvText: (r.tailoredCvText as string) ?? "",
@@ -235,11 +293,10 @@ Analyze the CV against the job description and return the JSON response.`;
       sectionSuggestions: Array.isArray(r.sectionSuggestions) ? (r.sectionSuggestions as string[]) : [],
     };
   }
-
   return result.data;
 }
 
-// ─── Cover Letter ────────────────────────────────────────────────────────────
+// ─── Cover Letter Generation ──────────────────────────────────────────────────
 
 export interface CoverLetterInput {
   originalCvText: string;
@@ -255,22 +312,23 @@ export async function generateCoverLetter(input: CoverLetterInput): Promise<stri
   const toneDescriptions = {
     professional: "formal, polished, and measured",
     enthusiastic: "warm, energetic, and genuinely excited about the role",
-    concise: "brief, direct, and highly focused (3 short paragraphs max)",
+    concise: "brief, direct, and highly focused — 3 short paragraphs maximum",
   };
 
-  const systemPrompt = `You are an expert cover letter writer for job applications.
-Your task is to write an ATS-friendly cover letter based ONLY on information present in the candidate's CV.
+  const SYSTEM_PROMPT = `You are an expert cover letter writer for job applications.
+Write an ATS-friendly cover letter based ONLY on information present in the candidate's CV.
 
-CRITICAL RULES:
-1. NEVER invent or fabricate any experience, skills, or achievements not in the CV
-2. Use ONLY information from the CV to support claims
-3. Match the tone: ${toneDescriptions[input.tone]}
-4. Keep it to 3-4 paragraphs
-5. Do NOT use generic filler phrases like "I am a hard-working individual"
-6. Address the specific requirements from the job description using evidence from the CV
-7. Return ONLY the cover letter text, no JSON`;
+ABSOLUTE RULES — VIOLATION IS GROUNDS FOR FAILURE:
+1. NEVER invent or fabricate any experience, skills, achievements, or qualifications not in the CV
+2. NEVER make claims the CV does not explicitly support
+3. Use ONLY information from the provided CV to back up every claim
+4. Tone: ${toneDescriptions[input.tone]}
+5. Length: 3–4 paragraphs
+6. Do NOT use generic filler phrases like "I am a hard-working individual" or "passionate team player"
+7. Address specific requirements from the job description using concrete evidence from the CV
+8. Return ONLY the cover letter text — no JSON, no headers, no subject lines`;
 
-  const userPrompt = `JOB TITLE: ${input.jobTitle}
+  const USER_PROMPT = `JOB TITLE: ${input.jobTitle}
 COMPANY: ${input.company}
 
 JOB DESCRIPTION:
@@ -278,23 +336,18 @@ ${input.jobDescription}
 
 CANDIDATE CV:
 ${input.tailoredCvText || input.originalCvText}
-${input.additionalContext ? `\nADDITIONAL CONTEXT: ${input.additionalContext}` : ""}
+${input.additionalContext ? `\nADDITIONAL CONTEXT PROVIDED BY CANDIDATE: ${input.additionalContext}` : ""}
 
 Write the cover letter.`;
 
-  const response = await openai.chat.completions.create({
+  const response = await openai.responses.create({
     model: "gpt-5.2",
-    max_completion_tokens: 2048,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
+    instructions: SYSTEM_PROMPT,
+    input: [{ role: "user", content: USER_PROMPT }],
+    max_output_tokens: 2048,
   });
 
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error("AI returned empty cover letter");
-  }
-
+  const content = response.output_text;
+  if (!content) throw new Error("AI returned empty cover letter");
   return content;
 }

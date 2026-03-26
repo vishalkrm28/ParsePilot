@@ -7,6 +7,7 @@
  */
 import type { ApplicationStatus } from "./applicationStatus";
 import type { ParsedCv } from "./parsedCv";
+import type { ParsedJobDescription } from "./parsedJobDescription";
 
 export interface Application {
   id: string;
@@ -16,12 +17,14 @@ export interface Application {
   jobDescription: string;
   originalCvText: string;
   parsedCvJson?: ParsedCv | null;
+  parsedJdJson?: ParsedJobDescription | null;
   tailoredCvText?: string | null;
   coverLetterText?: string | null;
   keywordMatchScore?: number | null;
   missingKeywords: string[];
   matchedKeywords: string[];
   missingInfoQuestions: string[];
+  sectionSuggestions: string[];
   status: ApplicationStatus;
   createdAt: Date;
   updatedAt: Date;

@@ -64,6 +64,48 @@ export interface ParsedEducation {
   end_date?: string | null;
 }
 
+export interface SaveTailoredCvBody {
+  /** @minLength 1 */
+  tailoredCvText: string;
+}
+
+export interface SaveCoverLetterBody {
+  /** @minLength 1 */
+  coverLetterText: string;
+}
+
+export type ParsedJobDescriptionJobType =
+  | (typeof ParsedJobDescriptionJobType)[keyof typeof ParsedJobDescriptionJobType]
+  | null;
+
+export const ParsedJobDescriptionJobType = {
+  "full-time": "full-time",
+  "part-time": "part-time",
+  contract: "contract",
+  internship: "internship",
+} as const;
+
+export type ParsedJobDescriptionLocationType =
+  | (typeof ParsedJobDescriptionLocationType)[keyof typeof ParsedJobDescriptionLocationType]
+  | null;
+
+export const ParsedJobDescriptionLocationType = {
+  remote: "remote",
+  hybrid: "hybrid",
+  onsite: "onsite",
+} as const;
+
+export interface ParsedJobDescription {
+  required_skills: string[];
+  preferred_skills: string[];
+  required_experience_years?: number | null;
+  key_responsibilities: string[];
+  must_have: string[];
+  nice_to_have: string[];
+  job_type?: ParsedJobDescriptionJobType;
+  location_type?: ParsedJobDescriptionLocationType;
+}
+
 export interface ParsedCv {
   name: string | null;
   email: string | null;
@@ -94,12 +136,14 @@ export interface Application {
   jobDescription: string;
   originalCvText: string;
   parsedCvJson?: ParsedCv | null;
+  parsedJdJson?: ParsedJobDescription | null;
   tailoredCvText?: string | null;
   coverLetterText?: string | null;
   keywordMatchScore?: number | null;
   missingKeywords: string[];
   matchedKeywords: string[];
   missingInfoQuestions: string[];
+  sectionSuggestions: string[];
   status: ApplicationStatus;
   createdAt: string;
   updatedAt: string;

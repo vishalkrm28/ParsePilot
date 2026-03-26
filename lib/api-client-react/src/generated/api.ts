@@ -34,6 +34,8 @@ import type {
   MobileTokenExchangeSuccess,
   ParseCvBody,
   ParseCvResult,
+  SaveCoverLetterBody,
+  SaveTailoredCvBody,
   UpdateApplicationBody,
   UploadCvBody,
   UploadCvResult,
@@ -1085,6 +1087,180 @@ export const useDeleteApplication = <
   TContext
 > => {
   return useMutation(getDeleteApplicationMutationOptions(options));
+};
+
+/**
+ * @summary Save edited tailored CV text
+ */
+export const getSaveTailoredCvUrl = (id: string) => {
+  return `/api/applications/${id}/tailored-cv`;
+};
+
+export const saveTailoredCv = async (
+  id: string,
+  saveTailoredCvBody: SaveTailoredCvBody,
+  options?: RequestInit,
+): Promise<Application> => {
+  return customFetch<Application>(getSaveTailoredCvUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(saveTailoredCvBody),
+  });
+};
+
+export const getSaveTailoredCvMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveTailoredCv>>,
+    TError,
+    { id: string; data: BodyType<SaveTailoredCvBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveTailoredCv>>,
+  TError,
+  { id: string; data: BodyType<SaveTailoredCvBody> },
+  TContext
+> => {
+  const mutationKey = ["saveTailoredCv"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveTailoredCv>>,
+    { id: string; data: BodyType<SaveTailoredCvBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return saveTailoredCv(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SaveTailoredCvMutationResult = NonNullable<
+  Awaited<ReturnType<typeof saveTailoredCv>>
+>;
+export type SaveTailoredCvMutationBody = BodyType<SaveTailoredCvBody>;
+export type SaveTailoredCvMutationError = ErrorType<void>;
+
+/**
+ * @summary Save edited tailored CV text
+ */
+export const useSaveTailoredCv = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveTailoredCv>>,
+    TError,
+    { id: string; data: BodyType<SaveTailoredCvBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof saveTailoredCv>>,
+  TError,
+  { id: string; data: BodyType<SaveTailoredCvBody> },
+  TContext
+> => {
+  return useMutation(getSaveTailoredCvMutationOptions(options));
+};
+
+/**
+ * @summary Save edited cover letter text
+ */
+export const getSaveCoverLetterUrl = (id: string) => {
+  return `/api/applications/${id}/cover-letter-save`;
+};
+
+export const saveCoverLetter = async (
+  id: string,
+  saveCoverLetterBody: SaveCoverLetterBody,
+  options?: RequestInit,
+): Promise<Application> => {
+  return customFetch<Application>(getSaveCoverLetterUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(saveCoverLetterBody),
+  });
+};
+
+export const getSaveCoverLetterMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveCoverLetter>>,
+    TError,
+    { id: string; data: BodyType<SaveCoverLetterBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveCoverLetter>>,
+  TError,
+  { id: string; data: BodyType<SaveCoverLetterBody> },
+  TContext
+> => {
+  const mutationKey = ["saveCoverLetter"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveCoverLetter>>,
+    { id: string; data: BodyType<SaveCoverLetterBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return saveCoverLetter(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SaveCoverLetterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof saveCoverLetter>>
+>;
+export type SaveCoverLetterMutationBody = BodyType<SaveCoverLetterBody>;
+export type SaveCoverLetterMutationError = ErrorType<void>;
+
+/**
+ * @summary Save edited cover letter text
+ */
+export const useSaveCoverLetter = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveCoverLetter>>,
+    TError,
+    { id: string; data: BodyType<SaveCoverLetterBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof saveCoverLetter>>,
+  TError,
+  { id: string; data: BodyType<SaveCoverLetterBody> },
+  TContext
+> => {
+  return useMutation(getSaveCoverLetterMutationOptions(options));
 };
 
 /**

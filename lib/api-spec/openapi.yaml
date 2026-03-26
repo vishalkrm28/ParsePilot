@@ -233,6 +233,60 @@ paths:
         "204":
           description: Deleted
 
+  /applications/{id}/tailored-cv:
+    patch:
+      operationId: saveTailoredCv
+      tags: [applications]
+      summary: Save edited tailored CV text
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveTailoredCvBody"
+      responses:
+        "200":
+          description: Updated application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "404":
+          description: Not found
+
+  /applications/{id}/cover-letter-save:
+    patch:
+      operationId: saveCoverLetter
+      tags: [applications]
+      summary: Save edited cover letter text
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveCoverLetterBody"
+      responses:
+        "200":
+          description: Updated application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "404":
+          description: Not found
+
   /applications/{id}/analyze:
     post:
       operationId: analyzeApplication
@@ -502,6 +556,65 @@ components:
         - institution
         - degree
 
+    SaveTailoredCvBody:
+      type: object
+      properties:
+        tailoredCvText:
+          type: string
+          minLength: 1
+      required:
+        - tailoredCvText
+
+    SaveCoverLetterBody:
+      type: object
+      properties:
+        coverLetterText:
+          type: string
+          minLength: 1
+      required:
+        - coverLetterText
+
+    ParsedJobDescription:
+      type: object
+      properties:
+        required_skills:
+          type: array
+          items:
+            type: string
+        preferred_skills:
+          type: array
+          items:
+            type: string
+        required_experience_years:
+          type: number
+          nullable: true
+        key_responsibilities:
+          type: array
+          items:
+            type: string
+        must_have:
+          type: array
+          items:
+            type: string
+        nice_to_have:
+          type: array
+          items:
+            type: string
+        job_type:
+          type: string
+          enum: [full-time, part-time, contract, internship]
+          nullable: true
+        location_type:
+          type: string
+          enum: [remote, hybrid, onsite]
+          nullable: true
+      required:
+        - required_skills
+        - preferred_skills
+        - key_responsibilities
+        - must_have
+        - nice_to_have
+
     ParsedCv:
       type: object
       properties:
@@ -572,6 +685,11 @@ components:
           oneOf:
             - $ref: "#/components/schemas/ParsedCv"
             - type: 'null'
+        parsedJdJson:
+          nullable: true
+          oneOf:
+            - $ref: "#/components/schemas/ParsedJobDescription"
+            - type: 'null'
         tailoredCvText:
           type: string
           nullable: true
@@ -590,6 +708,10 @@ components:
           items:
             type: string
         missingInfoQuestions:
+          type: array
+          items:
+            type: string
+        sectionSuggestions:
           type: array
           items:
             type: string
@@ -612,6 +734,7 @@ components:
         - missingKeywords
         - matchedKeywords
         - missingInfoQuestions
+        - sectionSuggestions
         - status
         - createdAt
         - updatedAt

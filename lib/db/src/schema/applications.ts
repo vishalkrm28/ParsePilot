@@ -2,6 +2,8 @@ import { pgTable, text, timestamp, real, jsonb, uuid } from "drizzle-orm/pg-core
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
+// ─── Parsed CV ───────────────────────────────────────────────────────────────
+
 export const ParsedWorkExperienceSchema = z.object({
   company: z.string(),
   title: z.string(),
@@ -33,6 +35,23 @@ export const ParsedCvSchema = z.object({
 
 export type ParsedCv = z.infer<typeof ParsedCvSchema>;
 
+// ─── Parsed Job Description ──────────────────────────────────────────────────
+
+export const ParsedJobDescriptionSchema = z.object({
+  required_skills: z.array(z.string()),
+  preferred_skills: z.array(z.string()),
+  required_experience_years: z.number().nullable(),
+  key_responsibilities: z.array(z.string()),
+  must_have: z.array(z.string()),
+  nice_to_have: z.array(z.string()),
+  job_type: z.enum(["full-time", "part-time", "contract", "internship"]).nullable(),
+  location_type: z.enum(["remote", "hybrid", "onsite"]).nullable(),
+});
+
+export type ParsedJobDescription = z.infer<typeof ParsedJobDescriptionSchema>;
+
+// ─── Applications Table ──────────────────────────────────────────────────────
+
 export const applicationsTable = pgTable("applications", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: text("user_id").notNull(),
@@ -41,12 +60,14 @@ export const applicationsTable = pgTable("applications", {
   jobDescription: text("job_description").notNull(),
   originalCvText: text("original_cv_text").notNull(),
   parsedCvJson: jsonb("parsed_cv_json").$type<ParsedCv>(),
+  parsedJdJson: jsonb("parsed_jd_json").$type<ParsedJobDescription>(),
   tailoredCvText: text("tailored_cv_text"),
   coverLetterText: text("cover_letter_text"),
   keywordMatchScore: real("keyword_match_score"),
   missingKeywords: jsonb("missing_keywords").$type<string[]>().default([]).notNull(),
   matchedKeywords: jsonb("matched_keywords").$type<string[]>().default([]).notNull(),
   missingInfoQuestions: jsonb("missing_info_questions").$type<string[]>().default([]).notNull(),
+  sectionSuggestions: jsonb("section_suggestions").$type<string[]>().default([]).notNull(),
   status: text("status", { enum: ["draft", "analyzed", "exported"] }).default("draft").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

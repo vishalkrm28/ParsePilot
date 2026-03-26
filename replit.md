@@ -54,12 +54,15 @@ artifacts-monorepo/
 
 1. **Auth** - Replit OIDC login; landing page for unauthenticated users, dashboard for signed-in users
 2. **CV Upload** - PDF and DOCX file upload with text extraction, or manual paste
-3. **AI Analysis** - GPT-5.2 analyzes CV vs job description, returns ATS-optimized rewrite
-4. **Keyword Match** - Shows match score %, matched/missing keywords as visual chips
-5. **Missing Info** - AI surfaces questions if key info is absent; user can answer and re-analyze
-6. **Cover Letter** - AI generates tone-controlled cover letter (professional/enthusiastic/concise)
-7. **Export** - Download tailored CV or cover letter as DOCX
-8. **Saved Applications** - All applications saved per authenticated user with status tracking
+3. **JD Parsing** - Job description parsed into structured JSON (`parseJobDescription()` via Responses API): required_skills, preferred_skills, key_responsibilities, must_have, nice_to_have, experience_years, job_type, location_type
+4. **AI Analysis** - GPT-5.2 analyzes CV vs parsed JD (Responses API), returns ATS-optimized rewrite; fabrication strictly forbidden in prompts; `parsedJdJson` + `sectionSuggestions` saved to DB
+5. **Keyword Match** - Shows match score %, matched/missing keywords as visual chips; score ring color-coded (green/amber/red)
+6. **Section Suggestions** - 5th tab: AI structural suggestions based only on existing CV content
+7. **Missing Info** - AI surfaces questions if key info is absent; user can answer and re-analyze with confirmed context
+8. **Cover Letter** - AI generates tone-controlled cover letter (professional/enthusiastic/concise); editable + saveable
+9. **Edit & Save** - Tailored CV and cover letter are fully editable with unsaved-changes indicator and Save/Discard buttons
+10. **Export** - Download tailored CV or cover letter as DOCX
+11. **Saved Applications** - All applications saved per authenticated user with status tracking
 
 ## Critical Rules (enforced in AI prompts)
 

@@ -7,10 +7,13 @@ import {
   AnalyzeApplicationBody,
   GenerateCoverLetterBody,
 } from "@workspace/api-zod";
-import { analyzeCvForJob, generateCoverLetter } from "../services/ai.js";
+import { z } from "zod";
+import { analyzeCvForJob, generateCoverLetter, parseJobDescription } from "../services/ai.js";
 import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
+
+// ─── GET /applications ───────────────────────────────────────────────────────
 
 router.get("/applications", async (req, res) => {
   const { userId } = req.query;
@@ -30,6 +33,8 @@ router.get("/applications", async (req, res) => {
     res.status(500).json({ error: "Failed to retrieve applications", code: "DB_ERROR" });
   }
 });
+
+// ─── POST /applications ──────────────────────────────────────────────────────
 
 router.post("/applications", async (req, res) => {
   const parsed = CreateApplicationBody.safeParse(req.body);
@@ -54,6 +59,7 @@ router.post("/applications", async (req, res) => {
         missingKeywords: [],
         matchedKeywords: [],
         missingInfoQuestions: [],
+        sectionSuggestions: [],
       })
       .returning();
     res.status(201).json(app);
@@ -62,6 +68,8 @@ router.post("/applications", async (req, res) => {
     res.status(500).json({ error: "Failed to create application", code: "DB_ERROR" });
   }
 });
+
+// ─── GET /applications/:id ───────────────────────────────────────────────────
 
 router.get("/applications/:id", async (req, res) => {
   const { id } = req.params;
@@ -80,6 +88,8 @@ router.get("/applications/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to retrieve application", code: "DB_ERROR" });
   }
 });
+
+// ─── PUT /applications/:id ───────────────────────────────────────────────────
 
 router.put("/applications/:id", async (req, res) => {
   const { id } = req.params;
@@ -109,6 +119,8 @@ router.put("/applications/:id", async (req, res) => {
   }
 });
 
+// ─── DELETE /applications/:id ────────────────────────────────────────────────
+
 router.delete("/applications/:id", async (req, res) => {
   const { id } = req.params;
   try {
@@ -119,6 +131,76 @@ router.delete("/applications/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to delete application", code: "DB_ERROR" });
   }
 });
+
+// ─── PATCH /applications/:id/tailored-cv ─────────────────────────────────────
+
+const SaveTailoredCvBody = z.object({
+  tailoredCvText: z.string().min(1, "Tailored CV text cannot be empty"),
+});
+
+router.patch("/applications/:id/tailored-cv", async (req, res) => {
+  const { id } = req.params;
+  const parsed = SaveTailoredCvBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: "Invalid request body",
+      details: parsed.error.issues.map((i) => ({ field: i.path.join("."), message: i.message })),
+      code: "VALIDATION_ERROR",
+    });
+    return;
+  }
+  try {
+    const [app] = await db
+      .update(applicationsTable)
+      .set({ tailoredCvText: parsed.data.tailoredCvText, updatedAt: new Date() })
+      .where(eq(applicationsTable.id, id))
+      .returning();
+    if (!app) {
+      res.status(404).json({ error: "Application not found", code: "NOT_FOUND" });
+      return;
+    }
+    res.json(app);
+  } catch (err) {
+    logger.error({ err, id }, "Failed to save tailored CV");
+    res.status(500).json({ error: "Failed to save tailored CV", code: "DB_ERROR" });
+  }
+});
+
+// ─── PATCH /applications/:id/cover-letter ────────────────────────────────────
+
+const SaveCoverLetterBody = z.object({
+  coverLetterText: z.string().min(1, "Cover letter text cannot be empty"),
+});
+
+router.patch("/applications/:id/cover-letter-save", async (req, res) => {
+  const { id } = req.params;
+  const parsed = SaveCoverLetterBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: "Invalid request body",
+      details: parsed.error.issues.map((i) => ({ field: i.path.join("."), message: i.message })),
+      code: "VALIDATION_ERROR",
+    });
+    return;
+  }
+  try {
+    const [app] = await db
+      .update(applicationsTable)
+      .set({ coverLetterText: parsed.data.coverLetterText, updatedAt: new Date() })
+      .where(eq(applicationsTable.id, id))
+      .returning();
+    if (!app) {
+      res.status(404).json({ error: "Application not found", code: "NOT_FOUND" });
+      return;
+    }
+    res.json(app);
+  } catch (err) {
+    logger.error({ err, id }, "Failed to save cover letter");
+    res.status(500).json({ error: "Failed to save cover letter", code: "DB_ERROR" });
+  }
+});
+
+// ─── POST /applications/:id/analyze ─────────────────────────────────────────
 
 router.post("/applications/:id/analyze", async (req, res) => {
   const { id } = req.params;
@@ -138,14 +220,27 @@ router.post("/applications/:id/analyze", async (req, res) => {
       return;
     }
 
+    // Parse the job description first (for richer analysis context)
+    let parsedJd = app.parsedJdJson ?? null;
+    if (!parsedJd) {
+      try {
+        parsedJd = await parseJobDescription(app.jobDescription);
+      } catch (err) {
+        logger.warn({ err, id }, "JD parse failed (non-fatal) — continuing without parsed JD");
+      }
+    }
+
+    // Analyze CV against job description (using parsed JD for extra context)
     const result = await analyzeCvForJob({
       originalCvText: app.originalCvText,
       jobDescription: app.jobDescription,
       jobTitle: app.jobTitle,
       company: app.company,
+      parsedJd,
       confirmedAnswers,
     });
 
+    // Save everything
     await db
       .update(applicationsTable)
       .set({
@@ -154,22 +249,26 @@ router.post("/applications/:id/analyze", async (req, res) => {
         missingKeywords: result.missingKeywords,
         matchedKeywords: result.matchedKeywords,
         missingInfoQuestions: result.missingInfoQuestions,
+        sectionSuggestions: result.sectionSuggestions,
+        parsedJdJson: parsedJd as any,
         status: "analyzed",
         updatedAt: new Date(),
       })
       .where(eq(applicationsTable.id, id));
 
-    res.json(result);
+    res.json({ ...result, parsedJd });
   } catch (err) {
     logger.error({ err, id }, "Failed to analyze application");
     res.status(500).json({ error: "Analysis failed. Please try again.", code: "ANALYSIS_ERROR" });
   }
 });
 
+// ─── POST /applications/:id/cover-letter ─────────────────────────────────────
+
 router.post("/applications/:id/cover-letter", async (req, res) => {
   const { id } = req.params;
   const parsed = GenerateCoverLetterBody.safeParse(req.body);
-  const tone = (parsed.success && parsed.data.tone) ? parsed.data.tone : "professional";
+  const tone = parsed.success && parsed.data.tone ? parsed.data.tone : "professional";
   const additionalContext = parsed.success ? parsed.data.additionalContext : undefined;
 
   try {

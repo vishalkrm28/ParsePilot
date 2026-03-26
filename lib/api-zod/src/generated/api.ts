@@ -130,12 +130,30 @@ export const ListApplicationsResponseItem = zod.object({
       zod.null(),
     ])
     .nullish(),
+  parsedJdJson: zod
+    .union([
+      zod.object({
+        required_skills: zod.array(zod.string()),
+        preferred_skills: zod.array(zod.string()),
+        required_experience_years: zod.number().nullish(),
+        key_responsibilities: zod.array(zod.string()),
+        must_have: zod.array(zod.string()),
+        nice_to_have: zod.array(zod.string()),
+        job_type: zod
+          .enum(["full-time", "part-time", "contract", "internship"])
+          .nullish(),
+        location_type: zod.enum(["remote", "hybrid", "onsite"]).nullish(),
+      }),
+      zod.null(),
+    ])
+    .nullish(),
   tailoredCvText: zod.string().nullish(),
   coverLetterText: zod.string().nullish(),
   keywordMatchScore: zod.number().nullish(),
   missingKeywords: zod.array(zod.string()),
   matchedKeywords: zod.array(zod.string()),
   missingInfoQuestions: zod.array(zod.string()),
+  sectionSuggestions: zod.array(zod.string()),
   status: zod.enum(["draft", "analyzed", "exported"]),
   createdAt: zod.date(),
   updatedAt: zod.date(),
@@ -233,12 +251,30 @@ export const GetApplicationResponse = zod.object({
       zod.null(),
     ])
     .nullish(),
+  parsedJdJson: zod
+    .union([
+      zod.object({
+        required_skills: zod.array(zod.string()),
+        preferred_skills: zod.array(zod.string()),
+        required_experience_years: zod.number().nullish(),
+        key_responsibilities: zod.array(zod.string()),
+        must_have: zod.array(zod.string()),
+        nice_to_have: zod.array(zod.string()),
+        job_type: zod
+          .enum(["full-time", "part-time", "contract", "internship"])
+          .nullish(),
+        location_type: zod.enum(["remote", "hybrid", "onsite"]).nullish(),
+      }),
+      zod.null(),
+    ])
+    .nullish(),
   tailoredCvText: zod.string().nullish(),
   coverLetterText: zod.string().nullish(),
   keywordMatchScore: zod.number().nullish(),
   missingKeywords: zod.array(zod.string()),
   matchedKeywords: zod.array(zod.string()),
   missingInfoQuestions: zod.array(zod.string()),
+  sectionSuggestions: zod.array(zod.string()),
   status: zod.enum(["draft", "analyzed", "exported"]),
   createdAt: zod.date(),
   updatedAt: zod.date(),
@@ -338,12 +374,30 @@ export const UpdateApplicationResponse = zod.object({
       zod.null(),
     ])
     .nullish(),
+  parsedJdJson: zod
+    .union([
+      zod.object({
+        required_skills: zod.array(zod.string()),
+        preferred_skills: zod.array(zod.string()),
+        required_experience_years: zod.number().nullish(),
+        key_responsibilities: zod.array(zod.string()),
+        must_have: zod.array(zod.string()),
+        nice_to_have: zod.array(zod.string()),
+        job_type: zod
+          .enum(["full-time", "part-time", "contract", "internship"])
+          .nullish(),
+        location_type: zod.enum(["remote", "hybrid", "onsite"]).nullish(),
+      }),
+      zod.null(),
+    ])
+    .nullish(),
   tailoredCvText: zod.string().nullish(),
   coverLetterText: zod.string().nullish(),
   keywordMatchScore: zod.number().nullish(),
   missingKeywords: zod.array(zod.string()),
   matchedKeywords: zod.array(zod.string()),
   missingInfoQuestions: zod.array(zod.string()),
+  sectionSuggestions: zod.array(zod.string()),
   status: zod.enum(["draft", "analyzed", "exported"]),
   createdAt: zod.date(),
   updatedAt: zod.date(),
@@ -354,6 +408,166 @@ export const UpdateApplicationResponse = zod.object({
  */
 export const DeleteApplicationParams = zod.object({
   id: zod.coerce.string(),
+});
+
+/**
+ * @summary Save edited tailored CV text
+ */
+export const SaveTailoredCvParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const SaveTailoredCvBody = zod.object({
+  tailoredCvText: zod.string().min(1),
+});
+
+export const SaveTailoredCvResponse = zod.object({
+  id: zod.string(),
+  userId: zod.string(),
+  jobTitle: zod.string(),
+  company: zod.string(),
+  jobDescription: zod.string(),
+  originalCvText: zod.string(),
+  parsedCvJson: zod
+    .union([
+      zod.object({
+        name: zod.string().nullable(),
+        email: zod.string().nullable(),
+        phone: zod.string().nullable(),
+        location: zod.string().nullable(),
+        summary: zod.string().nullable(),
+        work_experience: zod.array(
+          zod.object({
+            company: zod.string(),
+            title: zod.string(),
+            start_date: zod.string(),
+            end_date: zod.string().nullable(),
+            bullets: zod.array(zod.string()),
+          }),
+        ),
+        education: zod.array(
+          zod.object({
+            institution: zod.string(),
+            degree: zod.string(),
+            field: zod.string().nullish(),
+            start_date: zod.string().nullish(),
+            end_date: zod.string().nullish(),
+          }),
+        ),
+        skills: zod.array(zod.string()),
+        certifications: zod.array(zod.string()),
+        languages: zod.array(zod.string()),
+      }),
+      zod.null(),
+    ])
+    .nullish(),
+  parsedJdJson: zod
+    .union([
+      zod.object({
+        required_skills: zod.array(zod.string()),
+        preferred_skills: zod.array(zod.string()),
+        required_experience_years: zod.number().nullish(),
+        key_responsibilities: zod.array(zod.string()),
+        must_have: zod.array(zod.string()),
+        nice_to_have: zod.array(zod.string()),
+        job_type: zod
+          .enum(["full-time", "part-time", "contract", "internship"])
+          .nullish(),
+        location_type: zod.enum(["remote", "hybrid", "onsite"]).nullish(),
+      }),
+      zod.null(),
+    ])
+    .nullish(),
+  tailoredCvText: zod.string().nullish(),
+  coverLetterText: zod.string().nullish(),
+  keywordMatchScore: zod.number().nullish(),
+  missingKeywords: zod.array(zod.string()),
+  matchedKeywords: zod.array(zod.string()),
+  missingInfoQuestions: zod.array(zod.string()),
+  sectionSuggestions: zod.array(zod.string()),
+  status: zod.enum(["draft", "analyzed", "exported"]),
+  createdAt: zod.date(),
+  updatedAt: zod.date(),
+});
+
+/**
+ * @summary Save edited cover letter text
+ */
+export const SaveCoverLetterParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const SaveCoverLetterBody = zod.object({
+  coverLetterText: zod.string().min(1),
+});
+
+export const SaveCoverLetterResponse = zod.object({
+  id: zod.string(),
+  userId: zod.string(),
+  jobTitle: zod.string(),
+  company: zod.string(),
+  jobDescription: zod.string(),
+  originalCvText: zod.string(),
+  parsedCvJson: zod
+    .union([
+      zod.object({
+        name: zod.string().nullable(),
+        email: zod.string().nullable(),
+        phone: zod.string().nullable(),
+        location: zod.string().nullable(),
+        summary: zod.string().nullable(),
+        work_experience: zod.array(
+          zod.object({
+            company: zod.string(),
+            title: zod.string(),
+            start_date: zod.string(),
+            end_date: zod.string().nullable(),
+            bullets: zod.array(zod.string()),
+          }),
+        ),
+        education: zod.array(
+          zod.object({
+            institution: zod.string(),
+            degree: zod.string(),
+            field: zod.string().nullish(),
+            start_date: zod.string().nullish(),
+            end_date: zod.string().nullish(),
+          }),
+        ),
+        skills: zod.array(zod.string()),
+        certifications: zod.array(zod.string()),
+        languages: zod.array(zod.string()),
+      }),
+      zod.null(),
+    ])
+    .nullish(),
+  parsedJdJson: zod
+    .union([
+      zod.object({
+        required_skills: zod.array(zod.string()),
+        preferred_skills: zod.array(zod.string()),
+        required_experience_years: zod.number().nullish(),
+        key_responsibilities: zod.array(zod.string()),
+        must_have: zod.array(zod.string()),
+        nice_to_have: zod.array(zod.string()),
+        job_type: zod
+          .enum(["full-time", "part-time", "contract", "internship"])
+          .nullish(),
+        location_type: zod.enum(["remote", "hybrid", "onsite"]).nullish(),
+      }),
+      zod.null(),
+    ])
+    .nullish(),
+  tailoredCvText: zod.string().nullish(),
+  coverLetterText: zod.string().nullish(),
+  keywordMatchScore: zod.number().nullish(),
+  missingKeywords: zod.array(zod.string()),
+  matchedKeywords: zod.array(zod.string()),
+  missingInfoQuestions: zod.array(zod.string()),
+  sectionSuggestions: zod.array(zod.string()),
+  status: zod.enum(["draft", "analyzed", "exported"]),
+  createdAt: zod.date(),
+  updatedAt: zod.date(),
 });
 
 /**
