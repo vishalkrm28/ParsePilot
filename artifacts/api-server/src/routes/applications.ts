@@ -13,6 +13,7 @@ import { logger } from "../lib/logger.js";
 import { requirePro } from "../middlewares/requirePro.js";
 import { isUserPro } from "../lib/billing.js";
 import { spendCredits, getUserCredits, CREDIT_COSTS } from "../lib/credits.js";
+import { applyFreeFilter, applyProPass } from "../lib/preview.js";
 
 const router: IRouter = Router();
 
@@ -30,7 +31,16 @@ router.get("/applications", async (req, res) => {
       .from(applicationsTable)
       .where(eq(applicationsTable.userId, userId))
       .orderBy(desc(applicationsTable.createdAt));
-    res.json(apps);
+
+    // Strip premium content from list for free users (same policy as detail GET).
+    // We don't include freePreview in the list — it's only needed in the detail view.
+    const ownerId = req.user?.id;
+    const pro = ownerId ? await isUserPro(ownerId) : false;
+    const safeApps = pro
+      ? apps
+      : apps.map((a) => ({ ...a, tailoredCvText: null, coverLetterText: null }));
+
+    res.json(safeApps);
   } catch (err) {
     logger.error({ err }, "Failed to list applications");
     res.status(500).json({ error: "Failed to retrieve applications", code: "DB_ERROR" });
@@ -112,7 +122,24 @@ router.get("/applications/:id", async (req, res) => {
       res.status(404).json({ error: "Application not found", code: "NOT_FOUND" });
       return;
     }
-    res.json(app);
+
+    // ── Owner check ────────────────────────────────────────────────────────
+    // Prevents a Pro user from reading another user's tailored CV content
+    // by guessing application IDs. Only the owning user may access an app.
+    const requestingUserId = req.user?.id;
+    if (requestingUserId && app.userId !== requestingUserId) {
+      res.status(403).json({ error: "Access denied", code: "FORBIDDEN" });
+      return;
+    }
+
+    // ── Content gating ─────────────────────────────────────────────────────
+    // Premium content (full tailored CV, cover letter) is stripped for free
+    // users server-side. The full content is always stored in the DB so Pro
+    // features remain accessible after upgrade — it just isn't sent over the wire.
+    const pro = requestingUserId ? await isUserPro(requestingUserId) : false;
+    const response = pro ? applyProPass(app) : applyFreeFilter(app);
+
+    res.json(response);
   } catch (err) {
     logger.error({ err, id }, "Failed to get application");
     res.status(500).json({ error: "Failed to retrieve application", code: "DB_ERROR" });
@@ -168,7 +195,7 @@ const SaveTailoredCvBody = z.object({
   tailoredCvText: z.string().min(1, "Tailored CV text cannot be empty"),
 });
 
-router.patch("/applications/:id/tailored-cv", async (req, res) => {
+router.patch("/applications/:id/tailored-cv", requirePro, async (req, res) => {
   const { id } = req.params;
   const parsed = SaveTailoredCvBody.safeParse(req.body);
   if (!parsed.success) {
@@ -202,7 +229,7 @@ const SaveCoverLetterBody = z.object({
   coverLetterText: z.string().min(1, "Cover letter text cannot be empty"),
 });
 
-router.patch("/applications/:id/cover-letter-save", async (req, res) => {
+router.patch("/applications/:id/cover-letter-save", requirePro, async (req, res) => {
   const { id } = req.params;
   const parsed = SaveCoverLetterBody.safeParse(req.body);
   if (!parsed.success) {
@@ -289,7 +316,8 @@ router.post("/applications/:id/analyze", async (req, res) => {
       confirmedAnswers,
     });
 
-    // Save everything
+    // Save everything — always persist full tailoredCvText so Pro features
+    // remain accessible after a free→Pro upgrade.
     await db
       .update(applicationsTable)
       .set({
@@ -305,7 +333,13 @@ router.post("/applications/:id/analyze", async (req, res) => {
       })
       .where(eq(applicationsTable.id, id));
 
-    res.json({ ...result, parsedJd });
+    // ── Strip premium content from the response for free users ───────────
+    const pro = ownerUserId ? await isUserPro(ownerUserId) : false;
+    const safeResult = pro
+      ? applyProPass({ ...result, parsedJd })
+      : applyFreeFilter({ ...result, parsedJd });
+
+    res.json(safeResult);
   } catch (err) {
     logger.error({ err, id }, "Failed to analyze application");
     res.status(500).json({ error: "Analysis failed. Please try again.", code: "ANALYSIS_ERROR" });

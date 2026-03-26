@@ -262,15 +262,83 @@ stripe subscriptions update <sub_id> --trial-end=now
 | Feature | Free | Pro |
 |---------|------|-----|
 | Upload & parse CV | ✓ | ✓ |
-| ATS keyword analysis | ✓ | ✓ |
-| 1 saved application | ✓ | — |
-| Unlimited applications | — | ✓ |
-| AI-tailored CV output | — | ✓ |
-| Missing info questions | — | ✓ |
-| Section suggestions | — | ✓ |
+| ATS keyword analysis (full) | ✓ | ✓ |
+| Missing info questions | ✓ | ✓ |
+| Section suggestions | ✓ | ✓ |
+| AI-tailored CV — summary preview + 1 bullet | ✓ | — |
+| AI-tailored CV — full editable output | — | ✓ |
+| Edit & save tailored CV | — | ✓ |
 | Cover letter generation | — | ✓ |
 | DOCX export | — | ✓ |
 | PDF export | — | ✓ |
+| Unlimited saved applications | — | ✓ |
+
+---
+
+## Content gating (free preview vs pro full output)
+
+### How it works
+
+The full AI-generated tailored CV is **always generated and stored in the database** for every user who runs analysis — regardless of plan. This means:
+
+- Free users who later upgrade to Pro instantly see their full tailored CV without re-running analysis.
+- Pro users always receive the full output in API responses.
+
+### What free users receive
+
+Free users see a limited preview from `GET /applications/:id` and `POST /analyze`:
+
+```json
+{
+  "tailoredCvText": null,
+  "coverLetterText": null,
+  "freePreview": {
+    "summaryPreview": "First 220 chars of professional summary…",
+    "firstBullet": "First bullet from work experience",
+    "lockedSectionsCount": 4
+  },
+  "keywordMatchScore": 75,
+  "matchedKeywords": ["React", "TypeScript"],
+  "missingKeywords": ["Docker"],
+  "missingInfoQuestions": ["Do you have Docker experience?"],
+  "sectionSuggestions": ["Add a technical skills section"]
+}
+```
+
+### What Pro users receive
+
+```json
+{
+  "tailoredCvText": "PROFESSIONAL SUMMARY\n\nExperienced...",
+  "coverLetterText": null,
+  "freePreview": null,
+  "keywordMatchScore": 75,
+  ...
+}
+```
+
+### Where gating is enforced
+
+| Endpoint | Enforcement |
+|----------|------------|
+| `GET /applications/:id` | Server strips `tailoredCvText` + `coverLetterText` for free users; adds `freePreview` |
+| `GET /applications` (list) | Server strips `tailoredCvText` + `coverLetterText` from all items for free users |
+| `POST /applications/:id/analyze` | Server strips the response for free users; full content saved to DB |
+| `PATCH /applications/:id/tailored-cv` | `requirePro` middleware — 403 for free users |
+| `PATCH /applications/:id/cover-letter-save` | `requirePro` middleware — 403 for free users |
+| `GET /export/application/:id/docx` | `requirePro` middleware — 403 for free users |
+| `GET /export/application/:id/pdf` | `requirePro` middleware — 403 for free users |
+| `POST /applications/:id/cover-letter` | `requirePro` middleware — 403 for free users |
+
+### Central gating helper
+
+All response stripping is centralized in `artifacts/api-server/src/lib/preview.ts`:
+
+- `applyFreeFilter(row)` — strips premium fields, attaches `freePreview`
+- `applyProPass(row)` — passes through full row, adds `freePreview: null`
+- `buildCvPreview(tailoredCvText)` — extracts summary snippet + first bullet
+
+Do not add secondary content checks elsewhere — keep all gating in these two functions.
 
 ---
 

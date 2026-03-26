@@ -1,0 +1,73 @@
+Implement Milestone 14 now.
+
+Goal:
+For ParsePilot free users, do not expose full generated content. Free users should only see limited analysis and preview content. Pro users should see full output.
+
+Business objective:
+Reduce abuse from users creating multiple free accounts and prevent the free tier from replacing the paid product.
+
+What to build:
+
+1. Update the main analysis/result flow so plan entitlement is checked server-side before returning response data.
+
+2. For free users:
+   - return only:
+     - match score
+     - matched keywords
+     - missing keywords
+     - missing input suggestions
+     - truncated preview of professional summary
+     - only 1 visible rewritten bullet
+     - locked placeholders for the remaining content
+   - do NOT return:
+     - full tailored resume
+     - full cover letter
+     - export-ready content
+     - full editable sections
+
+3. For pro users:
+   - return full tailored resume
+   - return full cover letter
+   - keep editing and export enabled
+
+4. Update API responses so free vs pro data shapes are explicit and safe.
+
+5. Add a reusable helper for preview generation:
+   - truncate summary safely
+   - expose only first allowed bullet(s)
+   - replace remaining bullets/sections with locked placeholders
+
+6. Update frontend results page:
+   - if free user:
+     - show limited preview
+     - disable copy actions
+     - disable DOCX/PDF export
+     - show locked overlays and upgrade CTA
+   - if pro user:
+     - keep full behavior
+
+7. Important security rule:
+   - do not generate or send full premium content to free users in API responses
+   - do not rely only on blur/hide in frontend
+   - keep premium gating enforced server-side
+
+8. Keep UI clean:
+   - make free preview useful enough to demonstrate value
+   - make locked sections visually obvious
+   - include upgrade CTA
+
+9. Update README briefly:
+   - explain free preview vs pro full output logic
+
+Rules:
+- Do not duplicate entitlement logic
+- Keep plan checks centralized
+- Keep code production-minded
+- Do not break existing billing/credit logic
+- Be careful not to expose premium data in network responses for free users
+
+After implementation:
+1. Show exact files changed
+2. Show the free user response shape and pro user response shape
+3. List top 5 risks of premium leakage
+4. Fix the top 3 immediately

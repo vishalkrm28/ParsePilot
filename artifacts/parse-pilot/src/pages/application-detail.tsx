@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "wouter";
+import { Link } from "wouter";
 import {
   useGetApplication,
   useAnalyzeApplication,
@@ -26,6 +27,8 @@ import {
   Save,
   RotateCcw,
   AlertTriangle,
+  Lock,
+  Crown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
@@ -100,6 +103,113 @@ function AnalysisProgress() {
   );
 }
 
+// ─── Free preview type (extra field added by server-side gating) ─────────────
+
+interface FreePreview {
+  summaryPreview: string;
+  firstBullet: string;
+  lockedSectionsCount: number;
+}
+
+// ─── Locked CV section — shown to free users after analysis ──────────────────
+
+function LockedCvSection({ preview }: { preview: FreePreview }) {
+  // Fake locked lines that look like CV content
+  const lockedLines = [
+    { w: "100%" },
+    { w: "88%" },
+    { w: "75%" },
+    { w: "92%" },
+    { w: "60%" },
+    { w: "83%" },
+    { w: "70%" },
+    { w: "95%" },
+  ];
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-0">
+        {/* Header */}
+        <div className="bg-muted px-6 py-3 border-b border-border flex justify-between items-center rounded-t-2xl">
+          <span className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+            <Lock className="w-3.5 h-3.5" />
+            Tailored CV — Preview
+          </span>
+          <span className="text-xs text-violet-600 font-semibold bg-violet-50 border border-violet-200 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+            <Crown className="w-3 h-3" /> Pro unlocks full CV
+          </span>
+        </div>
+
+        {/* Visible preview content */}
+        <div className="p-6 font-mono text-sm space-y-4 relative">
+
+          {/* Summary section — visible */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+              Professional Summary
+            </p>
+            <p className="text-foreground leading-relaxed whitespace-pre-wrap">
+              {preview.summaryPreview}
+            </p>
+          </div>
+
+          {/* First bullet — visible */}
+          {preview.firstBullet && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+                Work Experience — First Highlight
+              </p>
+              <p className="text-foreground leading-relaxed flex gap-2">
+                <span className="text-muted-foreground">•</span>
+                {preview.firstBullet}
+              </p>
+            </div>
+          )}
+
+          {/* Locked blur section */}
+          <div className="relative mt-2 rounded-xl overflow-hidden">
+            {/* Blurred content */}
+            <div className="space-y-2.5 blur-[5px] pointer-events-none select-none opacity-60 p-4">
+              {lockedLines.map((l, i) => (
+                <div
+                  key={i}
+                  className="h-3 bg-muted-foreground/20 rounded-full"
+                  style={{ width: l.w }}
+                />
+              ))}
+            </div>
+
+            {/* Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/60 to-background flex flex-col items-center justify-end pb-6 text-center px-4">
+              <div className="bg-card border border-violet-200 shadow-xl rounded-2xl p-6 max-w-xs w-full">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-violet-100 to-indigo-100 flex items-center justify-center mx-auto mb-3">
+                  <Lock className="w-5 h-5 text-violet-500" />
+                </div>
+                <p className="font-semibold text-sm mb-1">
+                  {preview.lockedSectionsCount} section{preview.lockedSectionsCount !== 1 ? "s" : ""} locked
+                </p>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Upgrade to Pro to view, edit, and export your full tailored CV.
+                </p>
+                <Link href="/settings">
+                  <Button
+                    size="sm"
+                    className="w-full gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white border-0 shadow-md"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    Try Pro free for 7 days
+                  </Button>
+                </Link>
+                <p className="text-[10px] text-muted-foreground mt-2">No card charged for 7 days</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Main component ──────────────────────────────────────────────────────────
 
 type TabId = "cv" | "keywords" | "missing" | "cover" | "suggestions";
@@ -125,6 +235,9 @@ export default function ApplicationDetail() {
   const isPro = billingStatus?.isPro ?? false;
 
   const { data: app, isLoading, refetch } = useGetApplication(id);
+
+  // Extra field added by the server-side content gate — not in the generated type
+  const freePreview = (app as any)?.freePreview as FreePreview | null | undefined;
   const analyzeMutation = useAnalyzeApplication();
   const coverLetterMutation = useGenerateCoverLetter();
   const saveCvMutation = useSaveTailoredCv();
@@ -213,7 +326,10 @@ export default function ApplicationDetail() {
     );
   }
 
-  const needsAnalysis = app.status === "draft" || !app.tailoredCvText;
+  // A free user who has run analysis will have status=analyzed but tailoredCvText=null
+  // because the server strips it. Distinguish this from "never analyzed".
+  const isLockedForFree = !isPro && app.status === "analyzed" && !app.tailoredCvText && !!freePreview;
+  const needsAnalysis = app.status === "draft" || (!app.tailoredCvText && !isLockedForFree);
   const currentCvText = editedCv ?? app.tailoredCvText ?? "";
   const currentCoverText = editedCover ?? app.coverLetterText ?? "";
 
@@ -361,6 +477,9 @@ export default function ApplicationDetail() {
                       </Button>
                     </CardContent>
                   </Card>
+                ) : isLockedForFree && freePreview ? (
+                  /* Free user — analysis complete but content gated server-side */
+                  <LockedCvSection preview={freePreview} />
                 ) : needsAnalysis ? (
                   /* Empty state — no analysis yet */
                   <Card className="border-dashed border-2 bg-transparent text-center p-12">

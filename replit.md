@@ -138,6 +138,29 @@ pnpm --filter @workspace/db run push
 pnpm --filter @workspace/api-spec run codegen
 ```
 
+## Content Gating (Milestone 14)
+
+**Central helper:** `artifacts/api-server/src/lib/preview.ts`
+- `applyFreeFilter(row)` — strips `tailoredCvText` + `coverLetterText`, attaches `freePreview: { summaryPreview, firstBullet, lockedSectionsCount }`
+- `applyProPass(row)` — passes full row through, adds `freePreview: null`
+- `buildCvPreview(text)` — extracts summary snippet (220 chars) + first bullet + locked section count
+
+**Free user API response:** `tailoredCvText: null, coverLetterText: null, freePreview: {...}`
+**Pro user API response:** `tailoredCvText: "full CV...", freePreview: null`
+
+**Full tailored CV is always saved to DB** (so free→Pro upgrade instantly unlocks it without re-running analysis)
+
+**Gating points (server-side, not just frontend):**
+- `GET /applications/:id` — content stripped + owner check (prevents cross-user access)
+- `GET /applications` list — tailoredCvText/coverLetterText stripped for free users
+- `POST /analyze` response — stripped for free users
+- `PATCH /tailored-cv` — `requirePro`
+- `PATCH /cover-letter-save` — `requirePro`
+- `GET /export/*/docx` and `/pdf` — `requirePro` (existing)
+- `POST /cover-letter` — `requirePro` (existing)
+
+**Frontend locked state:** `LockedCvSection` component in `application-detail.tsx` — shows summary preview + first bullet + blurred placeholder rows + upgrade CTA. Triggered when `isLockedForFree = !isPro && app.status === "analyzed" && !app.tailoredCvText && !!freePreview`.
+
 ## AI Credits System (Milestone 12)
 
 **Tables:** `usage_balances` (one row per user), `usage_events` (append-only audit trail)
