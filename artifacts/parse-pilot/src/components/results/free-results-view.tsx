@@ -47,22 +47,28 @@ interface FreeResultsViewProps {
   isAnalyzing: boolean;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Conversion constants ─────────────────────────────────────────────────────
 
-const UNLOCK_INCLUDES = [
-  { icon: FileText, text: "Full optimized resume — every section rewritten" },
-  { icon: FileDown, text: "Download as DOCX or PDF" },
-  { icon: PenTool, text: "Copy and edit before you apply" },
-];
+/**
+ * Number of matched keywords shown in full — these confirm the AI understood
+ * the CV and demonstrate value freely.
+ */
+const FREE_MATCHED_KEYWORDS = 7;
+
+/**
+ * Number of missing keywords shown in full — just enough to prove the AI
+ * found real gaps. The rest are locked, creating a concrete reason to unlock.
+ *
+ * A/B test candidate: try 2 vs 3 vs 5.
+ * Hypothesis: 3 is the sweet spot — enough to feel credible, not enough to act on.
+ */
+const FREE_MISSING_KEYWORDS = 3;
 
 const TRUST_SIGNALS = [
   "No fake experience added",
   "ATS-friendly formatting",
   "Edit before export",
 ];
-
-// Show at most this many keyword chips before truncating
-const MAX_VISIBLE_KEYWORDS = 7;
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -77,14 +83,14 @@ function ScoreCircle({ score }: { score: number }) {
   return (
     <div className="relative w-28 h-28 shrink-0">
       <svg className="w-full h-full -rotate-90" aria-hidden="true">
-        <circle cx="56" cy="56" r="48" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-muted opacity-20" />
         <circle
-          cx="56"
-          cy="56"
-          r="48"
-          stroke="currentColor"
-          strokeWidth="8"
-          fill="transparent"
+          cx="56" cy="56" r="48"
+          stroke="currentColor" strokeWidth="8" fill="transparent"
+          className="text-muted opacity-20"
+        />
+        <circle
+          cx="56" cy="56" r="48"
+          stroke="currentColor" strokeWidth="8" fill="transparent"
           strokeDasharray={302}
           strokeDashoffset={302 - (302 * score) / 100}
           className={cn("transition-all duration-1000 ease-out", color)}
@@ -99,7 +105,13 @@ function ScoreCircle({ score }: { score: number }) {
   );
 }
 
-function KeywordChip({ text, variant }: { text: string; variant: "matched" | "missing" }) {
+function KeywordChip({
+  text,
+  variant,
+}: {
+  text: string;
+  variant: "matched" | "missing";
+}) {
   return (
     <span
       className={cn(
@@ -123,8 +135,17 @@ function LockedBadge({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SectionDivider() {
-  return <div className="h-px bg-border my-1" aria-hidden="true" />;
+/**
+ * The locked keyword pill — shows how many more keywords are hidden.
+ * Acts as a mini-CTA trigger placed directly in the keyword flow.
+ */
+function LockedKeywordCount({ count }: { count: number }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border border-dashed border-red-300 bg-red-50/60 text-red-700 select-none">
+      <Lock className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
+      +{count} more hidden
+    </span>
+  );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -133,15 +154,25 @@ function SectionDivider() {
  * Full-page conversion experience shown to free users after analysis.
  *
  * Layout (scrollable):
- *   1. Match Score + Keywords
- *   2. CTA-1: compact inline banner
- *   3. AI Insights (suggestions / missing info preview)
- *   4. Optimized Summary (gradient-faded preview)
+ *   Status header (above fold, with inline unlock button)
+ *   1. Match Score + partial keywords → INLINE CTA-0 (after locked missing keywords)
+ *   2. CTA-1: compact banner
+ *   3. AI Insights
+ *   4. Optimized Summary (gradient-faded)
  *   5. Experience Rewrite (1 bullet + blurred)
- *   6. CTA-2: detailed unlock block
- *   7. Cover Letter Teaser (blurred)
+ *   6. Cover Letter Teaser (blurred, Pro badge) — placed BEFORE CTA-2 to inflate value stack
+ *   7. CTA-2: detailed unlock block (result-specific copy)
  *   8. CTA-3: dark bottom banner
  *   9. Missing Info (answerable, drives re-analysis)
+ *
+ * KEY CONVERSION DECISIONS:
+ * - Missing keywords are locked at > FREE_MISSING_KEYWORDS. This converts the
+ *   keyword list from a free DIY checklist into an incomplete checklist that
+ *   requires payment to act on fully.
+ * - An inline CTA-0 appears directly below the locked keyword count, at the
+ *   moment of highest engagement (the user just saw their gaps).
+ * - Cover letter teaser is placed BEFORE the purchase block to maximise the
+ *   perceived value stack at the point of decision.
  *
  * Security: all premium content (tailoredCvText, coverLetterText) is stripped
  * server-side. This component only renders what the server intentionally sent.
@@ -165,11 +196,25 @@ export function FreeResultsView({
   const questions = app.missingInfoQuestions ?? [];
   const suggestions = app.sectionSuggestions ?? [];
 
-  // Prefer suggestions for insights; fall back to question text (trimmed to label form)
-  const insights =
-    suggestions.length > 0
-      ? suggestions.slice(0, 3)
-      : questions.slice(0, 3);
+  // How many missing keywords are hidden (the information gap)
+  const hiddenMissingCount = Math.max(0, missing.length - FREE_MISSING_KEYWORDS);
+
+  // Prefer suggestions for insights; fall back to question labels
+  const insights = suggestions.length > 0 ? suggestions.slice(0, 3) : questions.slice(0, 3);
+
+  // Result-specific CTA-2 bullets — use actual keyword data to feel concrete
+  const topMissingForCopy = missing.slice(0, 2);
+  const unlockIncludes: { icon: React.ElementType; text: string }[] = [
+    {
+      icon: FileText,
+      text:
+        topMissingForCopy.length > 0
+          ? `Full rewrite with ${topMissingForCopy.join(", ")}${hiddenMissingCount > 0 ? ` and ${hiddenMissingCount} more keywords` : ""} woven in`
+          : `Full optimized resume — every section rewritten`,
+    },
+    { icon: FileDown, text: "Download as DOCX or PDF, ready to send" },
+    { icon: PenTool, text: "Copy, edit, and apply — no extra steps" },
+  ];
 
   const scoreLabel =
     score >= 80
@@ -226,80 +271,96 @@ export function FreeResultsView({
 
       {/* ══ SECTION 1: Match Score + Keywords ═══════════════════════════════ */}
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-6 space-y-5">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
             {/* Score circle */}
             <ScoreCircle score={score} />
 
-            {/* Score label + keyword chips */}
-            <div className="flex-1 min-w-0 space-y-4">
-              <div>
-                <p className="text-sm font-medium text-foreground">{scoreLabel}</p>
-                {score < 80 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    The full rewrite uses your existing experience to close these gaps — without adding anything that isn't true.
-                  </p>
-                )}
-                {score < 85 && missing.length > 0 && (
-                  <p className="text-xs font-medium text-violet-600 mt-2">
-                    The rewrite works in {Math.min(missing.length, 5)} missing keyword{Math.min(missing.length, 5) !== 1 ? "s" : ""} — your effective match score improves when recruiters see the optimized version.
-                  </p>
-                )}
-              </div>
-
-              {/* Matched keywords */}
-              {matched.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                    Already present ({matched.length})
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {matched.slice(0, MAX_VISIBLE_KEYWORDS).map((kw) => (
-                      <KeywordChip key={kw} text={kw} variant="matched" />
-                    ))}
-                    {matched.length > MAX_VISIBLE_KEYWORDS && (
-                      <span className="text-xs text-muted-foreground self-center">
-                        +{matched.length - MAX_VISIBLE_KEYWORDS} more
-                      </span>
-                    )}
-                  </div>
-                </div>
+            {/* Score label */}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground">{scoreLabel}</p>
+              {score < 80 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  The full rewrite uses your existing experience to close these gaps — without adding anything that isn't true.
+                </p>
               )}
-
-              {/* Missing keywords */}
-              {missing.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
-                    <XCircle className="w-3 h-3 text-destructive" />
-                    Missing from your CV ({missing.length})
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {missing.slice(0, MAX_VISIBLE_KEYWORDS).map((kw) => (
-                      <KeywordChip key={kw} text={kw} variant="missing" />
-                    ))}
-                    {missing.length > MAX_VISIBLE_KEYWORDS && (
-                      <span className="text-xs text-muted-foreground self-center">
-                        +{missing.length - MAX_VISIBLE_KEYWORDS} more
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-2">
-                    These are used by ATS filters for this role. The full rewrite works them into your existing experience.
-                  </p>
-                </div>
+              {score < 85 && missing.length > 0 && (
+                <p className="text-xs font-medium text-violet-600 mt-2">
+                  The rewrite works in {Math.min(missing.length, 5)} missing keyword{Math.min(missing.length, 5) !== 1 ? "s" : ""} — your effective match score improves when recruiters see the optimized version.
+                </p>
               )}
             </div>
           </div>
+
+          {/* Matched keywords — shown fully (confirms value, not actionable by itself) */}
+          {matched.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                Already in your CV ({matched.length})
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {matched.slice(0, FREE_MATCHED_KEYWORDS).map((kw) => (
+                  <KeywordChip key={kw} text={kw} variant="matched" />
+                ))}
+                {matched.length > FREE_MATCHED_KEYWORDS && (
+                  <span className="text-xs text-muted-foreground self-center">
+                    +{matched.length - FREE_MATCHED_KEYWORDS} more
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Missing keywords — LOCKED beyond 3 to create information gap */}
+          {missing.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+                <XCircle className="w-3 h-3 text-destructive" />
+                Missing from your CV ({missing.length} total)
+              </p>
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {/* Show first 3 freely */}
+                {missing.slice(0, FREE_MISSING_KEYWORDS).map((kw) => (
+                  <KeywordChip key={kw} text={kw} variant="missing" />
+                ))}
+                {/* Lock the rest */}
+                {hiddenMissingCount > 0 && (
+                  <LockedKeywordCount count={hiddenMissingCount} />
+                )}
+              </div>
+
+              {/* CTA-0: inline trigger placed at moment of maximum keyword interest */}
+              {hiddenMissingCount > 0 ? (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1 pt-3 border-t border-border/60">
+                  <p className="text-xs text-foreground/80 flex-1">
+                    <span className="font-semibold">
+                      {hiddenMissingCount} more keyword{hiddenMissingCount !== 1 ? "s" : ""} are locked.
+                    </span>{" "}
+                    The full rewrite addresses all {missing.length} gaps using your existing experience.
+                  </p>
+                  <UnlockButton
+                    applicationId={applicationId}
+                    label={`Unlock all ${missing.length} keywords — $4`}
+                    className="shrink-0 h-8 px-4 text-xs font-semibold whitespace-nowrap"
+                  />
+                </div>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  These are used by ATS filters for this role. The full rewrite works them into your existing experience.
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* ══ CTA-1: Compact inline banner ════════════════════════════════════ */}
+      {/* ══ CTA-1: Compact banner ════════════════════════════════════════════ */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-5 py-4 rounded-xl bg-gradient-to-r from-violet-50 to-indigo-50/60 border border-violet-200/80">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-foreground">Your optimized resume is ready</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Unlock this result for $4, or get unlimited access with Pro
+            Unlock this result for $4 — no subscription required
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -309,7 +370,7 @@ export function FreeResultsView({
             className="h-8 px-4 text-xs font-semibold"
           />
           <UpgradeButton
-            label="Start Pro free"
+            label="Try Pro free"
             className="h-8 px-4 text-xs font-semibold"
           />
         </div>
@@ -351,17 +412,14 @@ export function FreeResultsView({
               <p className="font-mono text-sm leading-relaxed text-foreground">
                 {freePreview.summaryPreview}
               </p>
-              {/* Gradient fade — blends into the blurred section below */}
+              {/* Gradient fade into blur */}
               <div
                 className="absolute bottom-0 left-0 right-0 h-10 pointer-events-none"
                 style={{ background: "linear-gradient(to bottom, transparent, hsl(var(--card)))" }}
                 aria-hidden="true"
               />
             </div>
-            <BlurredLockedSection
-              lineCount={3}
-              lineWidths={["100%", "88%", "70%"]}
-            />
+            <BlurredLockedSection lineCount={3} lineWidths={["100%", "88%", "70%"]} />
           </CardContent>
         </Card>
       )}
@@ -371,13 +429,9 @@ export function FreeResultsView({
         <Card className="overflow-hidden">
           <CardContent className="p-0">
             <div className="bg-muted px-5 py-3 border-b border-border flex justify-between items-center rounded-t-2xl">
-              <span className="text-sm font-semibold text-foreground">
-                Experience Rewrite
-              </span>
+              <span className="text-sm font-semibold text-foreground">Experience Rewrite</span>
               <LockedBadge>Full rewrite locked</LockedBadge>
             </div>
-
-            {/* One visible bullet */}
             <div className="px-5 pt-4 pb-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2.5">
                 Work Experience — First Rewritten Bullet
@@ -389,20 +443,36 @@ export function FreeResultsView({
                 </p>
               </div>
               <p className="text-[11px] text-muted-foreground mt-2">
-                {freePreview.lockedSectionsCount} more section{freePreview.lockedSectionsCount !== 1 ? "s" : ""} rewritten below
+                {freePreview.lockedSectionsCount} more section{freePreview.lockedSectionsCount !== 1 ? "s" : ""} rewritten — locked
               </p>
             </div>
-
-            {/* Blurred remaining bullets */}
-            <BlurredLockedSection
-              lineCount={5}
-              lineWidths={["100%", "84%", "92%", "75%", "88%"]}
-            />
+            <BlurredLockedSection lineCount={5} lineWidths={["100%", "84%", "92%", "75%", "88%"]} />
           </CardContent>
         </Card>
       )}
 
-      {/* ══ CTA-2: Detailed conversion block ════════════════════════════════ */}
+      {/* ══ SECTION 5: Cover Letter Teaser ══════════════════════════════════
+           Placed BEFORE CTA-2 to inflate the perceived value stack at the
+           point of decision. Cover letter is a Pro-only feature.         */}
+      <Card className="overflow-hidden">
+        <CardContent className="p-0">
+          <div className="bg-muted px-5 py-3 border-b border-border flex justify-between items-center rounded-t-2xl">
+            <span className="text-sm font-semibold text-foreground">Cover Letter</span>
+            <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 px-2.5 py-0.5 rounded-full">
+              Pro feature
+            </span>
+          </div>
+          <div className="px-5 pt-4 pb-2">
+            <p className="text-xs text-muted-foreground mb-3">
+              A personalized letter written around your rewritten CV and this job description. Three tone options: professional, enthusiastic, concise.
+            </p>
+          </div>
+          <BlurredLockedSection lineCount={6} lineWidths={["100%", "92%", "85%", "100%", "78%", "60%"]} />
+        </CardContent>
+      </Card>
+
+      {/* ══ CTA-2: Detailed conversion block ════════════════════════════════
+           Includes are result-specific — uses actual keyword data for copy.  */}
       <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b border-border/60 text-center">
@@ -425,7 +495,7 @@ export function FreeResultsView({
           </div>
 
           <ul className="space-y-2 mb-4">
-            {UNLOCK_INCLUDES.map(({ icon: Icon, text }) => (
+            {unlockIncludes.map(({ icon: Icon, text }) => (
               <li key={text} className="flex items-center gap-2.5 text-sm text-foreground/85">
                 <Icon className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                 {text}
@@ -461,7 +531,7 @@ export function FreeResultsView({
                 ParsePilot Pro — $12/mo
               </p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                Unlimited results · Cover letters · Better value for multiple applications
+                Unlimited results · Cover letters · Better for multiple applications
               </p>
             </div>
             <UpgradeButton
@@ -474,27 +544,6 @@ export function FreeResultsView({
           </p>
         </div>
       </div>
-
-      {/* ══ SECTION 5: Cover Letter Teaser ══════════════════════════════════ */}
-      <Card className="overflow-hidden">
-        <CardContent className="p-0">
-          <div className="bg-muted px-5 py-3 border-b border-border flex justify-between items-center rounded-t-2xl">
-            <span className="text-sm font-semibold text-foreground">Cover Letter</span>
-            <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 px-2.5 py-0.5 rounded-full">
-              Pro feature
-            </span>
-          </div>
-          <div className="px-5 pt-4 pb-2">
-            <p className="text-xs text-muted-foreground mb-3">
-              A personalized letter written around your rewritten CV and this job description. Three tone options: professional, enthusiastic, concise.
-            </p>
-          </div>
-          <BlurredLockedSection
-            lineCount={6}
-            lineWidths={["100%", "92%", "85%", "100%", "78%", "60%"]}
-          />
-        </CardContent>
-      </Card>
 
       {/* ══ CTA-3: Dark bottom banner ════════════════════════════════════════ */}
       <UpgradeCTACard
