@@ -31,7 +31,6 @@ function extractToken(req: Request): string | null {
   if (authHeader?.startsWith("Bearer ")) {
     return authHeader.slice(7);
   }
-  // Fallback: Clerk's __session cookie
   const sessionCookie = req.cookies?.["__session"];
   if (sessionCookie) return sessionCookie;
   return null;
@@ -48,11 +47,6 @@ export async function authMiddleware(
 
   const token = extractToken(req);
 
-  req.log?.debug(
-    { hasToken: !!token, path: req.path },
-    "authMiddleware: token check",
-  );
-
   if (!token) {
     next();
     return;
@@ -60,8 +54,9 @@ export async function authMiddleware(
 
   let userId: string;
   try {
+    // Verify using ONLY publishableKey so we derive the JWKS URL from Clerk's
+    // auth domain — no secretKey needed for JWT verification itself.
     const payload = await verifyToken(token, {
-      secretKey: process.env.CLERK_SECRET_KEY,
       publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
     });
     userId = payload.sub;
@@ -90,14 +85,27 @@ export async function authMiddleware(
         profileImageUrl: existingUser.profileImageUrl,
       };
     } else {
-      const clerkUser = await clerk.users.getUser(userId);
-      const userData = {
-        id: userId,
-        email: clerkUser.emailAddresses[0]?.emailAddress ?? null,
-        firstName: clerkUser.firstName ?? null,
-        lastName: clerkUser.lastName ?? null,
-        profileImageUrl: clerkUser.imageUrl ?? null,
-      };
+      // Try to fetch full profile from Clerk; if secretKey is invalid, fall
+      // back to a minimal record so the user can still be authenticated.
+      let email: string | null = null;
+      let firstName: string | null = null;
+      let lastName: string | null = null;
+      let profileImageUrl: string | null = null;
+
+      try {
+        const clerkUser = await clerk.users.getUser(userId);
+        email = clerkUser.emailAddresses[0]?.emailAddress ?? null;
+        firstName = clerkUser.firstName ?? null;
+        lastName = clerkUser.lastName ?? null;
+        profileImageUrl = clerkUser.imageUrl ?? null;
+      } catch (profileErr) {
+        req.log?.warn(
+          { err: (profileErr as Error).message, userId },
+          "authMiddleware: could not fetch Clerk profile — using empty fields",
+        );
+      }
+
+      const userData = { id: userId, email, firstName, lastName, profileImageUrl };
 
       const [newUser] = await db
         .insert(usersTable)
