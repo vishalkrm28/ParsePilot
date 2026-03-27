@@ -27,18 +27,45 @@ const BULLET_RE  = /^[•\-\*]\s+(.+)$/;
 const JOB_RE     = /^([A-Z0-9].{0,70}?)\s*\|\s*(.{2,})$/;
 const CONTACT_RE = /@|linkedin\.com|github\.com|\+\d{2}|\b\d{10}\b|http/i;
 
+// Exhaustive list of recognised CV section headings.
+// Inside compact sections, ONLY these names trigger a new heading — preventing
+// all-caps skill abbreviations (SAP ERP, RMA, LEAN, SQL…) from being misread as headings.
+const KNOWN_SECTIONS = new Set([
+  // Summary / intro
+  "PROFESSIONAL SUMMARY", "SUMMARY", "EXECUTIVE SUMMARY", "PROFILE",
+  "OBJECTIVE", "CAREER OBJECTIVE", "PROFESSIONAL OBJECTIVE", "ABOUT",
+  // Experience
+  "WORK EXPERIENCE", "EXPERIENCE", "PROFESSIONAL EXPERIENCE",
+  "EMPLOYMENT HISTORY", "CAREER HISTORY", "WORK HISTORY",
+  // Education
+  "EDUCATION", "ACADEMIC BACKGROUND", "ACADEMIC QUALIFICATIONS",
+  "QUALIFICATIONS", "ACADEMIC HISTORY",
+  // Skills / competencies (compact)
+  "SKILLS", "TECHNICAL SKILLS", "KEY SKILLS", "CORE SKILLS", "HARD SKILLS", "SOFT SKILLS",
+  "CORE COMPETENCIES", "COMPETENCIES", "AREAS OF EXPERTISE", "EXPERTISE",
+  // Certs / awards (compact)
+  "CERTIFICATIONS", "CERTIFICATION", "LICENCES", "LICENSES", "CERTIFICATES",
+  "AWARDS", "HONOURS", "HONORS", "ACHIEVEMENTS",
+  // Languages (compact)
+  "LANGUAGES",
+  // Other
+  "INTERESTS", "HOBBIES", "VOLUNTEER EXPERIENCE", "VOLUNTEERING",
+  "PROJECTS", "SIDE PROJECTS", "PUBLICATIONS", "REFERENCES",
+  "ADDITIONAL INFORMATION", "ADDITIONAL", "PROFESSIONAL AFFILIATIONS",
+]);
+
 // Sections where bullets should be rendered as comma-separated inline tags
 const COMPACT_SECTIONS = new Set([
-  "SKILLS", "TECHNICAL SKILLS", "KEY SKILLS", "CORE SKILLS",
-  "CORE COMPETENCIES", "COMPETENCIES", "AREAS OF EXPERTISE",
-  "CERTIFICATIONS", "LICENCES", "LICENSES", "CERTIFICATES",
-  "LANGUAGES", "INTERESTS", "AWARDS",
+  "SKILLS", "TECHNICAL SKILLS", "KEY SKILLS", "CORE SKILLS", "HARD SKILLS", "SOFT SKILLS",
+  "CORE COMPETENCIES", "COMPETENCIES", "AREAS OF EXPERTISE", "EXPERTISE",
+  "CERTIFICATIONS", "CERTIFICATION", "LICENCES", "LICENSES", "CERTIFICATES",
+  "LANGUAGES", "INTERESTS", "HOBBIES", "AWARDS", "HONOURS", "HONORS", "ACHIEVEMENTS",
 ]);
 
 // Sections where job-line detection is suppressed
 const NON_JOB_SECTIONS = new Set([
-  "PROFESSIONAL SUMMARY", "SUMMARY", "PROFILE",
-  "OBJECTIVE", "CAREER OBJECTIVE", "ABOUT",
+  "PROFESSIONAL SUMMARY", "SUMMARY", "EXECUTIVE SUMMARY", "PROFILE",
+  "OBJECTIVE", "CAREER OBJECTIVE", "PROFESSIONAL OBJECTIVE", "ABOUT",
 ]);
 
 // ─── Parser ───────────────────────────────────────────────────────────────────
@@ -85,8 +112,15 @@ function parseLines(text: string): LineKind[] {
       continue;
     }
 
-    // Section heading
-    if (trimmed.length >= 4 && trimmed.length <= 60 && HEADING_RE.test(trimmed)) {
+    // Section heading.
+    // Inside a compact section (SKILLS, CERTS…) we only accept known section names —
+    // otherwise all-caps skill abbreviations (SAP ERP, LEAN, RMA…) become false headings.
+    const looksLikeHeading =
+      trimmed.length >= 4 &&
+      trimmed.length <= 60 &&
+      HEADING_RE.test(trimmed);
+    const isKnownSection = KNOWN_SECTIONS.has(trimmed);
+    if (looksLikeHeading && (isKnownSection || !isCompact)) {
       currentSection = trimmed;
       isCompact    = COMPACT_SECTIONS.has(trimmed);
       isJobSection = !NON_JOB_SECTIONS.has(trimmed);
@@ -94,7 +128,7 @@ function parseLines(text: string): LineKind[] {
       continue;
     }
 
-    // Bullet
+    // Bullet (with explicit prefix: •, -, *)
     const bm = BULLET_RE.exec(trimmed);
     if (bm) {
       result.push({ type: "bullet", text: bm[1], compact: isCompact });
@@ -114,6 +148,12 @@ function parseLines(text: string): LineKind[] {
         });
         continue;
       }
+    }
+
+    // Plain line inside a compact section (AI often emits skills with no bullet char)
+    if (isCompact) {
+      result.push({ type: "bullet", text: trimmed, compact: true });
+      continue;
     }
 
     result.push({ type: "body", text: trimmed });
