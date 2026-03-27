@@ -347,7 +347,7 @@ export async function buildDocxBuffer(
   const flushCompact = () => {
     if (!compactBuf.length) return;
     children.push(new Paragraph({
-      children: [new TextRun({ text: compactBuf.join("  ·  "), size: 20, font: "Calibri", color: "222222" })],
+      children: [new TextRun({ text: compactBuf.join("  ·  "), size: 20, font: CL_FONT, color: CL_CHARCOAL })],
       spacing: { after: 60 },
     }));
     compactBuf = [];
@@ -357,7 +357,7 @@ export async function buildDocxBuffer(
     if (!regularBuf.length) return;
     for (const b of regularBuf) {
       children.push(new Paragraph({
-        children: [new TextRun({ text: b, size: 20, font: "Calibri" })],
+        children: [new TextRun({ text: b, size: 20, font: CL_FONT, color: CL_CHARCOAL })],
         bullet: { level: 0 },
         spacing: { after: 30 },
         indent: { left: 360, hanging: 180 },
@@ -381,58 +381,67 @@ export async function buildDocxBuffer(
 
     switch (line.type) {
       case "name":
+        // Large name in near-black
         children.push(new Paragraph({
-          children: [new TextRun({ text: line.text, bold: true, size: 52, color: NAVY, font: "Calibri" })],
-          alignment: AlignmentType.CENTER, spacing: { after: 40 },
+          children: [new TextRun({ text: line.text, bold: true, size: 52, color: CL_NEAR_BLACK, font: CL_FONT })],
+          alignment: AlignmentType.CENTER, spacing: { after: 60 },
+        }));
+        // Short gold accent bar below name
+        children.push(new Paragraph({
+          children: [new TextRun({ text: "", size: 4 })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 80 },
+          border: { bottom: { color: CL_GOLD, size: 8, style: BorderStyle.SINGLE, space: 4 } },
+          indent: { left: 3200, right: 3200 },
         }));
         break;
 
       case "title":
         children.push(new Paragraph({
-          children: [new TextRun({ text: line.text, size: 26, color: NAVY_MID, font: "Calibri", italics: true })],
-          alignment: AlignmentType.CENTER, spacing: { after: 40 },
+          children: [new TextRun({ text: line.text, size: 22, color: CL_GREY, font: CL_FONT, italics: true })],
+          alignment: AlignmentType.CENTER, spacing: { after: 60 },
         }));
         break;
 
       case "contact": {
         const runs: TextRun[] = [];
         line.items.forEach((item, idx) => {
-          if (idx > 0) runs.push(new TextRun({ text: "   |   ", size: 18, color: RULE, font: "Calibri" }));
+          if (idx > 0) runs.push(new TextRun({ text: "   ·   ", size: 16, color: CL_PARCHMENT, font: CL_FONT }));
           runs.push(new TextRun({
-            text: `${contactIcon[item.kind]}${item.display}`,
-            size: 18, color: MUTED, font: "Calibri",
+            text: `${contactIcon[item.kind]}${item.display.toUpperCase()}`,
+            size: 15, color: CL_GREY, font: CL_FONT,
           }));
         });
         children.push(new Paragraph({
           children: runs,
           alignment: AlignmentType.CENTER,
           spacing: { after: 200 },
-          border: { bottom: { color: RULE, size: 4, style: BorderStyle.SINGLE, space: 8 } },
+          border: { bottom: { color: CL_PARCHMENT, size: 4, style: BorderStyle.SINGLE, space: 8 } },
         }));
         break;
       }
 
       case "heading":
         children.push(new Paragraph({
-          children: [new TextRun({ text: line.text, bold: true, size: 22, color: NAVY, font: "Calibri", allCaps: true })],
-          spacing: { before: 260, after: 80 },
-          border: { bottom: { color: NAVY_MID, size: 8, style: BorderStyle.SINGLE, space: 4 } },
+          children: [new TextRun({ text: line.text, bold: true, size: 20, color: CL_NEAR_BLACK, font: CL_FONT, allCaps: true })],
+          spacing: { before: 280, after: 80 },
+          border: { bottom: { color: CL_GOLD, size: 6, style: BorderStyle.SINGLE, space: 4 } },
         }));
         break;
 
       case "job":
         children.push(new Paragraph({
           children: [
-            new TextRun({ text: line.company, bold: true, size: 22, color: "111111", font: "Calibri" }),
+            new TextRun({ text: line.company, bold: true, size: 22, color: CL_NEAR_BLACK, font: CL_FONT }),
             new TextRun({ text: "\t", size: 22 }),
-            new TextRun({ text: line.dates, size: 20, color: MUTED, italics: true, font: "Calibri" }),
+            new TextRun({ text: line.dates, size: 19, color: CL_GREY, italics: true, font: CL_FONT }),
           ],
           tabStops: [{ type: TabStopType.RIGHT, position: 9360 }],
           spacing: { before: 120, after: 20 },
         }));
         if (line.jobTitle) {
           children.push(new Paragraph({
-            children: [new TextRun({ text: line.jobTitle, size: 20, color: NAVY_MID, font: "Calibri", italics: true })],
+            children: [new TextRun({ text: line.jobTitle, size: 20, color: CL_GOLD, font: CL_FONT, italics: true })],
             spacing: { after: 50 },
           }));
         }
@@ -445,7 +454,8 @@ export async function buildDocxBuffer(
 
       case "body":
         children.push(new Paragraph({
-          children: [new TextRun({ text: line.text, size: 20, font: "Calibri" })],
+          children: [new TextRun({ text: line.text, size: 20, font: CL_FONT, color: CL_CHARCOAL })],
+          alignment: AlignmentType.JUSTIFIED,
           spacing: { after: 60 },
         }));
         break;
@@ -645,82 +655,100 @@ export function buildPrintHtml(
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-body{font-family:'Calibri','Arial',sans-serif;font-size:11pt;line-height:1.55;
-     color:#1a1a1a;background:#e8ecf0}
+/* ════════════════════════════════════════════════════
+   SHARED PALETTE (CV + Cover Letter)
+     #1A1A1A  near-black  — name, headings, company
+     #2C2C2C  warm char.  — body text, bullets
+     #B8975A  warm gold   — accent bar, section rule, role text, icons
+     #888888  soft grey   — dates, contact labels, sub-title
+     #D8CDB8  warm parch. — divider, separator tint
+   Font: Georgia,"Times New Roman",serif (system serif, reliable in print)
+   ════════════════════════════════════════════════════ */
+
+body{font-family:Georgia,"Times New Roman",serif;font-size:11pt;
+     line-height:1.55;color:#2C2C2C;background:#e8ecf0}
 
 /* ── Print banner ── */
-.banner{background:#1e3a5f;color:#fff;padding:10px 28px;
+.banner{background:#1A1A1A;color:#fff;padding:10px 28px;
         display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .banner strong{font-size:13px}
-.banner p{font-size:11px;opacity:.65;margin-top:1px}
-.btn{background:#2d5a8e;color:#fff;border:none;padding:7px 20px;
-     border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
-.btn:hover{background:#3a72b5}
+.banner p{font-size:11px;opacity:.55;margin-top:1px}
+.btn{background:#B8975A;color:#fff;border:none;padding:7px 20px;
+     border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;
+     font-family:Georgia,"Times New Roman",serif;}
+.btn:hover{background:#A0813C}
 
 /* ── Page — A4 proportions on screen, Word margins in print ── */
-/* A4 at 96 dpi = 794px wide. Word default = 25.4mm (1 in) each side → 160mm text area ≈ 605px */
 .doc{
   width:794px;max-width:100%;
   margin:24px auto 52px;
   background:#fff;
-  padding:56px 96px 64px;  /* ≈ 25mm side margins on-screen */
+  padding:56px 96px 64px;
   border-radius:2px;
   box-shadow:0 2px 20px rgba(0,0,0,.18);
 }
 
 /* ── CV Header ── */
-.cv-name{font-size:26pt;font-weight:700;color:#1e3a5f;
-         text-align:center;letter-spacing:.015em;line-height:1.15;margin-bottom:4px}
-.cv-sub-title{font-size:11.5pt;color:#2d5a8e;text-align:center;
-              font-style:italic;margin-bottom:10px}
+.cv-name{
+  font-family:Georgia,"Times New Roman",serif;
+  font-size:26pt;font-weight:bold;color:#1A1A1A;
+  text-align:center;letter-spacing:.05em;line-height:1.1;margin-bottom:8px;
+}
+/* Short gold accent bar under name */
+.cv-name-bar{width:52px;height:2px;background:#B8975A;margin:0 auto 12px}
 
-/* Contact bar — structured items in a centered flex row */
+.cv-sub-title{
+  font-size:10.5pt;color:#777;text-align:center;
+  font-style:italic;margin-bottom:10px;
+}
+
+/* Contact bar — uppercase, letter-spaced, gold icons */
 .cv-contact-bar{
   display:flex;flex-wrap:wrap;justify-content:center;align-items:center;
   gap:4px 0;
   padding-bottom:12px;margin-bottom:16px;
-  border-bottom:1.5px solid #c8d4e0;
-  font-size:8.5pt;color:#555;
+  border-bottom:1px solid #D8CDB8;
+  font-size:7.5pt;color:#999;letter-spacing:.06em;text-transform:uppercase;
 }
 .cv-ci{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;padding:0 6px}
-.cv-ci a{color:#555;text-decoration:none}
-.cv-ci a:hover{color:#2d5a8e;text-decoration:underline}
+.cv-ci a{color:#999;text-decoration:none}
+.cv-ci a:hover{color:#B8975A;text-decoration:underline}
 .cv-ci-icon{
   display:inline-flex;align-items:center;justify-content:center;
   width:14px;height:14px;font-size:9pt;flex-shrink:0;
-  color:#2d5a8e;
+  color:#B8975A;   /* gold icons */
 }
-/* LinkedIn badge */
 .ci-li{background:#0a66c2;color:#fff!important;border-radius:2px;
        font-size:6.5pt;font-weight:700;letter-spacing:0;padding:1px 2px;width:auto;height:auto}
-/* GitHub badge */
 .ci-gh{background:#1a1a1a;color:#fff!important;border-radius:2px;
        font-size:6.5pt;font-weight:700;padding:1px 2px;width:auto;height:auto}
-.cv-ci-sep{color:#c8d4e0;font-size:9pt;padding:0 2px}
+.cv-ci-sep{color:#D8CDB8;font-size:9pt;padding:0 2px}
 
-/* ── Section heading ── */
-.cv-section{margin-top:16px;margin-bottom:6px;padding-bottom:3px;
-            border-bottom:2px solid #2d5a8e}
-.cv-section span{font-size:9pt;font-weight:700;color:#1e3a5f;
-                 letter-spacing:.12em;text-transform:uppercase}
+/* ── Section heading — gold rule, near-black uppercase label ── */
+.cv-section{margin-top:18px;margin-bottom:6px;padding-bottom:4px;
+            border-bottom:1.5px solid #B8975A}
+.cv-section span{
+  font-size:9pt;font-weight:700;color:#1A1A1A;
+  letter-spacing:.14em;text-transform:uppercase;
+}
 
 /* ── Job entry ── */
 .cv-job-header{display:flex;justify-content:space-between;
                align-items:baseline;margin-top:10px;margin-bottom:1px;gap:12px}
-.cv-company{font-weight:700;font-size:10pt;color:#111}
-.cv-dates{font-size:8.5pt;color:#666;white-space:nowrap;font-style:italic;flex-shrink:0}
-.cv-role{font-size:9.5pt;color:#2d5a8e;font-style:italic;margin-bottom:4px}
+.cv-company{font-weight:700;font-size:10pt;color:#1A1A1A}
+.cv-dates{font-size:8.5pt;color:#888;white-space:nowrap;font-style:italic;flex-shrink:0}
+.cv-role{font-size:9.5pt;color:#B8975A;font-style:italic;margin-bottom:4px}
 
 /* ── Regular bullets ── */
 .cv-bullets{margin:3px 0 4px 18px}
-.cv-bullets li{font-size:9.5pt;margin-bottom:2px;line-height:1.45;list-style-type:disc}
+.cv-bullets li{font-size:9.5pt;margin-bottom:2px;line-height:1.5;list-style-type:disc;color:#2C2C2C}
 
 /* ── Compact inline skills/certs ── */
-.cv-tags{font-size:9.5pt;color:#222;line-height:1.6;margin-bottom:2px}
-.cv-tag-sep{color:#bbb;margin:0 4px}
+.cv-tags{font-size:9.5pt;color:#2C2C2C;line-height:1.6;margin-bottom:2px}
+.cv-tag-sep{color:#C4B99A;margin:0 4px}
 
 /* ── Body paragraph (summary, etc.) ── */
-.cv-body{font-size:9.5pt;margin-bottom:4px;line-height:1.6;color:#1a1a1a;text-align:justify}
+.cv-body{font-size:9.5pt;margin-bottom:4px;line-height:1.65;color:#2C2C2C;text-align:justify}
 
 /* ════════════════════════════════════════════════════
    COVER LETTER — premium serif business-letter design
@@ -948,6 +976,7 @@ function renderCv(lines: LineKind[]): string {
     switch (line.type) {
       case "name":
         out.push(`<div class="cv-name">${esc(line.text)}</div>`);
+        out.push(`<div class="cv-name-bar"></div>`);
         break;
       case "title":
         out.push(`<div class="cv-sub-title">${esc(line.text)}</div>`);
