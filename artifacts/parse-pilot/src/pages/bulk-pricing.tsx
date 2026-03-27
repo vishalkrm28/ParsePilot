@@ -425,9 +425,9 @@ export default function BulkPricing() {
                   {/* Features */}
                   <ul className="space-y-1.5 mb-6 flex-1">
                     {[
-                      "Full ATS match score",
+                      "Full ATS match score per candidate",
                       "Missing keywords analysis",
-                      "Optimised CV for each role",
+                      "ATS-optimised CV output per candidate",
                       "Export as DOCX or PDF",
                     ].map((f) => (
                       <li key={f} className="flex items-center gap-2 text-xs text-muted-foreground">
