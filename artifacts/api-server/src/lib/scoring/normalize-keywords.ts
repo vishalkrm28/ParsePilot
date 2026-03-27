@@ -1,6 +1,7 @@
 export function normalizeKeyword(kw: string): string {
   return kw
     .toLowerCase()
+    .replace(/[-–—]/g, " ")
     .replace(/[^a-z0-9 +#./]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -66,4 +67,80 @@ export function isTermInText(term: string, text: string): boolean {
 
 function escapeRegex(s: string): string {
   return s.replace(/[+.#]/g, "\\$&");
+}
+
+// ── Significant-word extraction ────────────────────────────────────────────
+// Words that carry no discriminating meaning when checking keyword presence.
+const SIGNIFICANCE_STOP = new Set([
+  "a", "an", "the", "and", "or", "in", "on", "at", "to", "for", "of",
+  "with", "by", "from", "is", "are", "was", "were",
+  "skill", "skills", "ability", "abilities", "knowledge", "experience",
+  "proficiency", "expertise", "understanding", "competency", "competencies",
+  "strong", "excellent", "good", "solid", "proven", "demonstrated",
+  "including", "related", "based", "focused", "driven", "oriented",
+  "using", "used", "use", "via",
+]);
+
+/**
+ * Returns the meaningful constituent words from a (potentially multi-word)
+ * term — used to check individual word presence when exact phrase matching
+ * fails.  Words shorter than `minLen` or on the significance stop-list are
+ * excluded.
+ */
+export function getSignificantWords(term: string, minLen = 4): string[] {
+  return normalizeKeyword(term)
+    .split(" ")
+    .filter(w => w.length >= minLen && !SIGNIFICANCE_STOP.has(w));
+}
+
+// ── Root / stem extraction ─────────────────────────────────────────────────
+// A lightweight suffix stripper — NOT a full NLP stemmer, but covers the
+// most common English inflections found in CVs and job descriptions.
+
+const SUFFIXES_ORDERED = [
+  "ations", "ation",   // communication → communicat
+  "ements", "ement",   // management → manag, achievement → achiev  (must be before "ment")
+  "ments",  "ment",    // alignment → align
+  "nesses", "ness",    // effectiveness → effectiv
+  "ships",  "ship",    // leadership → leader
+  "tions",  "tion",    // execution → execut
+  "sions",  "sion",    // supervision → supervis
+  "ities",  "ity",     // creativity → creativ
+  "ives",   "ive",     // creative → creativ
+  "ials",   "ial",     // managerial → manager
+  "ings",   "ing",     // managing → manag
+  "ers",    "er",      // developer → develop
+  "eds",    "ed",      // managed → manag
+  "lys",    "ly",      // efficiently → efficient
+  "als",    "al",      // analytical → analytic
+];
+
+export function getWordRoot(word: string): string {
+  if (word.length <= 3) return word; // too short to stem safely
+  for (const suffix of SUFFIXES_ORDERED) {
+    if (word.endsWith(suffix) && word.length - suffix.length >= 4) {
+      return word.slice(0, -suffix.length);
+    }
+  }
+  // Trailing "s" for simple plurals (avoid stripping "ss" endings)
+  // >= 5 so "teams" (5) → "team", "leads" (5) → "lead" etc. are handled
+  if (word.endsWith("s") && !word.endsWith("ss") && word.length >= 5) {
+    return word.slice(0, -1);
+  }
+  return word;
+}
+
+/**
+ * Builds a set containing every word AND its root that appears in the CV
+ * full text.  Used for stem-based matching without expensive regex scanning.
+ */
+export function buildCvRootSet(cvFullText: string): Set<string> {
+  const roots = new Set<string>();
+  for (const word of normalizeKeyword(cvFullText).split(/\s+/)) {
+    if (word.length < 3) continue;
+    roots.add(word);
+    const root = getWordRoot(word);
+    if (root !== word) roots.add(root);
+  }
+  return roots;
 }
