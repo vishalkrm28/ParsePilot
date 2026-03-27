@@ -501,22 +501,30 @@ export default function ApplicationDetail() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
                   {identityWarning.isAboveLimit
-                    ? "Multiple profiles detected — consider a separate account"
-                    : "This looks like a different profile"}
+                    ? "This account is being used for multiple candidates"
+                    : "This looks like a different person's CV"}
                 </p>
-                <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 leading-relaxed">
                   {identityWarning.isAboveLimit
-                    ? `You've optimized CVs for ${identityWarning.distinctCount} different people on this account. ParsePilot works best as a personal CV tool — 1 extra credit was applied.`
-                    : "ParsePilot works best per individual. Optimizing for a different person used 1 extra credit."}
+                    ? `Pro is designed for one person's career — analyzing your own CV for multiple roles. For reviewing ${identityWarning.distinctCount}+ candidates, Bulk Mode is the right tool.`
+                    : "Pro is for tracking your own career across multiple job applications. For analyzing CVs of different candidates, use Bulk Mode instead."}
                 </p>
               </div>
-              <button
-                onClick={() => setIdentityWarning(null)}
-                className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 shrink-0 font-medium"
-                aria-label="Dismiss identity warning"
-              >
-                Dismiss
-              </button>
+              <div className="flex items-center gap-3 shrink-0">
+                <a
+                  href="/bulk"
+                  className="text-xs font-semibold text-amber-800 dark:text-amber-200 underline underline-offset-2 hover:no-underline whitespace-nowrap"
+                >
+                  Go to Bulk Mode
+                </a>
+                <button
+                  onClick={() => setIdentityWarning(null)}
+                  className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 font-medium"
+                  aria-label="Dismiss identity warning"
+                >
+                  Dismiss
+                </button>
+              </div>
             </div>
           </motion.div>
         )}

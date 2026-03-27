@@ -132,9 +132,9 @@ function ProUpsellBanner({ onUpgrade }: { onUpgrade: () => void }) {
         <Crown className="w-5 h-5 text-violet-500" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-sm mb-0.5">You might save more with Pro</p>
+        <p className="font-semibold text-sm mb-0.5">Analyzing your own CV for multiple roles? Try Pro</p>
         <p className="text-sm text-muted-foreground">
-          $14.99/month includes up to 100 CV analyses — better value if you analyze regularly.
+          Pro is designed for job seekers — $14.99/month, 100 analyses of your own CV across many roles.
         </p>
       </div>
       <button
@@ -462,7 +462,7 @@ export default function BulkPricing() {
           </div>
         )}
 
-        {/* Pro comparison section */}
+        {/* Pro vs Bulk clarification */}
         {!status?.isPro && (
           <div className="rounded-2xl border border-border bg-muted/20 p-6">
             <div className="flex items-start gap-4">
@@ -470,29 +470,31 @@ export default function BulkPricing() {
                 <Crown className="w-5 h-5 text-violet-500" />
               </div>
               <div className="flex-1">
-                <p className="font-bold mb-1">Need recurring bulk access?</p>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Pro at $14.99/month includes 100 CV analyses per month — better value if
-                  you analyze more than one batch regularly.
-                </p>
-                <div className="grid sm:grid-cols-3 gap-2 text-xs text-muted-foreground mb-4">
-                  {[
-                    ["Bulk 10 CVs", "$19 one-time"],
-                    ["Bulk 25 CVs", "$29 one-time"],
-                    ["Pro 100 CVs/mo", "$14.99/month"],
-                  ].map(([plan, price]) => (
-                    <div key={plan} className="flex flex-col items-center py-2 px-3 rounded-lg bg-background border border-border text-center">
-                      <span className="font-medium text-foreground">{plan}</span>
-                      <span className="text-primary font-semibold">{price}</span>
-                    </div>
-                  ))}
+                <p className="font-bold mb-1">Not sure which to choose?</p>
+                <div className="grid sm:grid-cols-2 gap-3 mb-4 mt-3">
+                  <div className="rounded-xl bg-background border border-border p-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Bulk Mode</p>
+                    <p className="text-sm font-semibold mb-1">Multiple candidates</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      You're a recruiter or hiring manager reviewing different people's CVs for one or more roles.
+                    </p>
+                    <p className="text-xs font-semibold text-primary mt-2">From $19 one-time</p>
+                  </div>
+                  <div className="rounded-xl bg-violet-500/5 border border-violet-500/20 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-violet-500 mb-2">Pro Plan</p>
+                    <p className="text-sm font-semibold mb-1">Your own career</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      You're a job seeker tailoring your own CV for many different roles over time.
+                    </p>
+                    <p className="text-xs font-semibold text-violet-600 mt-2">$14.99/month · 100 analyses</p>
+                  </div>
                 </div>
                 <button
                   onClick={goToProCheckout}
                   className="flex items-center gap-2 text-sm font-semibold text-violet-600 hover:text-violet-700 transition-colors"
                 >
                   <Sparkles className="w-4 h-4" />
-                  Start Pro — 7-day free trial
+                  Upgrade to Pro
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>

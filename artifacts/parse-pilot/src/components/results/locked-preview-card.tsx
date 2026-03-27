@@ -125,7 +125,7 @@ export function LockedPreviewCard({ preview, applicationId }: LockedPreviewCardP
                       ParsePilot Pro — $12/mo
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      Unlimited results · Cover letters · Better value if you apply to multiple roles
+                      Your career, unlimited roles · Cover letters · Export DOCX &amp; PDF
                     </p>
                   </div>
                   <UpgradeButton
