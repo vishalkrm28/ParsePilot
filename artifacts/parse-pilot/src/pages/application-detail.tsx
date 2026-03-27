@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useSearch, useLocation } from "wouter";
+import { useParams, useLocation } from "wouter";
 import {
   useGetApplication,
   useAnalyzeApplication,
@@ -251,9 +251,21 @@ type TabId = "cv" | "keywords" | "missing" | "cover" | "suggestions";
 export default function ApplicationDetail() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
-  const search = useSearch();
   const [, navigate] = useLocation();
-  const fromBulk = new URLSearchParams(search).get("from") === "bulk";
+  const [fromBulk, setFromBulk] = useState(false);
+
+  // Detect if user arrived here from a bulk session (check stored results)
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem("bulk_completed_results");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) setFromBulk(true);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const [activeTab, setActiveTab] = useState<TabId>("cv");
   const [missingAnswers, setMissingAnswers] = useState<Record<string, string>>({});

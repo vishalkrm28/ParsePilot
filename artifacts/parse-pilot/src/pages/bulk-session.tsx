@@ -508,14 +508,25 @@ export default function BulkSession() {
     isRunningRef.current = false;
     setIsRunning(false);
 
-    // Auto-switch to results view if anything completed
-    setCompletedResults((current) => {
-      if (current.length > 0) {
-        setView("results");
+    // Read directly from sessionStorage to avoid React state batching race
+    try {
+      const stored = sessionStorage.getItem(SESSION_KEY);
+      if (stored) {
+        const storedResults: CompletedResult[] = JSON.parse(stored);
+        if (storedResults.length > 0) {
+          setCompletedResults(storedResults);
+          setView("results");
+          toast({
+            title: "Batch complete",
+            description: `${storedResults.length} CV${storedResults.length !== 1 ? "s" : ""} analysed — results ranked below.`,
+          });
+          return;
+        }
       }
-      toast({ title: "Batch complete", description: `${current.length} CV${current.length !== 1 ? "s" : ""} analysed.` });
-      return current;
-    });
+    } catch {
+      // ignore
+    }
+    toast({ title: "Batch complete", description: "Processing complete." });
   };
 
   const startNewSession = () => {
@@ -529,7 +540,7 @@ export default function BulkSession() {
   };
 
   const handleViewDetail = (applicationId: string) => {
-    navigate(`/applications/${applicationId}?from=bulk`);
+    navigate(`/applications/${applicationId}`);
   };
 
   const pendingCount = queue.filter((i) => i.status === "pending").length;
