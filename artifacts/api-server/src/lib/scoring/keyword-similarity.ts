@@ -4,6 +4,7 @@ import {
   getSignificantWords,
   getWordRoot,
   buildCvRootSet,
+  prefixFoundInRoots,
 } from "./normalize-keywords.js";
 import { resolveToCanonical, getAllAliases } from "./keyword-synonyms.js";
 
@@ -18,19 +19,14 @@ function buildCvCorpus(cvKeywords: string[]): Set<string> {
     const norm = normalizeKeyword(kw);
     if (!norm) continue;
     corpus.add(norm);
-    // Canonical form
     const canonical = resolveToCanonical(norm);
     corpus.add(canonical);
-    // Root of canonical (handles "leadership" → "leader" etc.)
     corpus.add(getWordRoot(canonical));
-    // All aliases + their roots
     for (const alias of getAllAliases(norm)) {
       corpus.add(alias);
       corpus.add(getWordRoot(alias));
     }
-    // Root of the raw keyword itself
     corpus.add(getWordRoot(norm));
-    // For each word in a multi-word keyword, add its root too
     for (const word of norm.split(" ")) {
       if (word.length >= 4) corpus.add(getWordRoot(word));
     }
@@ -39,12 +35,11 @@ function buildCvCorpus(cvKeywords: string[]): Set<string> {
 }
 
 /**
- * Returns true if enough significant constituent words of `term` are present
- * in the CV text or CV root set.  Used as a fallback when exact phrase
- * matching fails — catches word-order variations, verbal/nominal form
- * switches, and partial phrase presence.
+ * Checks whether each significant word of `term` (len ≥ 4, not a stop word)
+ * can be found in the CV — either as an exact match, via the root set, or via
+ * the prefix-based fuzzy stem lookup.
  *
- * Threshold: 2-word phrases require both; 3+ phrases require ≥ ⌈75%⌉.
+ * Threshold: 2-word phrases require both; 3+ require ≥ ⌈75%⌉.
  */
 function significantWordsPresent(
   term: string,
@@ -52,18 +47,20 @@ function significantWordsPresent(
   cvRoots: Set<string>,
 ): boolean {
   const sigWords = getSignificantWords(term, 4);
-  if (sigWords.length < 2) return false; // single-significant-word terms use stem check instead
+  if (sigWords.length < 2) return false;
 
   const required = sigWords.length === 2 ? 2 : Math.ceil(sigWords.length * 0.75);
-
   let found = 0;
+
   for (const w of sigWords) {
     const root = getWordRoot(w);
-    if (
+    const wordFound =
       isTermInText(w, cvFullText) ||
       cvRoots.has(w) ||
-      cvRoots.has(root)
-    ) {
+      cvRoots.has(root) ||
+      prefixFoundInRoots(root, cvRoots);
+
+    if (wordFound) {
       found++;
       if (found >= required) return true;
     }
@@ -72,10 +69,11 @@ function significantWordsPresent(
 }
 
 /**
- * Returns true if the root/stem of a single-word JD term matches any word
- * (or word root) found in the CV.  Handles inflection variants:
- *   "leadership" → root "leader" → matches "leader", "leading", "led"
- *   "management" → root "manag" → matches "managing", "managed", "manages"
+ * Checks whether a single-word JD term can be found in the CV via stem or
+ * prefix matching.  Handles inflection variants:
+ *   "leadership" → root "leader" matches "leader", "leading", "led"
+ *   "management" → root "manag"  matches "managing", "managed"
+ *   "demonstration" → root "demonstr" → prefix matches "demonstrat" (from "demonstrated")
  */
 function stemMatchFound(
   norm: string,
@@ -85,12 +83,22 @@ function stemMatchFound(
   if (norm.split(" ").length !== 1 || norm.length < 5) return false;
 
   const root = getWordRoot(norm);
-  if (cvRoots.has(norm) || (root !== norm && cvRoots.has(root))) return true;
+  if (
+    cvRoots.has(norm) ||
+    cvRoots.has(root) ||
+    prefixFoundInRoots(root, cvRoots)
+  ) {
+    return true;
+  }
 
   for (const alias of aliases) {
     if (alias.split(" ").length !== 1) continue;
     const aliasRoot = getWordRoot(alias);
-    if (cvRoots.has(alias) || (aliasRoot !== alias && cvRoots.has(aliasRoot))) {
+    if (
+      cvRoots.has(alias) ||
+      cvRoots.has(aliasRoot) ||
+      prefixFoundInRoots(aliasRoot, cvRoots)
+    ) {
       return true;
     }
   }
@@ -128,7 +136,7 @@ export function matchKeywords(
       }
     }
 
-    // ── Pass 3: exact text search — term and canonical ───────────────────
+    // ── Pass 3: exact text search — term and canonical ───────────────────────
     if (!found && isTermInText(norm, cvFullText)) found = true;
     if (!found && canonical !== norm && isTermInText(canonical, cvFullText)) found = true;
 
@@ -141,8 +149,7 @@ export function matchKeywords(
 
     // ── Pass 5: significant-word presence check ───────────────────────────
     // Catches word-order variation, nominal/verbal form switch, partial
-    // phrase match.  E.g. "stakeholder communication" → looks for "stakeholder"
-    // AND "communication" independently in the CV.
+    // phrase match.  Also uses prefix lookup for each significant word.
     if (!found && significantWordsPresent(norm, cvFullText, cvRoots)) found = true;
 
     // ── Pass 6: significant-word check across canonical & aliases ─────────
@@ -153,26 +160,29 @@ export function matchKeywords(
       }
     }
 
-    // ── Pass 7: root/stem matching for single-word terms ─────────────────
-    // Catches inflection variants: "leadership" matches "leader",
-    // "analysis" matches "analyzing", "management" matches "managed".
+    // ── Pass 7: root/stem + prefix matching for single-word terms ─────────
+    // Catches inflection variants AND near-root mismatches like
+    // "demonstration"→"demonstr" ↔ "demonstrated"→"demonstrat" (share prefix).
     if (!found && stemMatchFound(norm, aliases, cvRoots)) found = true;
 
     // ── Pass 8: single-significant-word terms ─────────────────────────────
     // Handles phrases like "leadership skills" where the stop-word filter
-    // leaves only one meaningful word ("leadership"). Check that word's
-    // stem against the CV — same logic as stem matching but applied after
-    // extracting the significant token from a multi-word phrase.
+    // leaves only one meaningful word ("leadership"). Checks that word using
+    // stem + prefix matching.
     if (!found && norm.split(" ").length > 1) {
       const sigWords = getSignificantWords(norm, 4);
       if (sigWords.length === 1) {
         const w = sigWords[0];
         const root = getWordRoot(w);
-        if (isTermInText(w, cvFullText) || cvRoots.has(w) || cvRoots.has(root)) {
+        if (
+          isTermInText(w, cvFullText) ||
+          cvRoots.has(w) ||
+          cvRoots.has(root) ||
+          prefixFoundInRoots(root, cvRoots)
+        ) {
           found = true;
         }
       }
-      // Also try the significant word of each alias
       if (!found) {
         for (const alias of aliases) {
           if (alias === norm) continue;
@@ -180,7 +190,12 @@ export function matchKeywords(
           if (aliasSig.length === 1) {
             const w = aliasSig[0];
             const root = getWordRoot(w);
-            if (isTermInText(w, cvFullText) || cvRoots.has(w) || cvRoots.has(root)) {
+            if (
+              isTermInText(w, cvFullText) ||
+              cvRoots.has(w) ||
+              cvRoots.has(root) ||
+              prefixFoundInRoots(root, cvRoots)
+            ) {
               found = true;
               break;
             }

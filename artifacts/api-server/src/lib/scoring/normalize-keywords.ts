@@ -3,6 +3,15 @@ export function normalizeKeyword(kw: string): string {
     .toLowerCase()
     .replace(/[-–—]/g, " ")
     .replace(/[^a-z0-9 +#./]/g, " ")
+    // ── UK → US spelling normalization ──────────────────────────────────────
+    // Applied AFTER character stripping so it operates on clean tokens only.
+    // Both the JD text and CV text go through this function, so both sides
+    // always converge to the same form — matching is never broken.
+    .replace(/isations?\b/g,  "izations")   // organisations → organizations
+    .replace(/isation\b/g,    "ization")     // organisation → organization
+    .replace(/ising\b/g,      "izing")       // organising → organizing
+    .replace(/ised\b/g,       "ized")        // organised → organized
+    .replace(/ise\b/g,        "ize")         // organise → organize
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -98,21 +107,28 @@ export function getSignificantWords(term: string, minLen = 4): string[] {
 // most common English inflections found in CVs and job descriptions.
 
 const SUFFIXES_ORDERED = [
-  "ations", "ation",   // communication → communicat
-  "ements", "ement",   // management → manag, achievement → achiev  (must be before "ment")
-  "ments",  "ment",    // alignment → align
-  "nesses", "ness",    // effectiveness → effectiv
-  "ships",  "ship",    // leadership → leader
-  "tions",  "tion",    // execution → execut
-  "sions",  "sion",    // supervision → supervis
-  "ities",  "ity",     // creativity → creativ
-  "ives",   "ive",     // creative → creativ
-  "ials",   "ial",     // managerial → manager
-  "ings",   "ing",     // managing → manag
-  "ers",    "er",      // developer → develop
-  "eds",    "ed",      // managed → manag
-  "lys",    "ly",      // efficiently → efficient
-  "als",    "al",      // analytical → analytic
+  "ications", "ication",  // communication → commun, application → applic
+  "ications", "ication",  // (plural covered above)
+  "orations", "oration",  // collaboration → collab, exploration → explor
+  "orates",   "orate",    // collaborate → collab
+  "orating",  "orated",   // collaborating/collaborated → collab
+  "orative",              // collaborative → collab
+  "ations",   "ation",    // communication → communicat, creation → creat
+  "ements",   "ement",    // management → manag, achievement → achiev (before "ment")
+  "ments",    "ment",     // alignment → align, development → develop
+  "nesses",   "ness",     // effectiveness → effectiv
+  "ships",    "ship",     // leadership → leader
+  "tions",    "tion",     // execution → execut
+  "sions",    "sion",     // supervision → supervis
+  "ities",    "ity",      // creativity → creativ
+  "ives",     "ive",      // creative → creativ
+  "ials",     "ial",      // managerial → manager
+  "ings",     "ing",      // managing → manag
+  "ates",     "ate",      // coordinate → coordinat, automate → automat
+  "ers",      "er",       // developer → develop
+  "eds",      "ed",       // managed → manag
+  "lys",      "ly",       // efficiently → efficient
+  "als",      "al",       // analytical → analytic
 ];
 
 export function getWordRoot(word: string): string {
@@ -131,8 +147,29 @@ export function getWordRoot(word: string): string {
 }
 
 /**
- * Builds a set containing every word AND its root that appears in the CV
- * full text.  Used for stem-based matching without expensive regex scanning.
+ * Returns true if a prefix of `wordRoot` (≥ minLen chars, and within 2 chars
+ * of the full root length) is found in `cvRoots`.
+ *
+ * The "within-2" constraint prevents false positives from compound strings
+ * where a short prefix coincidentally appears in an unrelated CV word:
+ *   "containerorchestrat" (19) → min prefix = max(6, 17) = 17 → no match
+ *   "demonstr"            (8)  → min prefix = max(6, 6)  = 6  → checks fine
+ *   "coordin"             (7)  → min prefix = max(6, 5)  = 6  → checks fine
+ */
+export function prefixFoundInRoots(wordRoot: string, cvRoots: Set<string>, minLen = 6): boolean {
+  if (wordRoot.length < minLen) return false;
+  const effectiveMin = Math.max(minLen, wordRoot.length - 2);
+  for (let len = wordRoot.length; len >= effectiveMin; len--) {
+    if (cvRoots.has(wordRoot.slice(0, len))) return true;
+  }
+  return false;
+}
+
+/**
+ * Builds a set containing every word, its root, AND 6-char+ prefixes of each
+ * root.  The prefix entries enable prefix-based fuzzy stem matching: a CV
+ * word "demonstrated" → root "demonstrat" adds "demonstr", "demonstra", etc.
+ * so that the JD root "demonstr" (from "demonstration") finds a match.
  */
 export function buildCvRootSet(cvFullText: string): Set<string> {
   const roots = new Set<string>();
@@ -141,6 +178,13 @@ export function buildCvRootSet(cvFullText: string): Set<string> {
     roots.add(word);
     const root = getWordRoot(word);
     if (root !== word) roots.add(root);
+    // Add 6-char+ prefixes of the shorter of (word, root) to the set.
+    // This ensures that a JD root which is a prefix of a CV root still
+    // matches even when they differ by a few characters.
+    const stem = root.length < word.length ? root : word;
+    for (let len = 6; len < stem.length; len++) {
+      roots.add(stem.slice(0, len));
+    }
   }
   return roots;
 }
