@@ -1,6 +1,7 @@
 import { useAuth } from "@workspace/replit-auth-web";
 import { useLocation } from "wouter";
 import { useEffect, useState } from "react";
+import { Footer } from "@/components/layout/footer";
 import {
   Sparkles,
   FileText,
@@ -911,22 +912,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── Footer ──────────────────────────────────────────────────────── */}
-      <footer className="border-t border-border/40 bg-muted/10">
-        <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
-              <Sparkles className="w-3 h-3 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-foreground">ParsePilot</span>
-          </div>
-          <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-foreground transition-colors">Terms</a>
-            <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-            <a href="#" className="hover:text-foreground transition-colors">Contact</a>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

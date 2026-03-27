@@ -1,6 +1,7 @@
 import { Sidebar } from "./sidebar";
 import { useState } from "react";
 import { Menu, Sparkles } from "lucide-react";
+import { Link } from "wouter";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -47,6 +48,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-8">
           {children}
         </main>
+
+        {/* Subtle legal footer for authenticated users */}
+        <div className="border-t border-border/30 px-6 py-4 flex items-center justify-center gap-5 text-xs text-muted-foreground/50">
+          <Link href="/terms" className="hover:text-muted-foreground transition-colors">
+            Terms
+          </Link>
+          <Link href="/privacy" className="hover:text-muted-foreground transition-colors">
+            Privacy
+          </Link>
+          <span>© {new Date().getFullYear()} ParsePilot</span>
+        </div>
       </div>
     </div>
   );

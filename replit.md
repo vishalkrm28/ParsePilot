@@ -34,8 +34,8 @@ artifacts-monorepo/
 │   │       └── services/   # ai.ts, fileParser.ts, exporter.ts
 │   └── parse-pilot/        # React + Vite frontend (served at /)
 │       └── src/
-│           ├── pages/      # landing.tsx, dashboard.tsx, new-application.tsx, application-detail.tsx
-│           ├── components/ # Button, Card, Badge, Input, Textarea, layout/
+│           ├── pages/      # landing.tsx, dashboard.tsx, new-application.tsx, application-detail.tsx, terms.tsx, privacy.tsx
+│           ├── components/ # Button, Card, Badge, Input, Textarea, layout/ (sidebar, app-layout, footer)
 │           └── hooks/      # use-toast.ts
 ├── lib/
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config

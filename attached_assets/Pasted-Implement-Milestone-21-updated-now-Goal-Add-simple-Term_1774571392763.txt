@@ -1,0 +1,171 @@
+Implement Milestone 21 (updated) now.
+
+Goal:
+Add simple Terms of Service and Privacy Policy pages to ParsePilot, and update the footer to use a bold, high-impact brand statement instead of a generic footer.
+
+Important:
+- Keep legal pages simple and readable
+- Avoid heavy legal jargon
+- Maintain a premium, clean SaaS feel
+- Footer must feel like a strong brand statement, not a legal section
+
+--------------------------------------------------
+1. Create Terms of Service page
+--------------------------------------------------
+
+Create:
+- app/terms/page.tsx
+
+Content:
+
+Title:
+“Terms of Service”
+
+Sections:
+
+1. Introduction
+“ParsePilot provides AI-assisted resume analysis and optimization tools. By using this service, you agree to these terms.”
+
+2. Use of Service
+- Use ParsePilot for personal job applications
+- Do not misuse, copy, or exploit the platform
+
+3. No Guarantees
+- ParsePilot provides suggestions only
+- No guarantee of interviews or job outcomes
+
+4. User Responsibility
+- You are responsible for reviewing all generated content
+- Do not include false or misleading information
+
+5. Payments
+- One-time unlocks and subscriptions are non-refundable unless required by law
+- Pricing may change over time
+
+6. Limitation of Liability
+- ParsePilot is not responsible for decisions based on generated output
+
+7. Changes
+- Terms may be updated over time
+
+Keep tone:
+- simple
+- clear
+- non-intimidating
+
+--------------------------------------------------
+2. Create Privacy Policy page
+--------------------------------------------------
+
+Create:
+- app/privacy/page.tsx
+
+Content:
+
+Title:
+“Privacy Policy”
+
+Sections:
+
+1. Data We Collect
+- CV/resume content
+- job descriptions
+- account/email info
+
+2. How We Use Data
+- analyze resumes
+- generate tailored outputs
+- improve product performance
+
+3. Data Storage
+- data may be stored securely for results and history
+
+4. Third Parties
+- Stripe (payments)
+- AI providers (processing)
+
+5. Data Protection
+- reasonable steps taken to protect data
+
+6. Your Control
+- you choose what to upload
+- avoid sensitive/confidential info
+
+7. Changes
+- policy may be updated
+
+Tone:
+- transparent
+- simple
+- user-friendly
+
+--------------------------------------------------
+3. Footer update (BOLD STATEMENT)
+--------------------------------------------------
+
+Update footer across the app.
+
+Replace existing footer with:
+
+MAIN STATEMENT (large, bold, centered):
+
+“You’re not getting rejected. Your CV is. Fix that.”
+
+SUBLINE (smaller, below):
+
+“ATS-friendly • No fake experience • Edit before export”
+
+LEGAL LINKS (very subtle, below):
+
+- Terms → /terms
+- Privacy → /privacy
+
+--------------------------------------------------
+4. Footer design rules
+--------------------------------------------------
+
+- statement must be visually dominant
+- centered layout
+- large typography for main line
+- subline smaller and lighter
+- legal links very small and low emphasis
+- lots of whitespace
+- clean, premium design
+- no clutter
+
+--------------------------------------------------
+5. Navigation rules
+--------------------------------------------------
+
+- Do NOT add Terms/Privacy to top navbar
+- Only accessible via footer links and direct URLs
+
+--------------------------------------------------
+6. UI consistency
+--------------------------------------------------
+
+- legal pages must match app styling
+- readable spacing
+- mobile-friendly
+- not a wall of text
+
+--------------------------------------------------
+7. Compliance basics
+--------------------------------------------------
+
+- ensure Stripe checkout still works properly
+- ensure footer appears across main pages
+
+--------------------------------------------------
+8. After implementation
+--------------------------------------------------
+
+After implementation:
+
+1. Show files created/updated
+2. Show Terms page content
+3. Show Privacy page content
+4. Show final footer component code
+5. Confirm links work
+6. Suggest 2 improvements for trust and clarity
+7. Suggest 2 alternative bold footer statements (same tone)

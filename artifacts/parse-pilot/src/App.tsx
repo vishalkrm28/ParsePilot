@@ -12,6 +12,8 @@ import BillingSuccess from "@/pages/billing-success";
 import BillingCancel from "@/pages/billing-cancel";
 import UnlockSuccess from "@/pages/unlock-success";
 import Settings from "@/pages/settings";
+import Terms from "@/pages/terms";
+import Privacy from "@/pages/privacy";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -62,9 +64,17 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AuthGate>
-            <AppRouter />
-          </AuthGate>
+          <Switch>
+            {/* Public routes — no auth required */}
+            <Route path="/terms" component={Terms} />
+            <Route path="/privacy" component={Privacy} />
+            {/* Everything else goes through the auth gate */}
+            <Route>
+              <AuthGate>
+                <AppRouter />
+              </AuthGate>
+            </Route>
+          </Switch>
           <Toaster />
         </WouterRouter>
       </TooltipProvider>
