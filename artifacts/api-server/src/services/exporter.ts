@@ -512,46 +512,68 @@ async function buildCoverDocx(
     }));
   }
 
+  // ── Thin divider rule (empty paragraph with bottom border) ──────────────
+  children.push(new Paragraph({
+    children: [],
+    spacing: { before: 160, after: 320 },
+    border: { bottom: { color: RULE, size: 4, style: BorderStyle.SINGLE, space: 8 } },
+  }));
+
   // ── Date ─────────────────────────────────────────────────────────────────
   const dateStr = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   children.push(new Paragraph({
-    children: [new TextRun({ text: dateStr, size: 20, font: "Calibri", color: MUTED })],
-    alignment: AlignmentType.RIGHT, spacing: { after: 240 },
+    children: [new TextRun({ text: dateStr, size: 20, font: "Calibri", color: MUTED, italics: true })],
+    alignment: AlignmentType.RIGHT, spacing: { after: 280 },
   }));
 
   // ── Recipient block ───────────────────────────────────────────────────────
   children.push(new Paragraph({
-    children: [new TextRun({ text: "Hiring Team", bold: true, size: 22, font: "Calibri" })],
-    spacing: { after: 10 },
+    children: [new TextRun({ text: "Hiring Manager", bold: true, size: 22, font: "Calibri" })],
+    spacing: { after: 40 },
   }));
   children.push(new Paragraph({
-    children: [new TextRun({ text: company, size: 22, font: "Calibri" })],
-    spacing: { after: 240 },
+    children: [new TextRun({ text: company, size: 22, font: "Calibri", color: NAVY_MID, italics: true })],
+    spacing: { after: 280 },
   }));
 
   // ── Salutation ────────────────────────────────────────────────────────────
   children.push(new Paragraph({
-    children: [new TextRun({ text: salutation, size: 22, font: "Calibri" })],
-    spacing: { after: 200 },
+    children: [new TextRun({ text: salutation, bold: true, size: 22, font: "Calibri" })],
+    spacing: { after: 240 },
   }));
 
   // ── Body paragraphs ───────────────────────────────────────────────────────
   for (const para of paragraphs) {
     children.push(new Paragraph({
       children: [new TextRun({ text: para, size: 22, font: "Calibri" })],
-      spacing: { after: 180 },
+      alignment: AlignmentType.JUSTIFIED,
+      spacing: { after: 200 },
     }));
   }
 
   // ── Sign-off ──────────────────────────────────────────────────────────────
+  const candidateTitle = titleLine?.text ?? "";
   children.push(new Paragraph({
     children: [new TextRun({ text: signOffLine, size: 22, font: "Calibri" })],
-    spacing: { before: 200, after: 100 },
+    spacing: { before: 280, after: 560 },   /* 560 ≈ 0.4in blank for handwritten signature */
+  }));
+  // Signature underline
+  children.push(new Paragraph({
+    children: [new TextRun({ text: "", size: 22, font: "Calibri" })],
+    spacing: { after: 80 },
+    border: { bottom: { color: "999999", size: 4, style: BorderStyle.SINGLE, space: 4 } },
+    indent: { right: 7200 },  /* restrict underline to ~5cm width */
   }));
   children.push(new Paragraph({
-    children: [new TextRun({ text: displayName, bold: true, size: 22, color: NAVY, font: "Calibri" })],
-    spacing: { after: 0 },
+    children: [new TextRun({ text: displayName, bold: true, size: 24, color: NAVY, font: "Calibri" })],
+    spacing: { after: candidateTitle ? 40 : 0 },
   }));
+  if (candidateTitle) {
+    children.push(new Paragraph({
+      children: [new TextRun({ text: candidateTitle, size: 20, font: "Calibri", color: MUTED, italics: true })],
+      spacing: { after: 0 },
+    }));
+  }
 
   const doc = new Document({
     creator: "ParsePilot AI",
@@ -671,15 +693,31 @@ body{font-family:'Calibri','Arial',sans-serif;font-size:11pt;line-height:1.55;
 .cv-body{font-size:9.5pt;margin-bottom:4px;line-height:1.6;color:#1a1a1a;text-align:justify}
 
 /* ── Cover letter ── */
-.cl-date{font-size:9.5pt;color:#666;text-align:right;margin-bottom:22px}
-.cl-recipient{margin-bottom:18px}
-.cl-recipient-label{font-size:10pt;font-weight:700;color:#111;margin-bottom:2px}
-.cl-recipient-company{font-size:10pt;color:#444}
-.cl-salutation{font-size:11pt;font-weight:600;color:#1a1a1a;margin-bottom:18px}
-.cl-para{font-size:11pt;line-height:1.8;color:#1a1a1a;margin-bottom:14px;text-align:justify}
-.cl-sign-off{margin-top:28px;font-size:11pt;color:#1a1a1a}
-.cl-sign-off-phrase{margin-bottom:36px}
-.cl-sign-name{font-weight:700;color:#1e3a5f;font-size:12pt}
+/* Thin rule that separates the candidate header from the letter body */
+.cl-divider{border:none;border-top:1.5px solid #c8d4e0;margin:20px 0 28px}
+/* Date — right-aligned, subtle */
+.cl-date{font-size:9.5pt;color:#777;text-align:right;margin-bottom:28px;letter-spacing:.01em}
+/* Recipient block */
+.cl-recipient{margin-bottom:24px;line-height:1.5}
+.cl-recipient-label{font-size:10.5pt;font-weight:700;color:#1a1a1a}
+.cl-recipient-company{font-size:10.5pt;color:#2d5a8e;font-style:italic}
+/* Salutation */
+.cl-salutation{font-size:11pt;font-weight:600;color:#1a1a1a;margin-top:4px;margin-bottom:24px}
+/* Body */
+.cl-para{
+  font-size:11pt;line-height:1.9;color:#1a1a1a;
+  margin-bottom:18px;text-align:justify;
+  hyphens:auto;          /* smooth word-wrapping at right edge */
+}
+/* Sign-off */
+.cl-sign-off{margin-top:40px;font-size:11pt;color:#1a1a1a}
+.cl-sign-off-phrase{margin-bottom:48px}       /* space for handwritten signature */
+.cl-sig-line{
+  width:180px;border-top:1px solid #999;
+  margin-bottom:10px;
+}
+.cl-sign-name{font-weight:700;color:#1e3a5f;font-size:12pt;letter-spacing:.01em}
+.cl-sign-title{font-size:9.5pt;color:#555;font-style:italic;margin-top:3px}
 
 /* ── Print ── */
 /* Word default margins: 25.4 mm (1 inch) on all sides                  */
@@ -845,18 +883,21 @@ function renderCoverLetter(coverText: string, cvText: string, company: string): 
 
   const out: string[] = [];
 
-  // ── Candidate header (same look as CV) ──────────────────────────────────
+  // ── Candidate header (name · title · contact bar) ────────────────────────
   if (candidateName) out.push(`<div class="cv-name">${esc(candidateName)}</div>`);
   if (titleLine)      out.push(`<div class="cv-sub-title">${esc(titleLine.text)}</div>`);
   if (contactLine)    out.push(renderContactBar(contactLine.items));
 
-  // ── Date ─────────────────────────────────────────────────────────────────
+  // ── Thin rule separating header from letter body ──────────────────────────
+  out.push(`<hr class="cl-divider">`);
+
+  // ── Date (right-aligned, above recipient) ────────────────────────────────
   out.push(`<p class="cl-date">${esc(dateStr)}</p>`);
 
-  // ── Recipient ─────────────────────────────────────────────────────────────
+  // ── Recipient block ───────────────────────────────────────────────────────
   out.push(
     `<div class="cl-recipient">` +
-    `<div class="cl-recipient-label">Hiring Team</div>` +
+    `<div class="cl-recipient-label">Hiring Manager</div>` +
     `<div class="cl-recipient-company">${esc(company)}</div>` +
     `</div>`,
   );
@@ -869,11 +910,14 @@ function renderCoverLetter(coverText: string, cvText: string, company: string): 
     out.push(`<p class="cl-para">${esc(para)}</p>`);
   }
 
-  // ── Sign-off ──────────────────────────────────────────────────────────────
+  // ── Sign-off with signature space and optional title ─────────────────────
+  const candidateTitle = titleLine?.text ?? "";
   out.push(
     `<div class="cl-sign-off">` +
     `<p class="cl-sign-off-phrase">${esc(signOffLine)}</p>` +
+    `<div class="cl-sig-line"></div>` +
     `<p class="cl-sign-name">${esc(displayName)}</p>` +
+    (candidateTitle ? `<p class="cl-sign-title">${esc(candidateTitle)}</p>` : ``) +
     `</div>`,
   );
 
