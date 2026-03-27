@@ -95,7 +95,7 @@ export function LockedPreviewCard({ preview, applicationId }: LockedPreviewCardP
               <div className="px-5 py-4">
                 <div className="flex items-baseline justify-between mb-3">
                   <span className="text-sm font-bold text-foreground">Unlock this result</span>
-                  <span className="text-lg font-bold text-foreground">$4 <span className="text-xs font-normal text-muted-foreground">one-time</span></span>
+                  <span className="text-lg font-bold text-foreground">$6.99 <span className="text-xs font-normal text-muted-foreground">one-time</span></span>
                 </div>
 
                 <ul className="space-y-1.5 mb-4">
@@ -109,7 +109,7 @@ export function LockedPreviewCard({ preview, applicationId }: LockedPreviewCardP
 
                 <UnlockButton
                   applicationId={applicationId}
-                  label="Unlock now — $4"
+                  label="Unlock now — $6.99"
                   className="w-full h-10 text-sm font-semibold"
                 />
                 <p className="text-[10px] text-muted-foreground text-center mt-2">

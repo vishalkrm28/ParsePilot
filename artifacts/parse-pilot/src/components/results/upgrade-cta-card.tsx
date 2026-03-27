@@ -91,7 +91,7 @@ export function UpgradeCTACard({
             </p>
             <UnlockButton
               applicationId={applicationId}
-              label="Unlock this result for $4"
+              label="Unlock this result for $6.99"
               className="h-9 px-5 text-xs font-semibold bg-white/10 hover:bg-white/20 text-white border border-white/25 shadow-none"
             />
           </div>
