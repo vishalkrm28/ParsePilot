@@ -360,7 +360,7 @@ export default function BulkPricing() {
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="grid sm:grid-cols-3 gap-4 mb-10 pt-4">
+          <div className="grid sm:grid-cols-3 gap-4 mb-10">
             {tiers.map((tier) => {
               const isHighlighted = tier.badge === "Most Popular";
               const perCv = (tier.amountDollars / tier.cvLimit).toFixed(2);
@@ -369,22 +369,17 @@ export default function BulkPricing() {
                 <div
                   key={tier.id}
                   className={cn(
-                    "relative rounded-2xl border bg-card p-5 flex flex-col transition-shadow hover:shadow-md",
+                    "rounded-2xl border bg-card p-5 flex flex-col transition-shadow hover:shadow-md",
                     isHighlighted
-                      ? "border-primary shadow-primary/20 shadow-md ring-2 ring-primary ring-offset-2 ring-offset-background"
+                      ? "border-primary shadow-primary/20 shadow-md ring-2 ring-primary"
                       : "border-border",
                   )}
                 >
-                  {/* Accent stripe */}
-                  {isHighlighted && (
-                    <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-violet-500 to-indigo-500 rounded-t-2xl" />
-                  )}
-
                   {/* Badge */}
-                  {tier.badge && (
+                  {tier.badge ? (
                     <span
                       className={cn(
-                        "absolute -top-3 left-1/2 -translate-x-1/2 text-xs font-bold px-3 py-0.5 rounded-full whitespace-nowrap",
+                        "self-start text-xs font-bold px-2.5 py-0.5 rounded-full mb-3 whitespace-nowrap",
                         tier.badge === "Most Popular"
                           ? "bg-primary text-primary-foreground"
                           : "bg-amber-500 text-white",
@@ -399,10 +394,12 @@ export default function BulkPricing() {
                         tier.badge
                       )}
                     </span>
+                  ) : (
+                    <div className="mb-3 h-5" />
                   )}
 
                   {/* Price */}
-                  <div className="mb-3 mt-2">
+                  <div className="mb-3">
                     <p className="text-3xl font-extrabold">
                       ${tier.amountDollars}
                       <span className="text-sm font-normal text-muted-foreground ml-1">
