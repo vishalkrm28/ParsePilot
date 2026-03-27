@@ -321,14 +321,13 @@ export default function ApplicationDetail() {
     }
   }, [app?.coverLetterText]);
 
-  // Restore identity warning on page load if this application was previously flagged
+  // Restore identity warning whenever the server says this application is flagged
+  const appIdentityFlagged = (app as any)?.identityFlagged === true;
   useEffect(() => {
-    const raw = app as any;
-    if (raw?.identityFlagged === true && !identityWarning) {
-      setIdentityWarning({ show: true, isAboveLimit: false, distinctCount: 2 });
+    if (appIdentityFlagged) {
+      setIdentityWarning((prev) => prev ?? { show: true, isAboveLimit: false, distinctCount: 2 });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [app?.id]);
+  }, [appIdentityFlagged]);
 
   // ─── Handlers ───────────────────────────────────────────────────────────────
 
