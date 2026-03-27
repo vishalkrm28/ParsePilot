@@ -251,6 +251,13 @@ const NAVY     = "1e3a5f";
 const NAVY_MID = "2d5a8e";
 const RULE     = "c8d4e0";
 const MUTED    = "666666";
+// Cover letter premium palette
+const CL_NEAR_BLACK = "1A1A1A";
+const CL_CHARCOAL   = "2C2C2C";
+const CL_GOLD       = "B8975A";   // warm gold accent
+const CL_PARCHMENT  = "D8CDB8";  // warm divider
+const CL_GREY       = "888888";   // date, labels, title
+const CL_FONT       = "Georgia";  // elegant serif
 
 // ─── Cover letter parser ──────────────────────────────────────────────────────
 
@@ -482,95 +489,118 @@ async function buildCoverDocx(
 
   const children: Paragraph[] = [];
 
-  // ── Candidate header ──────────────────────────────────────────────────────
+  const candidateTitle = titleLine?.text ?? "";
+
+  // ── Candidate name — large, spaced, near-black ───────────────────────────
   children.push(new Paragraph({
-    children: [new TextRun({ text: candidateName, bold: true, size: 44, color: NAVY, font: "Calibri" })],
-    alignment: AlignmentType.CENTER, spacing: { after: 30 },
+    children: [new TextRun({
+      text: candidateName, bold: true, size: 52,
+      color: CL_NEAR_BLACK, font: CL_FONT,
+    })],
+    alignment: AlignmentType.CENTER, spacing: { after: 60 },
   }));
 
+  // ── Gold accent rule below name (thin full-width border on an empty para) ─
+  children.push(new Paragraph({
+    children: [new TextRun({ text: "", size: 4 })],
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 80 },
+    border: { bottom: { color: CL_GOLD, size: 8, style: BorderStyle.SINGLE, space: 4 } },
+    // Indent left+right to centre a short rule (~52px)
+    indent: { left: 3200, right: 3200 },
+  }));
+
+  // ── Professional title ────────────────────────────────────────────────────
   if (titleLine) {
     children.push(new Paragraph({
-      children: [new TextRun({ text: titleLine.text, size: 24, color: NAVY_MID, italics: true, font: "Calibri" })],
-      alignment: AlignmentType.CENTER, spacing: { after: 30 },
+      children: [new TextRun({ text: titleLine.text, size: 22, color: CL_GREY, italics: true, font: CL_FONT })],
+      alignment: AlignmentType.CENTER, spacing: { after: 60 },
     }));
   }
 
+  // ── Contact bar — subtle, uppercase-spaced ────────────────────────────────
   if (contactLine) {
     const contactIcon: Record<ContactItem["kind"], string> = {
-      location: "⊙  ", phone: "☏  ", email: "✉  ", linkedin: "in  ", github: "⌥  ", url: "🌐  ",
+      location: "⊙  ", phone: "☏  ", email: "✉  ", linkedin: "in  ", github: "⌥  ", url: "⊕  ",
     };
     const runs: TextRun[] = [];
     contactLine.items.forEach((item, idx) => {
-      if (idx > 0) runs.push(new TextRun({ text: "   |   ", size: 18, color: RULE, font: "Calibri" }));
-      runs.push(new TextRun({ text: `${contactIcon[item.kind]}${item.display}`, size: 18, color: MUTED, font: "Calibri" }));
+      if (idx > 0) runs.push(new TextRun({ text: "   ·   ", size: 16, color: CL_PARCHMENT, font: CL_FONT }));
+      runs.push(new TextRun({
+        text: `${contactIcon[item.kind]}${item.display.toUpperCase()}`,
+        size: 15, color: CL_GREY, font: CL_FONT,
+      }));
     });
     children.push(new Paragraph({
       children: runs,
       alignment: AlignmentType.CENTER,
-      spacing: { after: 280 },
-      border: { bottom: { color: RULE, size: 4, style: BorderStyle.SINGLE, space: 8 } },
+      spacing: { after: 60 },
     }));
   }
 
-  // ── Thin divider rule (empty paragraph with bottom border) ──────────────
+  // ── Warm parchment divider ────────────────────────────────────────────────
   children.push(new Paragraph({
     children: [],
-    spacing: { before: 160, after: 320 },
-    border: { bottom: { color: RULE, size: 4, style: BorderStyle.SINGLE, space: 8 } },
+    spacing: { before: 80, after: 360 },
+    border: { bottom: { color: CL_PARCHMENT, size: 4, style: BorderStyle.SINGLE, space: 8 } },
   }));
 
-  // ── Date ─────────────────────────────────────────────────────────────────
+  // ── Date — right-aligned, italic ─────────────────────────────────────────
   const dateStr = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   children.push(new Paragraph({
-    children: [new TextRun({ text: dateStr, size: 20, font: "Calibri", color: MUTED, italics: true })],
-    alignment: AlignmentType.RIGHT, spacing: { after: 280 },
+    children: [new TextRun({ text: dateStr, size: 20, font: CL_FONT, color: CL_GREY, italics: true })],
+    alignment: AlignmentType.RIGHT, spacing: { after: 300 },
   }));
 
   // ── Recipient block ───────────────────────────────────────────────────────
   children.push(new Paragraph({
-    children: [new TextRun({ text: "Hiring Manager", bold: true, size: 22, font: "Calibri" })],
+    children: [new TextRun({
+      text: "HIRING MANAGER", size: 16, bold: true,
+      font: CL_FONT, color: CL_GREY,
+    })],
     spacing: { after: 40 },
   }));
   children.push(new Paragraph({
-    children: [new TextRun({ text: company, size: 22, font: "Calibri", color: NAVY_MID, italics: true })],
-    spacing: { after: 280 },
+    children: [new TextRun({ text: company, size: 24, font: CL_FONT, color: CL_NEAR_BLACK, italics: true })],
+    spacing: { after: 300 },
   }));
 
   // ── Salutation ────────────────────────────────────────────────────────────
   children.push(new Paragraph({
-    children: [new TextRun({ text: salutation, bold: true, size: 22, font: "Calibri" })],
-    spacing: { after: 240 },
+    children: [new TextRun({ text: salutation, size: 24, font: CL_FONT, color: CL_NEAR_BLACK })],
+    spacing: { after: 260 },
   }));
 
-  // ── Body paragraphs ───────────────────────────────────────────────────────
+  // ── Body paragraphs — justified, Georgia serif ────────────────────────────
   for (const para of paragraphs) {
     children.push(new Paragraph({
-      children: [new TextRun({ text: para, size: 22, font: "Calibri" })],
+      children: [new TextRun({ text: para, size: 23, font: CL_FONT, color: CL_CHARCOAL })],
       alignment: AlignmentType.JUSTIFIED,
-      spacing: { after: 200 },
+      spacing: { after: 220 },
     }));
   }
 
   // ── Sign-off ──────────────────────────────────────────────────────────────
-  const candidateTitle = titleLine?.text ?? "";
   children.push(new Paragraph({
-    children: [new TextRun({ text: signOffLine, size: 22, font: "Calibri" })],
-    spacing: { before: 280, after: 560 },   /* 560 ≈ 0.4in blank for handwritten signature */
+    children: [new TextRun({ text: signOffLine, size: 23, font: CL_FONT, color: CL_CHARCOAL })],
+    spacing: { before: 320, after: 600 },   // 600 twips ≈ handwritten-signature space
   }));
-  // Signature underline
+  // Signature line — gold-tinted
   children.push(new Paragraph({
-    children: [new TextRun({ text: "", size: 22, font: "Calibri" })],
-    spacing: { after: 80 },
-    border: { bottom: { color: "999999", size: 4, style: BorderStyle.SINGLE, space: 4 } },
-    indent: { right: 7200 },  /* restrict underline to ~5cm width */
+    children: [new TextRun({ text: "", size: 22 })],
+    spacing: { after: 100 },
+    border: { bottom: { color: "C4B99A", size: 4, style: BorderStyle.SINGLE, space: 4 } },
+    indent: { right: 7500 },   // restrict line width to ~150px
   }));
+  // Name — bold, larger
   children.push(new Paragraph({
-    children: [new TextRun({ text: displayName, bold: true, size: 24, color: NAVY, font: "Calibri" })],
+    children: [new TextRun({ text: displayName, bold: true, size: 28, color: CL_NEAR_BLACK, font: CL_FONT })],
     spacing: { after: candidateTitle ? 40 : 0 },
   }));
+  // Title — italic, muted
   if (candidateTitle) {
     children.push(new Paragraph({
-      children: [new TextRun({ text: candidateTitle, size: 20, font: "Calibri", color: MUTED, italics: true })],
+      children: [new TextRun({ text: candidateTitle, size: 20, font: CL_FONT, color: CL_GREY, italics: true })],
       spacing: { after: 0 },
     }));
   }
@@ -692,32 +722,125 @@ body{font-family:'Calibri','Arial',sans-serif;font-size:11pt;line-height:1.55;
 /* ── Body paragraph (summary, etc.) ── */
 .cv-body{font-size:9.5pt;margin-bottom:4px;line-height:1.6;color:#1a1a1a;text-align:justify}
 
-/* ── Cover letter ── */
-/* Thin rule that separates the candidate header from the letter body */
-.cl-divider{border:none;border-top:1.5px solid #c8d4e0;margin:20px 0 28px}
-/* Date — right-aligned, subtle */
-.cl-date{font-size:9.5pt;color:#777;text-align:right;margin-bottom:28px;letter-spacing:.01em}
-/* Recipient block */
-.cl-recipient{margin-bottom:24px;line-height:1.5}
-.cl-recipient-label{font-size:10.5pt;font-weight:700;color:#1a1a1a}
-.cl-recipient-company{font-size:10.5pt;color:#2d5a8e;font-style:italic}
-/* Salutation */
-.cl-salutation{font-size:11pt;font-weight:600;color:#1a1a1a;margin-top:4px;margin-bottom:24px}
-/* Body */
-.cl-para{
-  font-size:11pt;line-height:1.9;color:#1a1a1a;
-  margin-bottom:18px;text-align:justify;
-  hyphens:auto;          /* smooth word-wrapping at right edge */
+/* ════════════════════════════════════════════════════
+   COVER LETTER — premium serif business-letter design
+   Font stack: Georgia (system serif, reliable in print)
+   Palette:
+     #1A1A1A  near-black  — name, headings
+     #2C2C2C  warm char.  — body text
+     #B8975A  warm gold   — accent bar, rule
+     #888888  soft grey   — date, labels, title
+     #D8CDB8  warm parch. — divider line
+   ════════════════════════════════════════════════════ */
+
+/* Root wrapper — all cover-letter elements inherit serif */
+.cl-wrap{font-family:Georgia,"Times New Roman",serif}
+
+/* ── Candidate name (distinct from CV style) ── */
+.cl-name{
+  font-family:Georgia,"Times New Roman",serif;
+  font-size:26pt;font-weight:bold;
+  color:#1A1A1A;
+  text-align:center;letter-spacing:.06em;
+  line-height:1.1;margin-bottom:8px;
 }
-/* Sign-off */
-.cl-sign-off{margin-top:40px;font-size:11pt;color:#1a1a1a}
-.cl-sign-off-phrase{margin-bottom:48px}       /* space for handwritten signature */
-.cl-sig-line{
-  width:180px;border-top:1px solid #999;
+/* Short gold accent bar below name */
+.cl-name-bar{
+  width:52px;height:2px;
+  background:#B8975A;
+  margin:0 auto 12px;
+}
+/* Professional title line */
+.cl-sub-title{
+  font-size:10.5pt;color:#777;
+  text-align:center;font-style:italic;
+  font-family:Georgia,"Times New Roman",serif;
   margin-bottom:10px;
 }
-.cl-sign-name{font-weight:700;color:#1e3a5f;font-size:12pt;letter-spacing:.01em}
-.cl-sign-title{font-size:9.5pt;color:#555;font-style:italic;margin-top:3px}
+/* Contact bar — override CV style for cover letter: subtle, uppercase */
+.cl-wrap .cv-contact-bar{
+  font-size:7.5pt;color:#999;
+  letter-spacing:.07em;text-transform:uppercase;
+  padding-bottom:14px;border-bottom:none;
+  gap:2px 0;
+}
+.cl-wrap .cv-ci{color:#999}
+.cl-wrap .cv-ci a{color:#999}
+.cl-wrap .cv-ci-icon{color:#B8975A}    /* gold icons */
+.cl-wrap .cv-ci-sep{color:#D8CDB8}
+
+/* ── Horizontal divider (warm parchment) ── */
+.cl-divider{
+  border:none;border-top:1px solid #D8CDB8;
+  margin:6px 0 32px;
+}
+
+/* ── Date ── */
+.cl-date{
+  font-size:9.5pt;color:#999;
+  text-align:right;font-style:italic;
+  font-family:Georgia,"Times New Roman",serif;
+  letter-spacing:.01em;margin-bottom:30px;
+}
+
+/* ── Recipient block ── */
+.cl-recipient{margin-bottom:24px;line-height:1.6}
+.cl-recipient-label{
+  font-size:7.5pt;font-weight:bold;
+  color:#aaa;letter-spacing:.1em;
+  text-transform:uppercase;
+  display:block;margin-bottom:2px;
+}
+.cl-recipient-company{
+  font-size:11.5pt;color:#1A1A1A;
+  font-style:italic;
+  font-family:Georgia,"Times New Roman",serif;
+}
+
+/* ── Salutation ── */
+.cl-salutation{
+  font-size:11.5pt;color:#1A1A1A;
+  font-family:Georgia,"Times New Roman",serif;
+  margin-top:4px;margin-bottom:28px;
+}
+
+/* ── Body paragraphs ── */
+.cl-para{
+  font-size:11.5pt;line-height:1.9;
+  color:#2C2C2C;
+  font-family:Georgia,"Times New Roman",serif;
+  margin-bottom:20px;
+  text-align:justify;hyphens:auto;
+}
+
+/* ── Sign-off ── */
+.cl-sign-off{margin-top:44px}
+.cl-sign-off-phrase{
+  font-size:11.5pt;color:#2C2C2C;
+  font-family:Georgia,"Times New Roman",serif;
+  margin-bottom:52px;   /* blank space for handwritten signature */
+}
+.cl-sig-line{
+  width:200px;border-top:1px solid #C4B99A;  /* gold-tinted line */
+  margin-bottom:10px;
+}
+.cl-sign-name{
+  font-family:Georgia,"Times New Roman",serif;
+  font-weight:bold;font-size:13pt;
+  color:#1A1A1A;letter-spacing:.03em;
+}
+.cl-sign-title{
+  font-size:9.5pt;color:#888;
+  font-style:italic;
+  font-family:Georgia,"Times New Roman",serif;
+  margin-top:4px;
+}
+
+/* ── Print overrides ── */
+@media print{
+  .cl-para,.cl-salutation,.cl-sign-off-phrase{text-align:justify}
+  .cl-wrap .cv-contact-bar{text-transform:uppercase}
+}
 
 /* ── Print ── */
 /* Word default margins: 25.4 mm (1 inch) on all sides                  */
@@ -881,23 +1004,31 @@ function renderCoverLetter(coverText: string, cvText: string, company: string): 
     day: "numeric", month: "long", year: "numeric",
   });
 
+  const candidateTitle = titleLine?.text ?? "";
+
   const out: string[] = [];
 
-  // ── Candidate header (name · title · contact bar) ────────────────────────
-  if (candidateName) out.push(`<div class="cv-name">${esc(candidateName)}</div>`);
-  if (titleLine)      out.push(`<div class="cv-sub-title">${esc(titleLine.text)}</div>`);
-  if (contactLine)    out.push(renderContactBar(contactLine.items));
+  // ── Open root wrapper (inherits serif, scopes contact-bar overrides) ──────
+  out.push(`<div class="cl-wrap">`);
 
-  // ── Thin rule separating header from letter body ──────────────────────────
+  // ── Candidate header — elegant serif treatment ────────────────────────────
+  if (candidateName) {
+    out.push(`<div class="cl-name">${esc(candidateName)}</div>`);
+    out.push(`<div class="cl-name-bar"></div>`);   // short gold accent bar
+  }
+  if (titleLine)   out.push(`<div class="cl-sub-title">${esc(titleLine.text)}</div>`);
+  if (contactLine) out.push(renderContactBar(contactLine.items));  // overridden by .cl-wrap selectors
+
+  // ── Warm parchment divider ────────────────────────────────────────────────
   out.push(`<hr class="cl-divider">`);
 
-  // ── Date (right-aligned, above recipient) ────────────────────────────────
+  // ── Date (right-aligned, italic) ─────────────────────────────────────────
   out.push(`<p class="cl-date">${esc(dateStr)}</p>`);
 
   // ── Recipient block ───────────────────────────────────────────────────────
   out.push(
     `<div class="cl-recipient">` +
-    `<div class="cl-recipient-label">Hiring Manager</div>` +
+    `<span class="cl-recipient-label">Hiring Manager</span>` +
     `<div class="cl-recipient-company">${esc(company)}</div>` +
     `</div>`,
   );
@@ -910,8 +1041,7 @@ function renderCoverLetter(coverText: string, cvText: string, company: string): 
     out.push(`<p class="cl-para">${esc(para)}</p>`);
   }
 
-  // ── Sign-off with signature space and optional title ─────────────────────
-  const candidateTitle = titleLine?.text ?? "";
+  // ── Sign-off: phrase → blank space → signature line → name → title ───────
   out.push(
     `<div class="cl-sign-off">` +
     `<p class="cl-sign-off-phrase">${esc(signOffLine)}</p>` +
@@ -920,6 +1050,8 @@ function renderCoverLetter(coverText: string, cvText: string, company: string): 
     (candidateTitle ? `<p class="cl-sign-title">${esc(candidateTitle)}</p>` : ``) +
     `</div>`,
   );
+
+  out.push(`</div>`);  // close .cl-wrap
 
   return out.join("\n");
 }
