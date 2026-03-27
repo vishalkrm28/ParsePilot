@@ -6,6 +6,7 @@ import uploadRouter from "./upload.js";
 import exportRouter from "./export.js";
 import billingRouter from "./billing.js";
 import bulkRouter from "./bulk.js";
+import contactRouter from "./contact.js";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(uploadRouter);
 router.use(exportRouter);
 router.use(billingRouter);
 router.use(bulkRouter);
+router.use(contactRouter);
 
 export default router;

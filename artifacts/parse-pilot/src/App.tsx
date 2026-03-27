@@ -14,6 +14,7 @@ import UnlockSuccess from "@/pages/unlock-success";
 import Settings from "@/pages/settings";
 import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
+import Contact from "@/pages/contact";
 import BulkPricing from "@/pages/bulk-pricing";
 import BulkSuccess from "@/pages/bulk-success";
 import BulkSession from "@/pages/bulk-session";
@@ -74,6 +75,7 @@ function App() {
             {/* Public routes — no auth required */}
             <Route path="/terms" component={Terms} />
             <Route path="/privacy" component={Privacy} />
+            <Route path="/contact" component={Contact} />
             {/* Everything else goes through the auth gate */}
             <Route>
               <AuthGate>

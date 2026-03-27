@@ -40,6 +40,12 @@ export function Footer() {
           >
             Privacy Policy
           </Link>
+          <Link
+            href="/contact"
+            className="hover:text-muted-foreground transition-colors"
+          >
+            Contact
+          </Link>
           <span>© {new Date().getFullYear()} ParsePilot</span>
         </div>
 

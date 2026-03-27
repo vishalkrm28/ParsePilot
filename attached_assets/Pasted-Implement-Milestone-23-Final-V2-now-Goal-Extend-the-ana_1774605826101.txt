@@ -1,0 +1,167 @@
+Implement Milestone 23 (Final V2) now.
+
+Goal:
+Extend the analytics system by adding a Contact feature so users can send queries directly from the app, while keeping the UI clean and professional.
+
+--------------------------------------------------
+1. Footer Update (Contact Link)
+--------------------------------------------------
+
+Update footer:
+
+Current:
+- Statement
+- Subline
+- Terms
+- Privacy
+
+Add:
+- Contact → /contact
+
+Final footer structure:
+
+Main statement (unchanged)
+Subline (unchanged)
+
+Small links:
+- Terms
+- Privacy
+- Contact
+
+Design:
+- Contact link same style as others
+- subtle, low emphasis
+
+--------------------------------------------------
+2. Create Contact Page
+--------------------------------------------------
+
+Create:
+- app/contact/page.tsx
+
+Page layout:
+
+Title:
+“Contact”
+
+Subtext:
+“Have a question or need help? Send us a message.”
+
+Form fields:
+- Name (required)
+- Email (required)
+- Message (required, textarea)
+
+Submit button:
+“Send Message”
+
+Also show:
+- support email: help@parsepilot.com
+
+Optional small text:
+“Or email us directly at help@parsepilot.com”
+
+--------------------------------------------------
+3. Contact Form Backend
+--------------------------------------------------
+
+Create API route:
+- /api/contact
+
+On submit:
+
+- validate inputs
+- store message in DB
+
+Create model:
+
+ContactMessage:
+- id
+- name
+- email
+- message
+- userId (optional)
+- createdAt
+
+--------------------------------------------------
+4. Email Forwarding (Optional but Recommended)
+--------------------------------------------------
+
+When form is submitted:
+
+- send email notification to:
+  help@parsepilot.com
+
+Use simple email service:
+- Resend OR Nodemailer
+
+Email content:
+
+Subject:
+“New Contact Message – ParsePilot”
+
+Body:
+- Name
+- Email
+- Message
+
+--------------------------------------------------
+5. UX Feedback
+--------------------------------------------------
+
+After submit:
+
+- show success message:
+  “Your message has been sent. We’ll get back to you soon.”
+
+- clear form
+
+On error:
+- show inline error
+
+--------------------------------------------------
+6. Analytics Integration (IMPORTANT)
+--------------------------------------------------
+
+Track events:
+
+- contact_page_viewed
+- contact_submitted
+
+Use:
+
+trackEvent("contact_submitted", {
+  hasUser: true/false
+})
+
+--------------------------------------------------
+7. UI / UX Rules
+--------------------------------------------------
+
+- keep page minimal
+- clean layout
+- not cluttered
+- mobile-friendly
+- consistent with app design
+
+--------------------------------------------------
+8. Security / Validation
+--------------------------------------------------
+
+- basic validation required
+- prevent empty submissions
+- sanitize inputs
+
+--------------------------------------------------
+9. After Implementation
+--------------------------------------------------
+
+After implementation:
+
+1. Show files created/updated
+2. Show Contact page UI
+3. Show API route logic
+4. Show DB schema for ContactMessage
+5. Confirm email sending setup
+6. Suggest 2 improvements for user trust
+7. Suggest 2 improvements for response workflow
