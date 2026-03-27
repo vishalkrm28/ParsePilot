@@ -204,12 +204,17 @@ export interface AnalysisOutput {
 }
 
 export async function analyzeCvForJob(input: AnalysisInput): Promise<AnalysisOutput> {
-  const confirmedContext =
-    input.confirmedAnswers && Object.keys(input.confirmedAnswers).length > 0
-      ? `\n\nCANDIDATE-CONFIRMED ADDITIONAL INFORMATION (use this to address missing keywords — only include if the candidate confirmed having this experience):\n${Object.entries(input.confirmedAnswers)
-          .map(([q, a]) => `Q: ${q}\nA: ${a}`)
-          .join("\n\n")}`
-      : "";
+  const filledAnswers = Object.entries(input.confirmedAnswers ?? {}).filter(
+    ([, a]) => a && a.trim().length > 0,
+  );
+  const hasConfirmedAnswers = filledAnswers.length > 0;
+
+  const confirmedSection = hasConfirmedAnswers
+    ? `\n\nCANDIDATE-CONFIRMED EXPERIENCE (treat as VERIFIED FACTS — the candidate has confirmed these details in their own words):
+${filledAnswers.map(([q, a]) => `• Question: ${q}\n  Confirmed answer: ${a.trim()}`).join("\n\n")}
+
+IMPORTANT: You MUST incorporate the above confirmed facts into the tailored CV. These are real experiences the candidate provided — not inventions. Weave them into the relevant job descriptions or PROFESSIONAL SUMMARY. Do NOT generate a missingInfoQuestions entry for anything the candidate has already confirmed above.`
+    : "";
 
   const parsedJdContext = input.parsedJd
     ? `\n\nSTRUCTURED JOB REQUIREMENTS (parsed from the job description):
@@ -227,14 +232,14 @@ Your task: analyze a candidate's CV against a job description and return a struc
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ABSOLUTE RULES — VIOLATION IS GROUNDS FOR FAILURE:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. NEVER invent, fabricate, hallucinate, or add ANY information not explicitly present in the original CV
-2. NEVER add fake job titles, companies, employment dates, degrees, certifications, skills, tools, or metrics
+1. NEVER invent, fabricate, or hallucinate content — only use what is in the original CV OR confirmed by the candidate
+2. NEVER add fake job titles, companies, employment dates, degrees, certifications, skills, or metrics
 3. NEVER embellish or upgrade job titles (e.g. do NOT change "Engineer" to "Senior Engineer")
-4. NEVER add years of experience to a skill unless it is stated in the original CV
-5. NEVER include skill claims that are not in the original CV, even if they are common for the role
+4. NEVER add years of experience to a skill unless stated in the original CV or confirmed by the candidate
+5. Keep all dates, company names, job titles, and metrics EXACTLY as they appear in the original CV
 6. ONLY rewrite, reorder, and rephrase existing content to better match the job description's language
-7. Keep all dates, company names, job titles, and metrics EXACTLY as they appear in the original CV
-8. Missing information → add a question to missingInfoQuestions INSTEAD of inventing content
+7. Candidate-confirmed answers (labeled "CANDIDATE-CONFIRMED EXPERIENCE") are VERIFIED FACTS — treat them exactly like content from the original CV and weave them into the tailored CV
+8. For topics where the candidate LEFT THE FIELD BLANK → add a question to missingInfoQuestions
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ATS FORMATTING RULES for tailoredCvText:
@@ -246,9 +251,9 @@ ATS FORMATTING RULES for tailoredCvText:
 
 Return ONLY valid JSON matching this schema:
 {
-  "tailoredCvText": "complete ATS-formatted CV using ONLY original CV content",
-  "missingInfoQuestions": ["specific questions about absent experience that would strengthen the application"],
-  "sectionSuggestions": ["concrete structural improvements to the CV — only based on existing content"]
+  "tailoredCvText": "complete ATS-formatted CV using original CV content and any candidate-confirmed facts",
+  "missingInfoQuestions": ["questions only for topics the candidate has NOT confirmed — skip any already answered above"],
+  "sectionSuggestions": ["concrete structural improvements to the CV — only based on existing or confirmed content"]
 }`;
 
   const USER_PROMPT = `JOB TITLE: ${input.jobTitle}
@@ -257,8 +262,8 @@ COMPANY: ${input.company}
 JOB DESCRIPTION:
 ${input.jobDescription}${parsedJdContext}
 
-ORIGINAL CV (source of truth — do not add anything not in this document):
-${input.originalCvText}${confirmedContext}
+ORIGINAL CV (source of truth):
+${input.originalCvText}${confirmedSection}
 
 Analyze the CV against the job description. Return JSON.`;
 
