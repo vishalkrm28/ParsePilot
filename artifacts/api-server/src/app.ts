@@ -31,6 +31,15 @@ app.use(
 app.use(cors({ credentials: true, origin: true }));
 app.use(cookieParser());
 
+// Disable all caching for API responses — user-specific data must never be served
+// from a proxy or browser cache to another user.
+app.use((_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  next();
+});
+
 // ─── Stripe webhook — must be mounted BEFORE express.json() ──────────────────
 // Stripe signature verification requires the exact raw bytes of the body.
 // express.json() consumes the stream and loses that raw buffer, so the webhook
