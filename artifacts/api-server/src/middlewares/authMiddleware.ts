@@ -54,10 +54,10 @@ export async function authMiddleware(
 
   let userId: string;
   try {
-    // Verify using ONLY publishableKey so we derive the JWKS URL from Clerk's
-    // auth domain — no secretKey needed for JWT verification itself.
+    // Use the PEM public key stored in CLERK_JWT_KEY so verification works
+    // fully offline — no secret key or JWKS network request needed.
     const payload = await verifyToken(token, {
-      publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+      jwtKey: process.env.CLERK_JWT_KEY,
     });
     userId = payload.sub;
   } catch (err) {
