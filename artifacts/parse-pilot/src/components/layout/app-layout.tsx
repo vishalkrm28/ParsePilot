@@ -57,6 +57,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Link href="/privacy" className="hover:text-muted-foreground transition-colors">
             Privacy
           </Link>
+          <Link href="/contact" className="hover:text-muted-foreground transition-colors">
+            Contact
+          </Link>
           <span>© {new Date().getFullYear()} ParsePilot</span>
         </div>
       </div>
