@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { authedFetch } from "@/lib/authed-fetch";
 import { Sparkles, Crown, Calendar, Loader2, CheckCircle2, Circle } from "lucide-react";
 import { Card, CardContent } from "@/components/Card";
 import { Badge } from "@/components/Badge";
@@ -51,7 +52,7 @@ export function SubscriptionCard() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/billing/status", { credentials: "include" })
+    authedFetch("/api/billing/status")
       .then((r) => {
         if (!r.ok) throw new Error("Failed to load billing status");
         return r.json() as Promise<BillingStatus>;

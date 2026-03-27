@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { authedFetch } from "@/lib/authed-fetch";
 import { AppLayout } from "@/components/layout/app-layout";
 import {
   Sparkles, Crown, CheckCircle2, ArrowRight, Zap, Users,
@@ -204,8 +205,8 @@ export default function BulkPricing() {
   // Load tiers and user's bulk status
   useEffect(() => {
     Promise.all([
-      fetch("/api/billing/bulk-tiers").then((r) => r.json()),
-      fetch("/api/billing/bulk-status", { credentials: "include" }).then((r) =>
+      authedFetch("/api/billing/bulk-tiers").then((r) => r.json()),
+      authedFetch("/api/billing/bulk-status").then((r) =>
         r.ok ? r.json() : null,
       ),
     ])
@@ -220,9 +221,8 @@ export default function BulkPricing() {
   const goToProCheckout = async () => {
     try {
       const base = window.location.origin;
-      const res = await fetch("/api/billing/checkout", {
+      const res = await authedFetch("/api/billing/checkout", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           successUrl: `${base}/billing/success`,
@@ -241,9 +241,8 @@ export default function BulkPricing() {
     setError(null);
     try {
       const base = window.location.origin;
-      const res = await fetch("/api/billing/bulk-checkout", {
+      const res = await authedFetch("/api/billing/bulk-checkout", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tier: tier.id,

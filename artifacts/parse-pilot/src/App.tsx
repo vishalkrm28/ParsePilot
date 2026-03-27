@@ -2,9 +2,11 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ClerkProvider } from "@clerk/clerk-react";
+import { ClerkProvider, useAuth as useClerkAuth } from "@clerk/clerk-react";
 import { useAuth } from "@workspace/replit-auth-web";
+import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
+import { registerClerkTokenGetter } from "@/lib/authed-fetch";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import NewApplication from "@/pages/new-application";
@@ -35,6 +37,15 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+function ClerkTokenSync() {
+  const { getToken } = useClerkAuth();
+  useEffect(() => {
+    registerClerkTokenGetter(getToken);
+    return () => registerClerkTokenGetter(null);
+  }, [getToken]);
+  return null;
+}
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isLoading, isAuthenticated, login } = useAuth();
@@ -76,6 +87,7 @@ function AppRouter() {
 function App() {
   return (
     <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+      <ClerkTokenSync />
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>

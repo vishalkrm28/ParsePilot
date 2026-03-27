@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { authedFetch } from "@/lib/authed-fetch";
 
 export interface BillingStatus {
   isPro: boolean;
@@ -37,7 +38,7 @@ export function useBillingStatus(): UseBillingStatusResult {
     setLoading(true);
     setError(null);
 
-    fetch("/api/billing/status", { credentials: "include" })
+    authedFetch("/api/billing/status")
       .then((r) => {
         if (!r.ok) throw new Error("Failed to load billing status");
         return r.json() as Promise<BillingStatus>;

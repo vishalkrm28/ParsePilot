@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { authedFetch } from "@/lib/authed-fetch";
 
 export interface CreditsStatus {
   availableCredits: number;
@@ -25,7 +26,7 @@ export function useCredits(): UseCreditsResult {
     let cancelled = false;
     setLoading(true);
 
-    fetch("/api/billing/credits", { credentials: "include" })
+    authedFetch("/api/billing/credits")
       .then((r) => {
         if (!r.ok) throw new Error("Failed to load credits");
         return r.json() as Promise<CreditsStatus>;

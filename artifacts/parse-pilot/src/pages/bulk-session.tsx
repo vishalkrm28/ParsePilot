@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { authedFetch } from "@/lib/authed-fetch";
 import { useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
 import {
@@ -386,8 +387,8 @@ export default function BulkSession() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/billing/bulk-status", { credentials: "include" }).then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/billing/credits", { credentials: "include" }).then((r) => (r.ok ? r.json() : null)),
+      authedFetch("/api/billing/bulk-status").then((r) => (r.ok ? r.json() : null)),
+      authedFetch("/api/billing/credits").then((r) => (r.ok ? r.json() : null)),
     ])
       .then(([s, c]) => { setStatus(s); setCredits(c); })
       .finally(() => setLoading(false));

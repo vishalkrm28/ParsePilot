@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { authedFetch } from "@/lib/authed-fetch";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/Button";
 import { useToast } from "@/hooks/use-toast";
@@ -21,9 +22,8 @@ export function ManageBillingButton({
   async function handleManage() {
     setLoading(true);
     try {
-      const response = await fetch("/api/billing/portal", {
+      const response = await authedFetch("/api/billing/portal", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
       });
 
