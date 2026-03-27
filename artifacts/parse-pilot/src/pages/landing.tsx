@@ -6,7 +6,6 @@ import {
   FileText,
   Target,
   CheckCircle2,
-  Download,
   ArrowRight,
   Shield,
   ChevronDown,
@@ -238,7 +237,8 @@ export default function Landing() {
           <div className="flex-1 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/30 bg-primary/5 text-primary text-sm font-medium mb-6">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              Match score + missing keywords — free, instantly
+              <span className="hidden sm:inline">Match score + missing keywords — free, instantly</span>
+              <span className="sm:hidden">Match score + keywords — free</span>
             </div>
 
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.07] mb-5">
@@ -250,9 +250,35 @@ export default function Landing() {
               instantly.
             </h1>
 
-            <p className="text-lg text-muted-foreground leading-relaxed mb-8 max-w-lg mx-auto lg:mx-0">
-              Get a real match score and missing keyword analysis in under a minute — then unlock a fully rewritten CV tailored to the role for $4.
+            <p className="text-base md:text-lg text-muted-foreground leading-relaxed mb-2 max-w-lg mx-auto lg:mx-0">
+              Upload your CV, paste a job description. Get a real ATS match score and the exact keywords you're missing — free. Unlock the full rewritten CV for $4.
             </p>
+
+            {/* Differentiation line */}
+            <p className="text-sm font-medium text-primary/80 mb-6 text-center lg:text-left">
+              Not a resume builder. An analysis tool that shows you exactly what's wrong.
+            </p>
+
+            {/* Mobile-only: inline proof preview so product is clear above the fold */}
+            <div className="lg:hidden mb-6 flex flex-wrap items-center justify-center gap-2 p-3 rounded-xl bg-muted/40 border border-border/60">
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-700 border border-amber-500/20">
+                <BarChart3 className="w-3 h-3" />
+                72% match score
+              </span>
+              {["SAP missing", "KPI reporting missing", "Full CV — $4 unlock"].map((t, i) => (
+                <span
+                  key={t}
+                  className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full border ${
+                    i < 2
+                      ? "bg-rose-500/10 text-rose-700 border-rose-500/20"
+                      : "bg-violet-500/10 text-violet-700 border-violet-500/20"
+                  }`}
+                >
+                  {i < 2 ? <X className="w-2.5 h-2.5" /> : <Lock className="w-2.5 h-2.5" />}
+                  {t}
+                </span>
+              ))}
+            </div>
 
             <div className="flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-3">
               <button
@@ -405,11 +431,11 @@ export default function Landing() {
 
       {/* ── How it works ─────────────────────────────────────────────────── */}
       <section className="max-w-6xl mx-auto px-6 py-20">
-        <div className="text-center mb-14">
+        <div className="text-center mb-12">
           <p className="text-primary text-sm font-semibold uppercase tracking-wider mb-3">
             How it works
           </p>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold">
             Three steps
           </h2>
         </div>
@@ -431,8 +457,8 @@ export default function Landing() {
             {
               num: "3",
               icon: <Zap className="w-5 h-5" />,
-              title: "Get your score — unlock the full result",
-              body: "See your match score and gaps instantly, free. Unlock the complete optimised CV for $4.",
+              title: "See your score. Unlock what you need.",
+              body: "Match score and keyword gaps are free. Pay $4 to unlock the complete optimised CV and export.",
             },
           ].map((s) => (
             <div key={s.num} className="flex gap-5">
@@ -870,25 +896,16 @@ export default function Landing() {
               See your match score and exactly what's missing — before you spend another hour rewriting your CV.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <button
-                onClick={login}
-                className="flex items-center gap-2 px-8 py-3.5 rounded-xl bg-white text-violet-700 font-semibold text-base hover:bg-violet-50 transition-colors shadow-lg"
-              >
-                <Sparkles className="w-4 h-4" />
-                Get My Match Score — Free
-              </button>
-              <a
-                href="#proof"
-                className="flex items-center gap-2 px-6 py-3.5 rounded-xl border border-white/30 text-white font-medium text-sm hover:bg-white/10 transition-colors"
-              >
-                See Example
-                <ArrowRight className="w-4 h-4" />
-              </a>
-            </div>
+            <button
+              onClick={login}
+              className="flex items-center gap-2 px-10 py-4 rounded-xl bg-white text-violet-700 font-semibold text-base hover:bg-violet-50 transition-colors shadow-lg mx-auto"
+            >
+              <Sparkles className="w-4 h-4" />
+              Get My Match Score — Free
+            </button>
 
-            <p className="text-violet-300 text-xs mt-6">
-              No card required · See the analysis before paying
+            <p className="text-violet-300 text-xs mt-5">
+              No card required · See your score and gaps before paying anything
             </p>
           </div>
         </div>
