@@ -239,16 +239,33 @@ export function matchKeywords(
     }
 
     // ── Pass 9: 3-char abbreviation fallback (minLen=3) ──────────────────
-    // Catches "AWS experience", "strong SQL skills", "GCP certification" etc.
-    // where the key term is a 3-char abbreviation and all surrounding words
-    // are in SIGNIFICANCE_STOP.  Only activates when minLen=4 yields 0 sig
-    // words so it does not interfere with earlier passes.
+    // Catches "AWS experience", "API design", "SQL proficiency" etc. where
+    // all surrounding words are in SIGNIFICANCE_STOP so minLen=4 yields 0
+    // significant words, leaving the 3-char abbreviation unchecked.
     if (
       !found &&
       norm.split(" ").length > 1 &&
       getSignificantWords(norm, 4).length === 0
     ) {
       found = singleSigWordFound(norm, aliases, cvFullText, cvRoots, cvCorpus, 3);
+    }
+
+    // ── Pass 10: slash-separated compound fallback ────────────────────────
+    // Handles "Python/Django", "AWS/GCP", "UI/UX" etc. where "/" acts as an
+    // "or" separator.  The normalizer preserves "/" so the whole term is
+    // treated as one word; this pass splits it and checks each component.
+    // OR-logic: if ANY component is found in the CV the term matches — the
+    // candidate satisfies whichever side of the slash they have.
+    if (!found && norm.includes("/")) {
+      const parts = norm.split("/").map(p => p.trim()).filter(p => p.length >= 2);
+      if (parts.length >= 2) {
+        for (const part of parts) {
+          if (wordFoundInCv(part, cvFullText, cvRoots, cvCorpus)) {
+            found = true;
+            break;
+          }
+        }
+      }
     }
 
     if (found) {

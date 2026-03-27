@@ -87,7 +87,8 @@ const SYNONYM_GROUPS: string[][] = [
   ["data visualization", "data viz", "data dashboards"],
   ["business intelligence", "bi"],
   ["predictive analytics", "predictive modeling"],
-  ["statistical analysis", "statistical modeling", "statistics"],
+  ["statistical analysis", "statistical modeling", "statistical modelling",
+   "statistics", "statistical methods", "quantitative analysis"],
   ["python pandas", "pandas", "dataframes"],
   ["numpy", "numerical python"],
   ["scikit-learn", "sklearn", "scikit learn"],
@@ -120,7 +121,8 @@ const SYNONYM_GROUPS: string[][] = [
   // ── Web & APIs ───────────────────────────────────────────────────────────
   ["html", "html5"],
   ["css", "css3"],
-  ["rest api", "restful api", "restful", "rest apis", "api development"],
+  ["rest api", "restful api", "restful", "rest apis", "api development",
+   "api design", "api architecture", "api integration", "web api", "http api"],
   ["graphql", "graph ql"],
   ["websockets", "web sockets", "websocket"],
 
@@ -172,6 +174,8 @@ const SYNONYM_GROUPS: string[][] = [
   ["accounts receivable", "ar"],
   ["financial reporting", "financial statements", "financial analysis"],
   ["financial forecasting", "revenue forecasting"],
+  ["investor relations", "investor communications", "investor engagement",
+   "ir", "shareholder relations", "shareholder communications"],
 
   // ── Marketing & digital ────────────────────────────────────────────────
   ["search engine optimization", "seo"],

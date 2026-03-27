@@ -83,11 +83,26 @@ function escapeRegex(s: string): string {
 const SIGNIFICANCE_STOP = new Set([
   "a", "an", "the", "and", "or", "in", "on", "at", "to", "for", "of",
   "with", "by", "from", "is", "are", "was", "were",
+  // Skill-qualifier words — carry no discriminating information
   "skill", "skills", "ability", "abilities", "knowledge", "experience",
   "proficiency", "expertise", "understanding", "competency", "competencies",
   "strong", "excellent", "good", "solid", "proven", "demonstrated",
   "including", "related", "based", "focused", "driven", "oriented",
   "using", "used", "use", "via",
+  // General seniority / structural words
+  "level", "levels",         // "board level", "entry level", "C-level"
+  "track",                   // "track record"
+  // Compound-word fragments — become noise after hyphen→space conversion
+  "hands",                   // "hands-on"
+  "depth",                   // "in-depth"
+  // Broad domain words — too generic to be discriminating alone
+  "design", "designs",       // "API design", "system design", "database design"
+  "environment", "environments",  // "cloud environment", "production environment"
+  "solution", "solutions",   // "enterprise solutions", "cloud solution"
+  "approach", "approaches",  // "agile approach"
+  "framework", "frameworks", // "strategic framework"
+  "effective", "effectively",
+  "extensive", "comprehensive", "exceptional",
 ]);
 
 /**
