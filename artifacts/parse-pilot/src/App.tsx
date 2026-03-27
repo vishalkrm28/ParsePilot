@@ -2,6 +2,7 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ClerkProvider } from "@clerk/clerk-react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { Loader2 } from "lucide-react";
 import Landing from "@/pages/landing";
@@ -19,6 +20,12 @@ import BulkPricing from "@/pages/bulk-pricing";
 import BulkSuccess from "@/pages/bulk-success";
 import BulkSession from "@/pages/bulk-session";
 import NotFound from "@/pages/not-found";
+
+const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
+
+if (!CLERK_PUBLISHABLE_KEY) {
+  throw new Error("VITE_CLERK_PUBLISHABLE_KEY is not set");
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -68,25 +75,27 @@ function AppRouter() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Switch>
-            {/* Public routes — no auth required */}
-            <Route path="/terms" component={Terms} />
-            <Route path="/privacy" component={Privacy} />
-            <Route path="/contact" component={Contact} />
-            {/* Everything else goes through the auth gate */}
-            <Route>
-              <AuthGate>
-                <AppRouter />
-              </AuthGate>
-            </Route>
-          </Switch>
-          <Toaster />
-        </WouterRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Switch>
+              {/* Public routes — no auth required */}
+              <Route path="/terms" component={Terms} />
+              <Route path="/privacy" component={Privacy} />
+              <Route path="/contact" component={Contact} />
+              {/* Everything else goes through the auth gate */}
+              <Route>
+                <AuthGate>
+                  <AppRouter />
+                </AuthGate>
+              </Route>
+            </Switch>
+            <Toaster />
+          </WouterRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
   );
 }
 

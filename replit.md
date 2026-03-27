@@ -16,7 +16,7 @@ ParsePilot AI is a production-ready SaaS web app that helps users tailor their C
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec in lib/api-spec)
 - **AI**: OpenAI via Replit AI Integrations proxy (gpt-5.2)
-- **Auth**: Replit Auth (OIDC) — `@workspace/replit-auth-web` on the frontend, `lib/auth.ts` + `authMiddleware.ts` on the server
+- **Auth**: Clerk — `@clerk/clerk-react` + `ClerkProvider` on the frontend, `@clerk/express` + `clerkMiddleware()` on the server; `CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY` secrets required; `VITE_CLERK_PUBLISHABLE_KEY` env var for Vite
 - **File parsing**: mammoth (DOCX), pdfjs-dist (PDF)
 - **File export**: docx (DOCX generation)
 - **Build**: esbuild (CJS bundle for API server)
@@ -52,7 +52,7 @@ artifacts-monorepo/
 
 ## Key Features
 
-1. **Auth** - Replit OIDC login; landing page for unauthenticated users, dashboard for signed-in users
+1. **Auth** - Clerk login (Google, Apple, email/password); `<ClerkProvider>` wraps App; `useAuth()` in `lib/replit-auth-web` wraps Clerk's `useUser`/`useClerk`; backend uses `clerkMiddleware()` + `getAuth()` + lazy DB upsert on first authenticated request; landing page for unauthenticated users, dashboard for signed-in users
 2. **CV Upload** - PDF and DOCX file upload with text extraction, or manual paste
 3. **JD Parsing** - Job description parsed into structured JSON (`parseJobDescription()` via Responses API): required_skills, preferred_skills, key_responsibilities, must_have, nice_to_have, experience_years, job_type, location_type
 4. **AI Analysis** - GPT-5.2 analyzes CV vs parsed JD (Responses API), returns ATS-optimized rewrite; fabrication strictly forbidden in prompts; `parsedJdJson` + `sectionSuggestions` saved to DB

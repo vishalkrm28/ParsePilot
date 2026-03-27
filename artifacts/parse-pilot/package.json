@@ -75,7 +75,8 @@
     "zod": "catalog:"
   },
   "dependencies": {
-    "react-dropzone": "^15.0.0",
-    "@workspace/replit-auth-web": "workspace:*"
+    "@clerk/clerk-react": "^5.61.3",
+    "@workspace/replit-auth-web": "workspace:*",
+    "react-dropzone": "^15.0.0"
   }
 }

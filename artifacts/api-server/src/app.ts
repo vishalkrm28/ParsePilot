@@ -2,6 +2,7 @@ import express, { type Express } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
+import { clerkMiddleware } from "@clerk/express";
 import { authMiddleware } from "./middlewares/authMiddleware.js";
 import router from "./routes/index.js";
 import webhookRouter from "./routes/webhook.js";
@@ -50,7 +51,10 @@ app.use("/api", webhookRouter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Auth middleware must run before routes — loads user from session on every request
+// Clerk middleware — verifies session cookies / Bearer tokens from Clerk SDK
+app.use(clerkMiddleware());
+
+// Auth middleware — maps Clerk identity to our DB user record and sets req.user
 app.use(authMiddleware);
 
 app.use("/api", router);

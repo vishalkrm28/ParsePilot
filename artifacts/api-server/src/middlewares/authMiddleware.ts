@@ -1,14 +1,9 @@
-import * as oidc from "openid-client";
+import { getAuth, createClerkClient } from "@clerk/express";
 import { type Request, type Response, type NextFunction } from "express";
 import type { AuthUser } from "@workspace/api-zod";
-import {
-  clearSession,
-  getOidcConfig,
-  getSessionId,
-  getSession,
-  updateSession,
-  type SessionData,
-} from "../lib/auth";
+import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { initFreeCredits } from "../lib/credits.js";
 
 declare global {
   namespace Express {
@@ -26,32 +21,9 @@ declare global {
   }
 }
 
-async function refreshIfExpired(
-  sid: string,
-  session: SessionData,
-): Promise<SessionData | null> {
-  const now = Math.floor(Date.now() / 1000);
-  if (!session.expires_at || now <= session.expires_at) return session;
-
-  if (!session.refresh_token) return null;
-
-  try {
-    const config = await getOidcConfig();
-    const tokens = await oidc.refreshTokenGrant(
-      config,
-      session.refresh_token,
-    );
-    session.access_token = tokens.access_token;
-    session.refresh_token = tokens.refresh_token ?? session.refresh_token;
-    session.expires_at = tokens.expiresIn()
-      ? now + tokens.expiresIn()!
-      : session.expires_at;
-    await updateSession(sid, session);
-    return session;
-  } catch {
-    return null;
-  }
-}
+const clerk = createClerkClient({
+  secretKey: process.env.CLERK_SECRET_KEY,
+});
 
 export async function authMiddleware(
   req: Request,
@@ -62,26 +34,60 @@ export async function authMiddleware(
     return this.user != null;
   } as Request["isAuthenticated"];
 
-  const sid = getSessionId(req);
-  if (!sid) {
+  const { userId } = getAuth(req);
+
+  if (!userId) {
     next();
     return;
   }
 
-  const session = await getSession(sid);
-  if (!session?.user?.id) {
-    await clearSession(res, sid);
-    next();
-    return;
+  try {
+    const [existingUser] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+
+    if (existingUser) {
+      req.user = {
+        id: existingUser.id,
+        email: existingUser.email,
+        firstName: existingUser.firstName,
+        lastName: existingUser.lastName,
+        profileImageUrl: existingUser.profileImageUrl,
+      };
+    } else {
+      const clerkUser = await clerk.users.getUser(userId);
+      const userData = {
+        id: userId,
+        email: clerkUser.emailAddresses[0]?.emailAddress ?? null,
+        firstName: clerkUser.firstName ?? null,
+        lastName: clerkUser.lastName ?? null,
+        profileImageUrl: clerkUser.imageUrl ?? null,
+      };
+
+      const [newUser] = await db
+        .insert(usersTable)
+        .values(userData)
+        .onConflictDoUpdate({
+          target: usersTable.id,
+          set: { ...userData, updatedAt: new Date() },
+        })
+        .returning();
+
+      await initFreeCredits(newUser.id);
+
+      req.user = {
+        id: newUser.id,
+        email: newUser.email,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        profileImageUrl: newUser.profileImageUrl,
+      };
+    }
+  } catch (err) {
+    req.log?.error({ err }, "authMiddleware: failed to upsert Clerk user");
   }
 
-  const refreshed = await refreshIfExpired(sid, session);
-  if (!refreshed) {
-    await clearSession(res, sid);
-    next();
-    return;
-  }
-
-  req.user = refreshed.user;
   next();
 }
