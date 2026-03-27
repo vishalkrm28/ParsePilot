@@ -104,10 +104,10 @@ export function SubscriptionCard() {
   return (
     <div className="grid gap-5 sm:grid-cols-2">
       {/* ── Free plan card ─────────────────────────── */}
-      <Card className={cn("relative", !isPro && "ring-2 ring-primary ring-offset-2 ring-offset-background")}>
+      <Card className={cn(!isPro && "ring-2 ring-primary")}>
         <CardContent className="p-6 flex flex-col gap-5">
           {!isPro && (
-            <span className="absolute -top-3 left-4 bg-primary text-primary-foreground text-xs font-semibold px-3 py-0.5 rounded-full">
+            <span className="self-start bg-primary text-primary-foreground text-xs font-semibold px-3 py-0.5 rounded-full">
               Current plan
             </span>
           )}
@@ -142,18 +142,10 @@ export function SubscriptionCard() {
       </Card>
 
       {/* ── Pro plan card ──────────────────────────── */}
-      <Card
-        className={cn(
-          "relative overflow-hidden",
-          isPro && "ring-2 ring-violet-500 ring-offset-2 ring-offset-background",
-        )}
-      >
-        {/* Gradient header stripe */}
-        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-violet-500 to-indigo-500" />
-
+      <Card className={cn(isPro && "ring-2 ring-violet-500")}>
         <CardContent className="p-6 flex flex-col gap-5">
           {isPro && (
-            <span className="absolute -top-3 left-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-semibold px-3 py-0.5 rounded-full">
+            <span className="self-start bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-semibold px-3 py-0.5 rounded-full">
               Current plan
             </span>
           )}
@@ -163,7 +155,7 @@ export function SubscriptionCard() {
               <p className="text-xs font-semibold uppercase tracking-wider text-violet-500 mb-1">
                 Pro
               </p>
-              <p className="text-3xl font-bold">$X</p>
+              <p className="text-3xl font-bold">$14.99</p>
               <p className="text-sm text-muted-foreground mt-0.5">per month</p>
             </div>
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/10 to-indigo-500/10 flex items-center justify-center">

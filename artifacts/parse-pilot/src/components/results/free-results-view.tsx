@@ -599,7 +599,7 @@ export function FreeResultsView({
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold text-foreground">
-                ParsePilot Pro — $12/mo
+                ParsePilot Pro — $14.99/mo
               </p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
                 Unlimited results · Cover letters · Better for multiple applications
@@ -622,7 +622,7 @@ export function FreeResultsView({
         headline="Your tailored resume is ready to use"
         description="Start Pro for unlimited results and cover letters — or unlock just this one for $4."
         variant="bottom"
-        ctaLabel="Get Pro — $12/mo"
+        ctaLabel="Get Pro — $14.99/mo"
         applicationId={applicationId}
       />
 

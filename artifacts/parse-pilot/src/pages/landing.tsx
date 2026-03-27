@@ -826,7 +826,7 @@ export default function Landing() {
                 <p className="text-xs font-semibold uppercase tracking-wider text-violet-600">Pro</p>
               </div>
               <p className="text-4xl font-bold mb-1">
-                $12<span className="text-lg font-normal text-muted-foreground">/mo</span>
+                $14.99<span className="text-lg font-normal text-muted-foreground">/mo</span>
               </p>
               <p className="text-sm text-muted-foreground mb-6">Cancel any time.</p>
               <ul className="space-y-2.5 text-sm flex-1 mb-7">
@@ -848,7 +848,7 @@ export default function Landing() {
                 onClick={login}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white text-sm font-semibold transition-all shadow-md"
               >
-                Get Pro — $12/mo
+                Get Pro — $14.99/mo
               </button>
               <p className="text-center text-xs text-muted-foreground mt-3">
                 Cancel any time. No long-term commitment.

@@ -46,7 +46,7 @@ export function UpgradeCTACard({
   headline = "See the complete rewrite",
   description,
   variant = "cv",
-  ctaLabel = "Get Pro — $12/mo",
+  ctaLabel = "Get Pro — $14.99/mo",
   dark = false,
   applicationId,
   className,
