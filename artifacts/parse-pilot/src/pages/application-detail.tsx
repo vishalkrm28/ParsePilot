@@ -290,6 +290,7 @@ export default function ApplicationDetail() {
 
   const { status: billingStatus } = useBillingStatus();
   const isPro = billingStatus?.isPro ?? false;
+  const hasBulkAccess = billingStatus?.hasBulkAccess ?? false;
 
   const { data: app, isLoading, refetch } = useGetApplication(id);
 
@@ -542,13 +543,15 @@ export default function ApplicationDetail() {
                 >
                   Go to Bulk Mode
                 </a>
-                <button
-                  onClick={() => setIdentityWarning(null)}
-                  className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 font-medium"
-                  aria-label="Dismiss identity warning"
-                >
-                  Dismiss
-                </button>
+                {hasBulkAccess && (
+                  <button
+                    onClick={() => setIdentityWarning(null)}
+                    className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 font-medium"
+                    aria-label="Dismiss identity warning"
+                  >
+                    Dismiss
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>
@@ -576,12 +579,14 @@ export default function ApplicationDetail() {
                 >
                   Switch to Bulk Mode
                 </a>
-                <button
-                  onClick={() => setIdentityWarning(null)}
-                  className="px-5 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
-                >
-                  Dismiss anyway
-                </button>
+                {hasBulkAccess && (
+                  <button
+                    onClick={() => setIdentityWarning(null)}
+                    className="px-5 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+                  >
+                    Dismiss anyway
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 export interface BillingStatus {
   isPro: boolean;
+  hasBulkAccess: boolean;
   subscriptionStatus: string | null;
   currentPeriodEnd: string | null;
   hasCustomer: boolean;

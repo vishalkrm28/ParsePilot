@@ -7,6 +7,7 @@ import { getStripe } from "../lib/stripe.js";
 import { logger } from "../lib/logger.js";
 import { getUserCredits, FREE_CREDIT_ALLOWANCE, PRO_CREDIT_ALLOWANCE } from "../lib/credits.js";
 import { subscriptionIsActive, hasUnlockedResult } from "../lib/billing.js";
+import { hasBulkAccess } from "../lib/bulk.js";
 
 /**
  * Extract a structured log context from a Stripe SDK error so we get
@@ -143,8 +144,11 @@ router.get("/billing/status", async (req, res) => {
       (dbUser.subscriptionStatus === "active" || dbUser.subscriptionStatus === "trialing") &&
       (!dbUser.currentPeriodEnd || dbUser.currentPeriodEnd > new Date());
 
+    const bulkAccess = await hasBulkAccess(req.user.id);
+
     res.json({
       isPro,
+      hasBulkAccess: bulkAccess,
       subscriptionStatus: dbUser.subscriptionStatus ?? null,
       subscriptionPriceId: dbUser.subscriptionPriceId ?? null,
       currentPeriodEnd: dbUser.currentPeriodEnd?.toISOString() ?? null,
