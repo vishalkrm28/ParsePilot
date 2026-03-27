@@ -1,4 +1,4 @@
-import { getAuth, createClerkClient } from "@clerk/express";
+import { createClerkClient, verifyToken } from "@clerk/express";
 import { type Request, type Response, type NextFunction } from "express";
 import type { AuthUser } from "@workspace/api-zod";
 import { db, usersTable } from "@workspace/db";
@@ -23,7 +23,19 @@ declare global {
 
 const clerk = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
+  publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
 });
+
+function extractToken(req: Request): string | null {
+  const authHeader = req.headers["authorization"];
+  if (authHeader?.startsWith("Bearer ")) {
+    return authHeader.slice(7);
+  }
+  // Fallback: Clerk's __session cookie
+  const sessionCookie = req.cookies?.["__session"];
+  if (sessionCookie) return sessionCookie;
+  return null;
+}
 
 export async function authMiddleware(
   req: Request,
@@ -34,9 +46,30 @@ export async function authMiddleware(
     return this.user != null;
   } as Request["isAuthenticated"];
 
-  const { userId } = getAuth(req);
+  const token = extractToken(req);
 
-  if (!userId) {
+  req.log?.debug(
+    { hasToken: !!token, path: req.path },
+    "authMiddleware: token check",
+  );
+
+  if (!token) {
+    next();
+    return;
+  }
+
+  let userId: string;
+  try {
+    const payload = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY,
+      publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+    });
+    userId = payload.sub;
+  } catch (err) {
+    req.log?.warn(
+      { err: (err as Error).message, path: req.path },
+      "authMiddleware: token verification failed",
+    );
     next();
     return;
   }
