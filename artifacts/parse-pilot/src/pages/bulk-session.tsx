@@ -1,11 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
+import { useAuth } from "@workspace/replit-auth-web";
+import { useUploadCv, useCreateApplication, analyzeApplication } from "@workspace/api-client-react";
+import { useDropzone } from "react-dropzone";
 import { AppLayout } from "@/components/layout/app-layout";
 import {
-  Users, ArrowRight, Loader2, FilePlus2, CheckCircle2,
-  AlertCircle, ChevronRight, Lock, Crown,
+  Users, Loader2, CheckCircle2, AlertCircle, ChevronRight,
+  Lock, Crown, UploadCloud, X, Play, FileText, ExternalLink,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 interface BulkStatus {
   isPro: boolean;
@@ -27,6 +32,16 @@ interface CreditStatus {
   isPro: boolean;
 }
 
+type CvItemStatus = "pending" | "uploading" | "creating" | "analyzing" | "done" | "error";
+
+interface CvQueueItem {
+  id: string;
+  file: File;
+  status: CvItemStatus;
+  applicationId?: string;
+  errorMessage?: string;
+}
+
 // ─── Slot progress bar ────────────────────────────────────────────────────────
 
 function SlotProgress({ used, limit }: { used: number; limit: number }) {
@@ -43,21 +58,13 @@ function SlotProgress({ used, limit }: { used: number; limit: number }) {
             {remaining} remaining of {limit} in this pass
           </p>
         </div>
-        <span
-          className={cn(
-            "text-2xl font-extrabold",
-            isAlmostFull ? "text-amber-500" : "text-foreground",
-          )}
-        >
+        <span className={cn("text-2xl font-extrabold", isAlmostFull ? "text-amber-500" : "text-foreground")}>
           {used}/{limit}
         </span>
       </div>
       <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
         <div
-          className={cn(
-            "h-full rounded-full transition-all",
-            isAlmostFull ? "bg-amber-500" : "bg-primary",
-          )}
+          className={cn("h-full rounded-full transition-all", isAlmostFull ? "bg-amber-500" : "bg-primary")}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -77,98 +84,200 @@ function SlotProgress({ used, limit }: { used: number; limit: number }) {
   );
 }
 
-// ─── How it works ─────────────────────────────────────────────────────────────
+// ─── Status badge ─────────────────────────────────────────────────────────────
 
-function HowItWorks() {
+function StatusBadge({ status }: { status: CvItemStatus }) {
+  const map: Record<CvItemStatus, { label: string; className: string; icon: React.ReactNode }> = {
+    pending: {
+      label: "Pending",
+      className: "bg-muted text-muted-foreground",
+      icon: <Clock className="w-3 h-3" />,
+    },
+    uploading: {
+      label: "Uploading…",
+      className: "bg-blue-500/10 text-blue-600",
+      icon: <Loader2 className="w-3 h-3 animate-spin" />,
+    },
+    creating: {
+      label: "Saving…",
+      className: "bg-blue-500/10 text-blue-600",
+      icon: <Loader2 className="w-3 h-3 animate-spin" />,
+    },
+    analyzing: {
+      label: "Analysing…",
+      className: "bg-violet-500/10 text-violet-600",
+      icon: <Loader2 className="w-3 h-3 animate-spin" />,
+    },
+    done: {
+      label: "Done",
+      className: "bg-emerald-500/10 text-emerald-600",
+      icon: <CheckCircle2 className="w-3 h-3" />,
+    },
+    error: {
+      label: "Failed",
+      className: "bg-red-500/10 text-red-600",
+      icon: <AlertCircle className="w-3 h-3" />,
+    },
+  };
+  const { label, className, icon } = map[status];
   return (
-    <div className="rounded-2xl border border-border bg-card p-5">
-      <h3 className="font-semibold text-sm mb-4">How bulk analysis works</h3>
-      <div className="space-y-4">
-        {[
-          {
-            num: "1",
-            title: "Start a new analysis",
-            body: "Each CV you analyze uses one slot from your bulk pass. Full results are included — no additional unlock fee.",
-          },
-          {
-            num: "2",
-            title: "Upload CV + job description",
-            body: "Paste the job description and upload the candidate's CV (PDF or DOCX).",
-          },
-          {
-            num: "3",
-            title: "Get the full score + rewrite",
-            body: "See the ATS match score, missing keywords, and optimised CV — all included in your bulk pass.",
-          },
-        ].map((step) => (
-          <div key={step.num} className="flex gap-3">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-              {step.num}
-            </div>
-            <div>
-              <p className="text-sm font-semibold">{step.title}</p>
-              <p className="text-xs text-muted-foreground leading-relaxed">{step.body}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <span className={cn("inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full", className)}>
+      {icon}
+      {label}
+    </span>
   );
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function BulkSession() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+
   const [status, setStatus] = useState<BulkStatus | null>(null);
   const [credits, setCredits] = useState<CreditStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [, navigate] = useLocation();
+
+  const [jobTitle, setJobTitle] = useState("");
+  const [company, setCompany] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
+  const [queue, setQueue] = useState<CvQueueItem[]>([]);
+  const [isRunning, setIsRunning] = useState(false);
+
+  const uploadMutation = useUploadCv();
+  const createMutation = useCreateApplication();
+
+  const isRunningRef = useRef(false);
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/billing/bulk-status", { credentials: "include" })
-        .then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/billing/credits", { credentials: "include" })
-        .then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/billing/bulk-status", { credentials: "include" }).then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/billing/credits", { credentials: "include" }).then((r) => (r.ok ? r.json() : null)),
     ])
-      .then(([s, c]) => {
-        setStatus(s);
-        setCredits(c);
-      })
+      .then(([s, c]) => { setStatus(s); setCredits(c); })
       .finally(() => setLoading(false));
   }, []);
 
-  const hasAccess =
-    status?.isPro ||
-    (status?.activePass && status.activePass.remaining > 0);
-  const remaining =
-    status?.isPro
-      ? credits?.availableCredits ?? 0
-      : status?.activePass?.remaining ?? 0;
-  const limit =
-    status?.isPro
-      ? credits?.planAllowance ?? 100
-      : status?.activePass?.cvLimit ?? 0;
+  const hasAccess = status?.isPro || (status?.activePass && status.activePass.remaining > 0);
+  const remaining = status?.isPro ? (credits?.availableCredits ?? 0) : (status?.activePass?.remaining ?? 0);
+  const limit = status?.isPro ? (credits?.planAllowance ?? 100) : (status?.activePass?.cvLimit ?? 0);
   const used = limit - remaining;
+
+  // ── Dropzone (multiple files) ─────────────────────────────────────────────
+
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    const newItems: CvQueueItem[] = acceptedFiles.map((file) => ({
+      id: `${file.name}-${Date.now()}-${Math.random()}`,
+      file,
+      status: "pending",
+    }));
+    setQueue((prev) => [...prev, ...newItems]);
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "application/pdf": [".pdf"],
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+      "application/msword": [".doc"],
+      "text/plain": [".txt"],
+    },
+    multiple: true,
+  });
+
+  const removeItem = (id: string) => {
+    setQueue((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const updateItem = (id: string, patch: Partial<CvQueueItem>) => {
+    setQueue((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  };
+
+  // ── Process queue ─────────────────────────────────────────────────────────
+
+  const processSingle = async (item: CvQueueItem): Promise<void> => {
+    if (!user?.id) return;
+
+    try {
+      // 1. Upload & extract CV text
+      updateItem(item.id, { status: "uploading" });
+      const uploadResult = await uploadMutation.mutateAsync({ data: { file: item.file } });
+
+      // 2. Create application
+      updateItem(item.id, { status: "creating" });
+      const app = await createMutation.mutateAsync({
+        data: {
+          userId: user.id,
+          jobTitle: jobTitle.trim() || "Bulk Analysis",
+          company: company.trim() || "—",
+          jobDescription: jobDescription.trim(),
+          originalCvText: uploadResult.extractedText,
+          parsedCvJson: uploadResult.parsedCv ?? undefined,
+        },
+      });
+
+      // 3. Trigger analysis
+      updateItem(item.id, { status: "analyzing", applicationId: app.id });
+      await analyzeApplication(app.id, {}, { credentials: "include" });
+
+      updateItem(item.id, { status: "done", applicationId: app.id });
+    } catch (err: unknown) {
+      const body = (err as any)?.response?.data as { error?: string } | undefined;
+      updateItem(item.id, {
+        status: "error",
+        errorMessage: body?.error ?? (err instanceof Error ? err.message : "Unknown error"),
+      });
+    }
+  };
+
+  const runAll = async () => {
+    if (isRunningRef.current) return;
+    if (!jobDescription.trim()) {
+      toast({ variant: "destructive", title: "Job description required", description: "Paste the job description before running." });
+      return;
+    }
+
+    const pending = queue.filter((i) => i.status === "pending" || i.status === "error");
+    if (pending.length === 0) {
+      toast({ title: "Nothing to run", description: "All CVs have already been processed." });
+      return;
+    }
+
+    isRunningRef.current = true;
+    setIsRunning(true);
+
+    for (const item of pending) {
+      if (!isRunningRef.current) break;
+      await processSingle(item);
+    }
+
+    isRunningRef.current = false;
+    setIsRunning(false);
+    toast({ title: "Batch complete", description: "All CVs have been processed." });
+  };
+
+  const pendingCount = queue.filter((i) => i.status === "pending").length;
+  const errorCount = queue.filter((i) => i.status === "error").length;
+  const doneCount = queue.filter((i) => i.status === "done").length;
+  const runnableCount = pendingCount + errorCount;
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <AppLayout>
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <Users className="w-4 h-4 text-primary" />
             </div>
-            <span className="text-sm font-semibold text-primary uppercase tracking-wider">
-              Bulk Mode
-            </span>
+            <span className="text-sm font-semibold text-primary uppercase tracking-wider">Bulk Mode</span>
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight mb-1">
-            Bulk analysis session
-          </h1>
+          <h1 className="text-2xl font-extrabold tracking-tight mb-1">Batch CV analysis</h1>
           <p className="text-sm text-muted-foreground">
-            Each CV you analyze uses one slot. Full results are included in your pass.
+            Drop all candidate CVs at once. Each uses one slot and gets a full ATS analysis.
           </p>
         </div>
 
@@ -177,30 +286,21 @@ export default function BulkSession() {
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         ) : !hasAccess ? (
-          // No access state
           <div className="text-center py-16">
             <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
               <Lock className="w-6 h-6 text-muted-foreground" />
             </div>
             <h2 className="text-xl font-bold mb-2">No active bulk pass</h2>
             <p className="text-muted-foreground text-sm mb-6 max-w-sm mx-auto">
-              Purchase a bulk pass to start analyzing multiple CVs with full results included.
+              Purchase a bulk pass to start analyzing multiple CVs.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <button
-                onClick={() => navigate("/bulk")}
-                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
-              >
-                <Users className="w-4 h-4" />
-                View bulk pricing
-              </button>
-              <button
-                onClick={() => navigate("/")}
-                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-border text-sm font-medium hover:bg-muted/40 transition-colors"
-              >
-                Back to dashboard
-              </button>
-            </div>
+            <button
+              onClick={() => navigate("/bulk")}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
+            >
+              <Users className="w-4 h-4" />
+              View bulk pricing
+            </button>
           </div>
         ) : (
           <div className="space-y-5">
@@ -213,83 +313,173 @@ export default function BulkSession() {
             )}
 
             {/* Slot progress */}
-            {!status?.isPro && status?.activePass && (
-              <SlotProgress used={used} limit={limit} />
-            )}
+            {!status?.isPro && status?.activePass && <SlotProgress used={used} limit={limit} />}
 
-            {/* Start new analysis CTA */}
-            <div className="rounded-2xl border-2 border-primary bg-primary/5 p-6 text-center">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                <FilePlus2 className="w-5 h-5 text-primary" />
+            {/* Job details */}
+            <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+              <p className="font-semibold text-sm">Role details <span className="text-muted-foreground font-normal">(shared across all CVs)</span></p>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1.5">Job title</label>
+                  <input
+                    type="text"
+                    value={jobTitle}
+                    onChange={(e) => setJobTitle(e.target.value)}
+                    placeholder="e.g. Senior Software Engineer"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1.5">Company</label>
+                  <input
+                    type="text"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    placeholder="e.g. Acme Corp"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                </div>
               </div>
-              <h3 className="font-bold mb-1.5">Start a new CV analysis</h3>
-              <p className="text-sm text-muted-foreground mb-5">
-                Upload a CV and paste a job description. Full results are included — no
-                additional payment needed.
-              </p>
-              <button
-                onClick={() => navigate("/new")}
-                className="inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
-              >
-                <FilePlus2 className="w-4 h-4" />
-                Analyze a CV
-                <ArrowRight className="w-4 h-4" />
-              </button>
-              {remaining > 0 && (
-                <p className="text-xs text-muted-foreground mt-3">
-                  {remaining} slot{remaining !== 1 ? "s" : ""} remaining in this pass
-                </p>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1.5">
+                  Job description <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={jobDescription}
+                  onChange={(e) => setJobDescription(e.target.value)}
+                  placeholder="Paste the full job description here…"
+                  rows={6}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Multi-file dropzone */}
+            <div
+              {...getRootProps()}
+              className={cn(
+                "rounded-2xl border-2 border-dashed p-8 text-center cursor-pointer transition-colors",
+                isDragActive
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/50 hover:bg-muted/30",
+              )}
+            >
+              <input {...getInputProps()} />
+              <UploadCloud className={cn("w-8 h-8 mx-auto mb-3", isDragActive ? "text-primary" : "text-muted-foreground")} />
+              {isDragActive ? (
+                <p className="text-sm font-semibold text-primary">Drop the CVs here…</p>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-foreground mb-1">Drop all candidate CVs here</p>
+                  <p className="text-xs text-muted-foreground">PDF, DOCX, DOC or TXT — select multiple files at once</p>
+                </>
               )}
             </div>
 
-            {/* How it works */}
-            <HowItWorks />
-
-            {/* Key reminders */}
-            <div className="grid sm:grid-cols-2 gap-3">
-              {[
-                {
-                  icon: CheckCircle2,
-                  color: "text-emerald-500",
-                  title: "Full results included",
-                  body: "No $6.99 unlock fee per CV — it's all included in your bulk pass.",
-                },
-                {
-                  icon: CheckCircle2,
-                  color: "text-emerald-500",
-                  title: "Export as DOCX or PDF",
-                  body: "Download any optimised CV directly — all exports included.",
-                },
-              ].map((card) => (
-                <div key={card.title} className="rounded-xl border border-border bg-card p-4">
-                  <card.icon className={cn("w-4 h-4 mb-2", card.color)} />
-                  <p className="text-sm font-semibold mb-1">{card.title}</p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{card.body}</p>
+            {/* CV queue */}
+            {queue.length > 0 && (
+              <div className="rounded-2xl border border-border bg-card overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60">
+                  <p className="text-sm font-semibold">
+                    {queue.length} CV{queue.length !== 1 ? "s" : ""} queued
+                    {doneCount > 0 && <span className="text-muted-foreground font-normal"> · {doneCount} done</span>}
+                  </p>
+                  {runnableCount > 0 && !isRunning && (
+                    <button
+                      onClick={runAll}
+                      disabled={!jobDescription.trim()}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      Analyse {runnableCount} CV{runnableCount !== 1 ? "s" : ""}
+                    </button>
+                  )}
+                  {isRunning && (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Processing…
+                    </span>
+                  )}
                 </div>
-              ))}
-            </div>
 
-            {/* View all results link */}
-            <button
-              onClick={() => navigate("/")}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              View all your analyses on the dashboard
-              <ChevronRight className="w-4 h-4" />
-            </button>
+                <ul className="divide-y divide-border/60">
+                  {queue.map((item) => (
+                    <li key={item.id} className="flex items-center gap-3 px-5 py-3.5">
+                      <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{item.file.name}</p>
+                        {item.errorMessage && (
+                          <p className="text-xs text-red-600 mt-0.5 truncate">{item.errorMessage}</p>
+                        )}
+                      </div>
+                      <StatusBadge status={item.status} />
+                      {item.status === "done" && item.applicationId && (
+                        <button
+                          onClick={() => navigate(`/applications/${item.applicationId}`)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline ml-1 flex-shrink-0"
+                        >
+                          View
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
+                      )}
+                      {(item.status === "pending" || item.status === "error") && !isRunning && (
+                        <button
+                          onClick={() => removeItem(item.id)}
+                          className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 ml-1"
+                          aria-label="Remove"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
 
-            {/* Buy more link */}
-            {!status?.isPro && (
-              <div className="pt-2 border-t border-border/40">
-                <button
-                  onClick={() => navigate("/bulk")}
-                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Need more slots? Buy another bulk pass
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+                {/* Run button at bottom when queue is long */}
+                {runnableCount > 0 && !isRunning && queue.length > 3 && (
+                  <div className="px-5 py-3.5 border-t border-border/60 bg-muted/20">
+                    <button
+                      onClick={runAll}
+                      disabled={!jobDescription.trim()}
+                      className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold bg-primary text-primary-foreground px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40"
+                    >
+                      <Play className="w-4 h-4" />
+                      Analyse {runnableCount} CV{runnableCount !== 1 ? "s" : ""}
+                    </button>
+                    {!jobDescription.trim() && (
+                      <p className="text-xs text-muted-foreground text-center mt-2">Add a job description above to continue</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
+
+            {/* Empty state prompt */}
+            {queue.length === 0 && (
+              <p className="text-center text-xs text-muted-foreground py-2">
+                Drop CVs above and paste a job description to get started.
+              </p>
+            )}
+
+            {/* Buy more / dashboard links */}
+            <div className="flex flex-col sm:flex-row gap-4 pt-2 border-t border-border/40 text-sm text-muted-foreground">
+              <button
+                onClick={() => navigate("/")}
+                className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+              >
+                View all analyses on dashboard
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              {!status?.isPro && (
+                <button
+                  onClick={() => navigate("/bulk")}
+                  className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+                >
+                  Need more slots? Buy another pass
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
