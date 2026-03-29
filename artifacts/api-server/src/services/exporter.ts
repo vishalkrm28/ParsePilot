@@ -185,37 +185,60 @@ function parseContactItems(rawLines: string[]): ContactItem[] {
 }
 
 /**
- * Build a structured ContactItem[] from AI-extracted parsedCvJson.
- * This is the preferred source — avoids all PDF text-extraction fragility.
- * Returns null when parsedCvJson lacks sufficient contact data.
+ * Merge text-parsed ContactItems with AI-extracted parsedCvJson data.
+ *
+ * Strategy:
+ *  • Text-parsing (raw CV) is the base — it catches everything, including URLs
+ *    that span multiple tokens in the original PDF.
+ *  • parsedCvJson overrides individual fields (location, phone, email) with
+ *    clean, AI-normalised values so fragmented fragments are fixed.
+ *  • linkedin/github from parsedCvJson are ADDED if not already present in the
+ *    text-parsed list — this covers new applications where the AI extracted
+ *    them cleanly. For old applications without parsedCvJson.linkedin the
+ *    text-parsed URL is kept unchanged.
+ *
+ * The merge never removes an item; it only replaces or appends.
  */
-function contactItemsFromParsedCv(
+function mergeContactItems(
+  textItems: ContactItem[],
   parsedCv: Record<string, unknown>,
-): ContactItem[] | null {
-  const items: ContactItem[] = [];
+): ContactItem[] {
+  // Work on a mutable copy
+  const merged: ContactItem[] = textItems.map((i) => ({ ...i }));
 
+  const replaceOrAppend = (item: ContactItem, atFront = false) => {
+    const idx = merged.findIndex((i) => i.kind === item.kind);
+    if (idx >= 0) {
+      merged[idx] = item;
+    } else {
+      atFront ? merged.unshift(item) : merged.push(item);
+    }
+  };
+
+  // Override location, phone, email with clean AI-extracted values
   const loc = typeof parsedCv.location === "string" ? parsedCv.location.trim() : null;
-  if (loc) items.push({ kind: "location", display: loc });
+  if (loc) replaceOrAppend({ kind: "location", display: loc }, true);
 
   const phone = typeof parsedCv.phone === "string" ? parsedCv.phone.trim() : null;
-  if (phone) items.push({ kind: "phone", display: phone });
+  if (phone) replaceOrAppend({ kind: "phone", display: phone });
 
   const email = typeof parsedCv.email === "string" ? parsedCv.email.trim().toLowerCase() : null;
-  if (email) items.push({ kind: "email", display: email, href: `mailto:${email}` });
+  if (email) replaceOrAppend({ kind: "email", display: email, href: `mailto:${email}` });
 
+  // linkedin/github: add from AI if not already present from text-parsing
   const linkedin = typeof parsedCv.linkedin === "string" ? parsedCv.linkedin.trim() : null;
   if (linkedin) {
     const url = /^https?:\/\//i.test(linkedin) ? linkedin : `https://${linkedin}`;
-    items.push({ kind: "linkedin", display: linkedin.replace(/^https?:\/\//i, ""), href: url });
+    replaceOrAppend({ kind: "linkedin", display: linkedin.replace(/^https?:\/\//i, ""), href: url });
   }
 
   const github = typeof parsedCv.github === "string" ? parsedCv.github.trim() : null;
   if (github) {
     const url = /^https?:\/\//i.test(github) ? github : `https://${github}`;
-    items.push({ kind: "github", display: github.replace(/^https?:\/\//i, ""), href: url });
+    replaceOrAppend({ kind: "github", display: github.replace(/^https?:\/\//i, ""), href: url });
   }
 
-  return items.length > 0 ? items : null;
+  return merged;
 }
 
 // ─── CV line parser ───────────────────────────────────────────────────────────
@@ -420,15 +443,16 @@ export async function buildDocxBuffer(
     return buildCoverDocx(coverLetterText, cvText, _company);
   }
   const lines = parseLines(cvText);
-  // Override contact section with AI-extracted structured data when available
+  // Merge text-parsed contact items with AI-extracted structured data
   if (parsedCvJson) {
-    const structuredContact = contactItemsFromParsedCv(parsedCvJson);
-    if (structuredContact) {
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].type === "contact") {
-          lines[i] = { type: "contact", items: structuredContact };
-          break;
-        }
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].type === "contact") {
+        const merged = mergeContactItems(
+          (lines[i] as { type: "contact"; items: ContactItem[] }).items,
+          parsedCvJson,
+        );
+        lines[i] = { type: "contact", items: merged };
+        break;
       }
     }
   }
@@ -740,16 +764,19 @@ export function buildPrintHtml(
     body = renderCoverLetter(text, cvText ?? "", companyParam);
   } else {
     const lines = parseLines(text);
-    // Override the contact section with AI-extracted structured data when available —
-    // this avoids all PDF text-extraction fragility.
+    // Merge text-parsed contact items with AI-extracted structured data.
+    // Text-parsing is the base (catches everything inc. PDF-split URLs).
+    // parsedCvJson overrides clean fields and adds any AI-detected URLs
+    // not found by the text parser (e.g. LinkedIn missing from raw text).
     if (parsedCvJson) {
-      const structuredContact = contactItemsFromParsedCv(parsedCvJson);
-      if (structuredContact) {
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i].type === "contact") {
-            lines[i] = { type: "contact", items: structuredContact };
-            break;
-          }
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].type === "contact") {
+          const merged = mergeContactItems(
+            (lines[i] as { type: "contact"; items: ContactItem[] }).items,
+            parsedCvJson,
+          );
+          lines[i] = { type: "contact", items: merged };
+          break;
         }
       }
     }
