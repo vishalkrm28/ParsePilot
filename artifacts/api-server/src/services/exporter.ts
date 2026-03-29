@@ -102,17 +102,33 @@ function parseContactItems(rawLines: string[]): ContactItem[] {
   const flat = preNormalizeContact(rawLines.join(" "));
   const tokens = flat.split(/\s+/).filter(Boolean);
 
-  // Re-merge phone fragments: country code "+31" may be separated from number "682349489"
-  const merged: string[] = [];
+  // Pass 1 — re-merge phone fragments: "+31" separated from "682349489"
+  const pass1: string[] = [];
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
     if (t.startsWith("+") && /^\+\d{1,4}$/.test(t)) {
-      // Next token is all digits → same phone number
       let phone = t;
       while (i + 1 < tokens.length && /^\d[\d\-().]{3,14}$/.test(tokens[i + 1])) {
         phone += " " + tokens[++i];
       }
-      merged.push(phone);
+      pass1.push(phone);
+    } else {
+      pass1.push(t);
+    }
+  }
+
+  // Pass 2 — re-merge split URL fragments.
+  // PDF extractors sometimes insert spaces inside a URL (e.g. "HTTPS://WWW." + "LINKEDIN.COM/…").
+  // Merge a URL token with following tokens whenever it ends with "." or "/" (clearly incomplete).
+  const merged: string[] = [];
+  for (let i = 0; i < pass1.length; i++) {
+    const t = pass1[i];
+    if (/^https?:\/\//i.test(t)) {
+      let url = t;
+      while ((url.endsWith(".") || url.endsWith("/") || url.endsWith("//")) && i + 1 < pass1.length) {
+        url += pass1[++i];
+      }
+      merged.push(url);
     } else {
       merged.push(t);
     }
@@ -127,8 +143,18 @@ function parseContactItems(rawLines: string[]): ContactItem[] {
 
     const tokLower = tok.toLowerCase();
     if (LINKEDIN_RE.test(tok)) {
-      const url = /^https?:\/\//i.test(tok) ? tok.toLowerCase() : `https://${tokLower}`;
-      const label = tokLower.replace(/^https?:\/\//, "").replace(/\/$/, "");
+      let url = /^https?:\/\//i.test(tok) ? tokLower : `https://${tokLower}`;
+      // Strip trailing plain-word path segments that look like a city/location glued on
+      // by the PDF extractor (e.g. "linkedin.com/in/nitishkrm/almere" → strip "almere").
+      // LinkedIn profile URLs are "linkedin.com/in/{slug}" — anything extra is noise.
+      // Save the stripped word so we can add it as a location item.
+      let strippedCity = "";
+      url = url.replace(/(linkedin\.com\/in\/[^/]+)\/?([a-z]{3,})\s*$/, (_m, base, city) => {
+        strippedCity = city;
+        return base;
+      });
+      if (strippedCity) locationBuf.push(strippedCity);
+      const label = url.replace(/^https?:\/\//, "").replace(/\/$/, "");
       items.push({ kind: "linkedin", display: label, href: url });
     } else if (GITHUB_RE.test(tok)) {
       const url = /^https?:\/\//i.test(tok) ? tok.toLowerCase() : `https://${tokLower}`;
