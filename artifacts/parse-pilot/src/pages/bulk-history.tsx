@@ -11,13 +11,16 @@ import {
   BarChart2,
   Plus,
   Trophy,
+  ShoppingCart,
+  Crown,
+  AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 interface BulkStatus {
   isPro?: boolean;
-  activePass?: { remaining: number } | null;
+  activePass?: { remaining: number; cvLimit: number } | null;
 }
 
 interface BulkSessionSummary {
@@ -47,6 +50,7 @@ function ScorePill({ score, label }: { score: number | null; label: string }) {
 export default function BulkHistory() {
   const [, navigate] = useLocation();
   const [sessions, setSessions] = useState<BulkSessionSummary[]>([]);
+  const [bulkStatus, setBulkStatus] = useState<BulkStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,6 +64,7 @@ export default function BulkHistory() {
           navigate("/bulk");
           return;
         }
+        setBulkStatus(status);
         return authedFetch("/api/bulk-sessions")
           .then((r) => r.json())
           .then((data) => setSessions(data))
@@ -73,28 +78,80 @@ export default function BulkHistory() {
     <AppLayout>
       <div className="max-w-3xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <Users className="w-4 h-4 text-primary" />
             </div>
             <span className="text-sm font-semibold text-primary uppercase tracking-wider">Bulk Mode</span>
           </div>
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <h1 className="text-2xl font-extrabold tracking-tight mb-1">Batch analysis history</h1>
               <p className="text-sm text-muted-foreground">
                 All your previous bulk screening sessions — click one to see the full ranked results.
               </p>
             </div>
-            <Link href="/bulk/session">
-              <button className="flex-shrink-0 inline-flex items-center gap-2 text-sm font-semibold bg-primary text-primary-foreground px-4 py-2 rounded-xl hover:opacity-90 transition-opacity">
-                <Plus className="w-4 h-4" />
-                New batch
-              </button>
-            </Link>
+            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 flex-shrink-0">
+              <Link href="/bulk">
+                <button className="inline-flex items-center gap-1.5 text-sm font-semibold border border-border px-3 py-2 rounded-xl hover:border-primary/40 hover:bg-primary/5 transition-colors whitespace-nowrap">
+                  <ShoppingCart className="w-3.5 h-3.5" />
+                  Buy more slots
+                </button>
+              </Link>
+              <Link href="/bulk/session">
+                <button className="inline-flex items-center gap-2 text-sm font-semibold bg-primary text-primary-foreground px-4 py-2 rounded-xl hover:opacity-90 transition-opacity whitespace-nowrap">
+                  <Plus className="w-4 h-4" />
+                  New batch
+                </button>
+              </Link>
+            </div>
           </div>
         </div>
+
+        {/* Pass usage banner */}
+        {bulkStatus && !loading && (
+          <div className="mb-6">
+            {bulkStatus.isPro ? (
+              <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-violet-500/5 border border-violet-500/20 text-sm text-violet-700">
+                <Crown className="w-4 h-4 flex-shrink-0" />
+                <span>You're on <strong>Pro</strong> — bulk analyses use your credit balance. Buy a bulk pass below if you want a dedicated slot bank.</span>
+              </div>
+            ) : bulkStatus.activePass ? (
+              (() => {
+                const { remaining, cvLimit } = bulkStatus.activePass;
+                const pct = Math.round(((cvLimit - remaining) / cvLimit) * 100);
+                const isLow = remaining <= Math.ceil(cvLimit * 0.2);
+                return (
+                  <div className={cn(
+                    "px-4 py-3 rounded-xl border text-sm",
+                    isLow ? "bg-amber-500/5 border-amber-400/30" : "bg-emerald-500/5 border-emerald-500/25"
+                  )}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={cn("font-semibold", isLow ? "text-amber-700" : "text-emerald-700")}>
+                        {isLow && <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5" />}
+                        Active pass — {remaining} of {cvLimit} slots remaining
+                      </span>
+                      {isLow && (
+                        <Link href="/bulk">
+                          <button className="text-xs font-semibold text-amber-700 hover:text-amber-800 underline underline-offset-2">
+                            Top up
+                          </button>
+                        </Link>
+                      )}
+                    </div>
+                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full transition-all", isLow ? "bg-amber-500" : "bg-emerald-500")}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()
+            ) : null}
+          </div>
+        )}
 
         {/* Content */}
         {loading ? (
