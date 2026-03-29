@@ -105,6 +105,35 @@ export async function authMiddleware(
         );
       }
 
+      // Check if a row already exists with this email but a different Clerk ID
+      // (e.g. dev → production Clerk instance migration where the same Google
+      // account receives a new Clerk user ID in the production environment).
+      if (email) {
+        const [existingByEmail] = await db
+          .select()
+          .from(usersTable)
+          .where(eq(usersTable.email, email))
+          .limit(1);
+
+        if (existingByEmail) {
+          // Reuse the existing row so that all credits, apps and billing data
+          // already linked to this DB id remain intact.
+          req.log?.info(
+            { dbId: existingByEmail.id, clerkId: userId, email },
+            "authMiddleware: matched existing user by email — reusing DB record",
+          );
+          req.user = {
+            id: existingByEmail.id,
+            email: existingByEmail.email,
+            firstName: existingByEmail.firstName,
+            lastName: existingByEmail.lastName,
+            profileImageUrl: existingByEmail.profileImageUrl,
+          };
+          next();
+          return;
+        }
+      }
+
       const userData = { id: userId, email, firstName, lastName, profileImageUrl };
 
       const [newUser] = await db
