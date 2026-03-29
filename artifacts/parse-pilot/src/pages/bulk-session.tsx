@@ -369,19 +369,42 @@ export default function BulkSession() {
   const createMutation = useCreateApplication();
   const isRunningRef = useRef(false);
 
-  // Restore completed results from sessionStorage on mount
+  // Restore completed results from sessionStorage on mount,
+  // but validate that the applications still exist in the DB.
   useEffect(() => {
     try {
       const stored = sessionStorage.getItem(SESSION_KEY);
-      if (stored) {
-        const parsed: CompletedResult[] = JSON.parse(stored);
-        if (parsed.length > 0) {
-          setCompletedResults(parsed);
-          setView("results");
-        }
-      }
+      if (!stored) return;
+      const parsed: CompletedResult[] = JSON.parse(stored);
+      if (!parsed.length) return;
+
+      // Fetch current applications to validate cached IDs
+      authedFetch("/api/applications")
+        .then((r) => (r.ok ? r.json() : []))
+        .then((apps: { id: string }[]) => {
+          const liveIds = new Set(apps.map((a) => a.id));
+          const valid = parsed.filter((r) => liveIds.has(r.applicationId));
+          if (valid.length > 0) {
+            setCompletedResults(valid);
+            setView("results");
+            if (valid.length !== parsed.length) {
+              // Persist the pruned list
+              sessionStorage.setItem(SESSION_KEY, JSON.stringify(valid));
+            }
+          } else {
+            // All deleted — clear the stale cache
+            sessionStorage.removeItem(SESSION_KEY);
+          }
+        })
+        .catch(() => {
+          // On network error keep cache as-is
+          if (parsed.length > 0) {
+            setCompletedResults(parsed);
+            setView("results");
+          }
+        });
     } catch {
-      // ignore
+      // ignore malformed cache
     }
   }, []);
 
