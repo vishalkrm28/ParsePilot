@@ -55,42 +55,84 @@ router.post("/_admin/fix-user-migration", async (req, res) => {
   }
 
   try {
-    // 1. Copy stripe billing fields from old row into new row
-    const copyResult = await db.execute(sql`
-      UPDATE users
-      SET
-        stripe_customer_id     = (SELECT stripe_customer_id     FROM users WHERE id = ${old_id}),
-        stripe_subscription_id = (SELECT stripe_subscription_id FROM users WHERE id = ${old_id}),
-        subscription_status    = (SELECT subscription_status    FROM users WHERE id = ${old_id}),
-        subscription_price_id  = (SELECT subscription_price_id  FROM users WHERE id = ${old_id}),
-        current_period_end     = (SELECT current_period_end     FROM users WHERE id = ${old_id}),
-        updated_at = NOW()
-      WHERE id = ${new_id}
-    `);
+    // Read both rows so we can see what state each is in
+    const [oldRows] = await db.execute(sql`SELECT * FROM users WHERE id = ${old_id}`);
+    const [newRows] = await db.execute(sql`SELECT * FROM users WHERE id = ${new_id}`);
+    const oldRow = oldRows as Record<string, unknown> | undefined;
+    const newRow = newRows as Record<string, unknown> | undefined;
 
-    // 2. Delete usage_balances seeded for the new (empty) user by initFreeCredits,
-    //    so the old user's balance takes precedence after the move.
-    await db.execute(sql`
-      DELETE FROM usage_balances
-      WHERE user_id = ${new_id}
-        AND EXISTS (SELECT 1 FROM usage_balances WHERE user_id = ${old_id})
-    `);
+    if (!newRow) {
+      res.status(404).json({ error: `new_id ${new_id} not found in users table` });
+      return;
+    }
 
-    // 3. Move all child rows still pointing to the old id
-    await db.execute(sql`UPDATE applications           SET user_id = ${new_id} WHERE user_id = ${old_id}`);
-    await db.execute(sql`UPDATE bulk_sessions           SET user_id = ${new_id} WHERE user_id = ${old_id}`);
-    await db.execute(sql`UPDATE bulk_passes             SET user_id = ${new_id} WHERE user_id = ${old_id}`);
-    await db.execute(sql`UPDATE contact_messages        SET user_id = ${new_id} WHERE user_id = ${old_id}`);
-    await db.execute(sql`UPDATE unlock_purchases        SET user_id = ${new_id} WHERE user_id = ${old_id}`);
-    await db.execute(sql`UPDATE usage_balances          SET user_id = ${new_id} WHERE user_id = ${old_id}`);
-    await db.execute(sql`UPDATE usage_events            SET user_id = ${new_id} WHERE user_id = ${old_id}`);
-    await db.execute(sql`UPDATE user_identity_profiles  SET user_id = ${new_id} WHERE user_id = ${old_id}`);
+    const report: Record<string, unknown> = { oldRow: oldRow ?? "not found", newRowBefore: newRow };
 
-    // 4. Delete the old stale row
-    const del = await db.execute(sql`DELETE FROM users WHERE id = ${old_id}`);
+    // Always restore the real email on the new (active) user row
+    const { real_email } = req.body as { real_email?: string };
+    if (real_email) {
+      await db.execute(sql`UPDATE users SET email = ${real_email} WHERE id = ${new_id}`);
+      report["emailRestored"] = real_email;
+    }
 
-    logger.info({ old_id, new_id }, "Admin fix-user-migration: merge complete");
-    res.json({ success: true, copyResult, deleted: del.rowCount });
+    // 1. If new row is missing stripe data but old row has it, copy it over.
+    //    First null out the old row's stripe fields to release the unique constraint,
+    //    then update the new row.
+    if (oldRow) {
+      const oldStripe = oldRow["stripe_customer_id"];
+      const newStripe = newRow["stripe_customer_id"];
+
+      if (oldStripe && !newStripe) {
+        // New row needs stripe data — null old row first to release unique constraint
+        await db.execute(sql`
+          UPDATE users SET stripe_customer_id = NULL, stripe_subscription_id = NULL
+          WHERE id = ${old_id}
+        `);
+        await db.execute(sql`
+          UPDATE users SET
+            stripe_customer_id     = ${oldStripe as string},
+            stripe_subscription_id = ${(oldRow["stripe_subscription_id"] as string) ?? null},
+            subscription_status    = ${(oldRow["subscription_status"] as string) ?? null},
+            subscription_price_id  = ${(oldRow["subscription_price_id"] as string) ?? null},
+            current_period_end     = ${(oldRow["current_period_end"] as string) ?? null},
+            updated_at = NOW()
+          WHERE id = ${new_id}
+        `);
+        report["stripeAction"] = "copied from old to new";
+      } else if (oldStripe && newStripe) {
+        // Both have stripe data — just null out old row's stripe fields so delete succeeds
+        await db.execute(sql`
+          UPDATE users SET stripe_customer_id = NULL, stripe_subscription_id = NULL
+          WHERE id = ${old_id}
+        `);
+        report["stripeAction"] = "new row already had stripe data — old stripe fields nulled";
+      } else {
+        report["stripeAction"] = "no stripe data to migrate";
+      }
+
+      // 2. Delete stale initFreeCredits balance on new row if old row has a real balance
+      await db.execute(sql`
+        DELETE FROM usage_balances
+        WHERE user_id = ${new_id}
+          AND EXISTS (SELECT 1 FROM usage_balances WHERE user_id = ${old_id})
+      `);
+
+      // 3. Move all child rows still pointing to the old id
+      const moved: Record<string, number> = {};
+      for (const tbl of ["applications","bulk_sessions","bulk_passes","contact_messages",
+                          "unlock_purchases","usage_balances","usage_events","user_identity_profiles"]) {
+        const r = await db.execute(sql.raw(`UPDATE ${tbl} SET user_id = '${new_id}' WHERE user_id = '${old_id}'`));
+        moved[tbl] = (r as any).rowCount ?? 0;
+      }
+      report["moved"] = moved;
+
+      // 4. Delete the old stale row (no children point to it anymore)
+      const del = await db.execute(sql`DELETE FROM users WHERE id = ${old_id}`);
+      report["oldRowDeleted"] = (del as any).rowCount ?? 0;
+    }
+
+    logger.info({ old_id, new_id, report }, "Admin fix-user-migration: complete");
+    res.json({ success: true, report });
   } catch (err: any) {
     logger.error({ err }, "Admin fix-user-migration failed");
     res.status(500).json({ error: err.message });
