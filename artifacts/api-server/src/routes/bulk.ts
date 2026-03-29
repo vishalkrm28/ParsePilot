@@ -206,7 +206,7 @@ router.get("/billing/bulk-tiers", (_req, res) => {
     id,
     cvLimit: config.cvLimit,
     amountCents: config.amountCents,
-    amountPounds: config.amountCents / 100,
+    amountDollars: config.amountCents / 100,
     badge: config.badge,
     tagline: config.tagline,
     label: config.label,
