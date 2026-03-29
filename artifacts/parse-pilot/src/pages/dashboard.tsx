@@ -19,6 +19,7 @@ import {
   TrendingUp,
   AlertTriangle,
   Lock,
+  User,
 } from "lucide-react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
@@ -213,6 +214,12 @@ export default function Dashboard() {
                             <Badge className={`text-xs border ${status.className}`}>{status.label}</Badge>
                           </div>
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                            {(app.parsedCvJson as any)?.name && (
+                              <span className="flex items-center gap-1.5 font-medium text-foreground/80">
+                                <User className="w-3.5 h-3.5" />
+                                {(app.parsedCvJson as any).name}
+                              </span>
+                            )}
                             <span className="flex items-center gap-1.5">
                               <Building2 className="w-3.5 h-3.5" />
                               {app.company}
