@@ -56,10 +56,10 @@ router.post("/_admin/fix-user-migration", async (req, res) => {
 
   try {
     // Read both rows so we can see what state each is in
-    const [oldRows] = await db.execute(sql`SELECT * FROM users WHERE id = ${old_id}`);
-    const [newRows] = await db.execute(sql`SELECT * FROM users WHERE id = ${new_id}`);
-    const oldRow = oldRows as Record<string, unknown> | undefined;
-    const newRow = newRows as Record<string, unknown> | undefined;
+    const oldResult = await db.execute(sql`SELECT * FROM users WHERE id = ${old_id}`);
+    const newResult = await db.execute(sql`SELECT * FROM users WHERE id = ${new_id}`);
+    const oldRow = (oldResult.rows?.[0] ?? oldResult[0]) as Record<string, unknown> | undefined;
+    const newRow = (newResult.rows?.[0] ?? newResult[0]) as Record<string, unknown> | undefined;
 
     if (!newRow) {
       res.status(404).json({ error: `new_id ${new_id} not found in users table` });
