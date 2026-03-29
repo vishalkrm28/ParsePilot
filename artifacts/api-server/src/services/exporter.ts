@@ -72,6 +72,14 @@ const NON_JOB_SECTIONS = new Set([
   "OBJECTIVE", "CAREER OBJECTIVE", "PROFESSIONAL OBJECTIVE", "ABOUT",
 ]);
 
+// Sections where all-caps sub-lines should NOT be treated as headings.
+// Institution names (e.g. "ANTWERP MANAGEMENT SCHOOL") are all-caps but are
+// NOT section headings — they must not get the gold-rule heading treatment.
+const SUPPRESS_SUBHEADING_SECTIONS = new Set([
+  "EDUCATION", "ACADEMIC BACKGROUND", "ACADEMIC QUALIFICATIONS",
+  "QUALIFICATIONS", "ACADEMIC HISTORY",
+]);
+
 // ─── Contact tokeniser ────────────────────────────────────────────────────────
 
 /**
@@ -290,6 +298,7 @@ function parseLines(text: string): LineKind[] {
   let currentSection = "";
   let isCompact = false;
   let isJobSection = true;
+  let isSuppressSubheading = false; // true inside EDUCATION-type sections
 
   for (let i = headerEnd; i < raw.length; i++) {
     const trimmed = raw[i];
@@ -306,10 +315,17 @@ function parseLines(text: string): LineKind[] {
       HEADING_RE.test(trimmed);
     const isKnownSection = KNOWN_SECTIONS.has(trimmed);
 
-    if (looksLikeHeading && (isKnownSection || !isCompact)) {
-      currentSection = trimmed;
-      isCompact    = COMPACT_SECTIONS.has(trimmed);
-      isJobSection = !NON_JOB_SECTIONS.has(trimmed);
+    // Promote to heading only when:
+    //   • it's a known section name (always safe), OR
+    //   • we're NOT in a compact section AND NOT in a suppress-subheading
+    //     section (e.g. EDUCATION). Without the latter guard, institution
+    //     names written in ALL CAPS ("ANTWERP MANAGEMENT SCHOOL") would be
+    //     wrongly rendered as section headings.
+    if (looksLikeHeading && (isKnownSection || (!isCompact && !isSuppressSubheading))) {
+      currentSection        = trimmed;
+      isCompact             = COMPACT_SECTIONS.has(trimmed);
+      isJobSection          = !NON_JOB_SECTIONS.has(trimmed);
+      isSuppressSubheading  = SUPPRESS_SUBHEADING_SECTIONS.has(trimmed);
       result.push({ type: "heading", text: trimmed, compact: isCompact });
       continue;
     }
