@@ -75,13 +75,32 @@ const NON_JOB_SECTIONS = new Set([
 // ─── Contact tokeniser ────────────────────────────────────────────────────────
 
 /**
+ * PDF text extractors frequently concatenate contact fields with no spaces.
+ * This pre-processor inserts spaces at known boundaries before we tokenise:
+ *   "682349489VISHALKRM@GMAIL.COMHTTPS://linkedin…ALMERE"
+ *   → "682349489 VISHALKRM@GMAIL.COM HTTPS://linkedin…ALMERE"
+ */
+function preNormalizeContact(s: string): string {
+  return s
+    // Space before https?:// when directly attached to the previous token
+    .replace(/(?<=[^\s])(https?:\/\/)/gi, " $1")
+    // Space between a run of digits and a following letter-then-@ sequence
+    // Catches "682349489VISHALKRM@…" → "682349489 VISHALKRM@…"
+    .replace(/(\d)([A-Za-z][^\s@]*@)/g, "$1 $2")
+    // Space before a bare "linkedin" or "github" keyword if preceded by non-space
+    .replace(/(?<=[^\s])(linkedin\.com|github\.com)/gi, " $1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
  * Takes one or more raw contact lines (e.g. "+31 682… vishalkrm@gmail.com https://…linkedin… Almere")
  * and returns a structured list of ContactItem, one per piece of info.
  */
 function parseContactItems(rawLines: string[]): ContactItem[] {
-  // Flatten all lines and split on whitespace.
-  // URLs never contain spaces, so simple splitting is safe.
-  const tokens = rawLines.join(" ").split(/\s+/).filter(Boolean);
+  // Flatten, pre-normalise to separate concatenated fields, then split on whitespace.
+  const flat = preNormalizeContact(rawLines.join(" "));
+  const tokens = flat.split(/\s+/).filter(Boolean);
 
   // Re-merge phone fragments: country code "+31" may be separated from number "682349489"
   const merged: string[] = [];
@@ -106,18 +125,19 @@ function parseContactItems(rawLines: string[]): ContactItem[] {
   for (const tok of merged) {
     if (!tok.trim()) continue;
 
+    const tokLower = tok.toLowerCase();
     if (LINKEDIN_RE.test(tok)) {
-      const url = tok.startsWith("http") ? tok : `https://${tok}`;
-      const label = tok.replace(/^https?:\/\//, "").replace(/\/$/, "");
+      const url = /^https?:\/\//i.test(tok) ? tok.toLowerCase() : `https://${tokLower}`;
+      const label = tokLower.replace(/^https?:\/\//, "").replace(/\/$/, "");
       items.push({ kind: "linkedin", display: label, href: url });
     } else if (GITHUB_RE.test(tok)) {
-      const url = tok.startsWith("http") ? tok : `https://${tok}`;
-      const label = tok.replace(/^https?:\/\//, "").replace(/\/$/, "");
+      const url = /^https?:\/\//i.test(tok) ? tok.toLowerCase() : `https://${tokLower}`;
+      const label = tokLower.replace(/^https?:\/\//, "").replace(/\/$/, "");
       items.push({ kind: "github", display: label, href: url });
-    } else if (tok.startsWith("http")) {
-      items.push({ kind: "url", display: tok, href: tok });
+    } else if (/^https?:\/\//i.test(tok)) {
+      items.push({ kind: "url", display: tokLower, href: tokLower });
     } else if (EMAIL_RE.test(tok)) {
-      items.push({ kind: "email", display: tok, href: `mailto:${tok}` });
+      items.push({ kind: "email", display: tokLower, href: `mailto:${tokLower}` });
     } else if (PHONE_RE.test(tok)) {
       items.push({ kind: "phone", display: tok });
     } else {
