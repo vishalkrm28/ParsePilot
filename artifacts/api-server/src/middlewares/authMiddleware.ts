@@ -2,7 +2,7 @@ import { createClerkClient, verifyToken } from "@clerk/express";
 import { type Request, type Response, type NextFunction } from "express";
 import type { AuthUser } from "@workspace/api-zod";
 import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { initFreeCredits } from "../lib/credits.js";
 
 declare global {
@@ -116,18 +116,58 @@ export async function authMiddleware(
           .limit(1);
 
         if (existingByEmail) {
-          // Reuse the existing row so that all credits, apps and billing data
-          // already linked to this DB id remain intact.
+          const oldId = existingByEmail.id;
           req.log?.info(
-            { dbId: existingByEmail.id, clerkId: userId, email },
-            "authMiddleware: matched existing user by email — reusing DB record",
+            { oldId, newClerkId: userId, email },
+            "authMiddleware: email match found with different Clerk ID — re-keying user",
           );
+
+          // Re-key the user: migrate all data from the old DB id to the new
+          // Clerk id so that every subsequent login resolves by ID.
+          // Steps:
+          //  1. Temporarily blank the old row's email to release the unique constraint
+          //  2. Insert a new users row with the new Clerk ID and real email
+          //  3. Move all child table rows to the new ID
+          //  4. Delete the old users row
+          await db.execute(sql`
+            UPDATE users
+            SET email = 'migrating_' || id || '@tmp.parsepilot.internal'
+            WHERE id = ${oldId}
+          `);
+
+          await db.execute(sql`
+            INSERT INTO users
+              (id, email, first_name, last_name, profile_image_url,
+               stripe_customer_id, stripe_subscription_id, subscription_status,
+               subscription_price_id, current_period_end, created_at, updated_at)
+            SELECT
+              ${userId}, ${email}, ${firstName}, ${lastName}, ${profileImageUrl},
+              stripe_customer_id, stripe_subscription_id, subscription_status,
+              subscription_price_id, current_period_end, created_at, NOW()
+            FROM users WHERE id = ${oldId}
+          `);
+
+          // Move child rows
+          await db.execute(sql`UPDATE applications           SET user_id = ${userId} WHERE user_id = ${oldId}`);
+          await db.execute(sql`UPDATE bulk_sessions           SET user_id = ${userId} WHERE user_id = ${oldId}`);
+          await db.execute(sql`UPDATE bulk_passes             SET user_id = ${userId} WHERE user_id = ${oldId}`);
+          await db.execute(sql`UPDATE contact_messages        SET user_id = ${userId} WHERE user_id = ${oldId}`);
+          await db.execute(sql`UPDATE unlock_purchases        SET user_id = ${userId} WHERE user_id = ${oldId}`);
+          await db.execute(sql`UPDATE usage_balances          SET user_id = ${userId} WHERE user_id = ${oldId}`);
+          await db.execute(sql`UPDATE usage_events            SET user_id = ${userId} WHERE user_id = ${oldId}`);
+          await db.execute(sql`UPDATE user_identity_profiles  SET user_id = ${userId} WHERE user_id = ${oldId}`);
+
+          // Delete the old users row (no children reference it anymore)
+          await db.execute(sql`DELETE FROM users WHERE id = ${oldId}`);
+
+          req.log?.info({ oldId, newId: userId }, "authMiddleware: user re-key complete");
+
           req.user = {
-            id: existingByEmail.id,
-            email: existingByEmail.email,
-            firstName: existingByEmail.firstName,
-            lastName: existingByEmail.lastName,
-            profileImageUrl: existingByEmail.profileImageUrl,
+            id: userId,
+            email,
+            firstName,
+            lastName,
+            profileImageUrl,
           };
           next();
           return;
