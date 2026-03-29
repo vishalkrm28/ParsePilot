@@ -364,6 +364,9 @@ export default function BulkSession() {
 
   const [view, setView] = useState<PageView>("session");
   const [completedResults, setCompletedResults] = useState<CompletedResult[]>([]);
+  // Ref keeps the authoritative list in sync with sessionStorage, bypassing
+  // React 18 auto-batching which can delay state-updater execution.
+  const completedResultsRef = useRef<CompletedResult[]>([]);
 
   const uploadMutation = useUploadCv();
   const createMutation = useCreateApplication();
@@ -371,7 +374,9 @@ export default function BulkSession() {
 
   // Restore completed results from sessionStorage on mount,
   // but validate that the applications still exist in the DB.
+  // Runs only once user.id is available to provide the required query param.
   useEffect(() => {
+    if (!user?.id) return;
     try {
       const stored = sessionStorage.getItem(SESSION_KEY);
       if (!stored) return;
@@ -379,34 +384,41 @@ export default function BulkSession() {
       if (!parsed.length) return;
 
       // Fetch current applications to validate cached IDs
-      authedFetch("/api/applications")
-        .then((r) => (r.ok ? r.json() : []))
-        .then((apps: { id: string }[]) => {
+      authedFetch(`/api/applications?userId=${encodeURIComponent(user.id)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((apps: { id: string }[] | null) => {
+          if (!apps) {
+            // On any API error keep cache as-is
+            completedResultsRef.current = parsed;
+            setCompletedResults(parsed);
+            setView("results");
+            return;
+          }
           const liveIds = new Set(apps.map((a) => a.id));
           const valid = parsed.filter((r) => liveIds.has(r.applicationId));
           if (valid.length > 0) {
+            completedResultsRef.current = valid;
             setCompletedResults(valid);
             setView("results");
             if (valid.length !== parsed.length) {
-              // Persist the pruned list
               sessionStorage.setItem(SESSION_KEY, JSON.stringify(valid));
             }
           } else {
             // All deleted — clear the stale cache
+            completedResultsRef.current = [];
             sessionStorage.removeItem(SESSION_KEY);
           }
         })
         .catch(() => {
           // On network error keep cache as-is
-          if (parsed.length > 0) {
-            setCompletedResults(parsed);
-            setView("results");
-          }
+          completedResultsRef.current = parsed;
+          setCompletedResults(parsed);
+          setView("results");
         });
     } catch {
       // ignore malformed cache
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     Promise.all([
@@ -470,15 +482,17 @@ export default function BulkSession() {
   };
 
   const addCompletedResult = (result: CompletedResult) => {
-    setCompletedResults((prev) => {
-      const next = [...prev, result];
-      try {
-        sessionStorage.setItem(SESSION_KEY, JSON.stringify(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
+    // Write synchronously to the ref and sessionStorage BEFORE triggering
+    // a React state update, so that runAll can reliably read both immediately
+    // after the for-loop without racing against React 18 auto-batching.
+    const next = [...completedResultsRef.current, result];
+    completedResultsRef.current = next;
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+    setCompletedResults(next);
   };
 
   // ── Process queue ─────────────────────────────────────────────────────────
@@ -549,24 +563,18 @@ export default function BulkSession() {
     isRunningRef.current = false;
     setIsRunning(false);
 
-    // Read directly from sessionStorage to avoid React state batching race
-    try {
-      const stored = sessionStorage.getItem(SESSION_KEY);
-      if (stored) {
-        const storedResults: CompletedResult[] = JSON.parse(stored);
-        if (storedResults.length > 0) {
-          setCompletedResults(storedResults);
-          setView("results");
-          toast({
-            title: "Batch complete",
-            description: `${storedResults.length} CV${storedResults.length !== 1 ? "s" : ""} analysed — results ranked below.`,
-          });
-          await saveSession(storedResults);
-          return;
-        }
-      }
-    } catch {
-      // ignore
+    // Use the ref — it is updated synchronously on every addCompletedResult call,
+    // so it is always accurate here regardless of React 18 auto-batching.
+    const finalResults = completedResultsRef.current;
+    if (finalResults.length > 0) {
+      setCompletedResults(finalResults);
+      setView("results");
+      toast({
+        title: "Batch complete",
+        description: `${finalResults.length} CV${finalResults.length !== 1 ? "s" : ""} analysed — results ranked below.`,
+      });
+      await saveSession(finalResults);
+      return;
     }
     toast({ title: "Batch complete", description: "Processing complete." });
   };
@@ -595,6 +603,7 @@ export default function BulkSession() {
     setJobTitle("");
     setCompany("");
     setJobDescription("");
+    completedResultsRef.current = [];
     setCompletedResults([]);
     try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
   };
