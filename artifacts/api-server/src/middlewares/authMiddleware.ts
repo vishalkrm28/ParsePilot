@@ -115,7 +115,7 @@ export async function authMiddleware(
           .where(eq(usersTable.email, email))
           .limit(1);
 
-        if (existingByEmail) {
+        if (existingByEmail && existingByEmail.id !== userId) {
           const oldId = existingByEmail.id;
           req.log?.info(
             { oldId, newClerkId: userId, email },
