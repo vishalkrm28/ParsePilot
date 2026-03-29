@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, count } from "drizzle-orm";
-import { db, applicationsTable } from "@workspace/db";
+import { db, applicationsTable, usersTable } from "@workspace/db";
 import {
   CreateApplicationBody,
   UpdateApplicationBody,
@@ -608,6 +608,16 @@ router.post("/applications/:id/cover-letter", requirePro, async (req, res) => {
       return;
     }
 
+    // Fetch the user's real name to pin in the cover letter signature
+    let candidateName: string | undefined;
+    if (ownerUserId) {
+      const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, ownerUserId));
+      const firstName = dbUser?.firstName?.trim() ?? "";
+      const lastName = dbUser?.lastName?.trim() ?? "";
+      const full = [firstName, lastName].filter(Boolean).join(" ");
+      if (full) candidateName = full;
+    }
+
     const coverLetterText = await generateCoverLetter({
       originalCvText: app.originalCvText,
       tailoredCvText: app.tailoredCvText,
@@ -616,6 +626,7 @@ router.post("/applications/:id/cover-letter", requirePro, async (req, res) => {
       company: app.company,
       tone,
       additionalContext,
+      candidateName,
     });
 
     await db

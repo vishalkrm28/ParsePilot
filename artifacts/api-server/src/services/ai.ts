@@ -363,6 +363,7 @@ export interface CoverLetterInput {
   company: string;
   tone: "professional" | "enthusiastic" | "concise";
   additionalContext?: string;
+  candidateName?: string;
 }
 
 export async function generateCoverLetter(input: CoverLetterInput): Promise<string> {
@@ -445,7 +446,7 @@ Dear Hiring Manager,
 [Para 4 if applicable]
 
 Kind regards,
-[Candidate's actual full name from the CV]
+${input.candidateName ? input.candidateName : "[Candidate's full name — extract it from the CV header, first line, or contact section. Use ONLY the name as written in the CV — do not alter, shorten, or invent it.]"}
 
 Rules:
 - Blank line between every paragraph
