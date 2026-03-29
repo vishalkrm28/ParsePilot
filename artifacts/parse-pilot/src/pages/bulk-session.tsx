@@ -551,7 +551,7 @@ export default function BulkSession() {
   const saveSession = async (results: CompletedResult[]) => {
     if (results.length === 0) return;
     try {
-      await authedFetch("/bulk-sessions", {
+      await authedFetch("/api/bulk-sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

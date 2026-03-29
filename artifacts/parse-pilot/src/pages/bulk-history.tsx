@@ -60,7 +60,7 @@ export default function BulkHistory() {
           navigate("/bulk");
           return;
         }
-        return authedFetch("/bulk-sessions")
+        return authedFetch("/api/bulk-sessions")
           .then((r) => r.json())
           .then((data) => setSessions(data))
           .catch(() => setError("Failed to load bulk sessions"));

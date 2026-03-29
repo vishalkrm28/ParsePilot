@@ -119,7 +119,7 @@ export default function BulkSessionDetail() {
 
   useEffect(() => {
     if (!id) return;
-    authedFetch(`/bulk-sessions/${id}`)
+    authedFetch(`/api/bulk-sessions/${id}`)
       .then((r) => r.json())
       .then((d) => setData(d))
       .catch(() => setError("Failed to load session"))
