@@ -18,8 +18,8 @@ export function useAuth(): AuthState {
 
   const login = useCallback(() => {
     openSignIn({
-      afterSignInUrl: "/",
-      afterSignUpUrl: "/",
+      fallbackRedirectUrl: "/",
+      signUpFallbackRedirectUrl: "/",
     });
   }, [openSignIn]);
 
