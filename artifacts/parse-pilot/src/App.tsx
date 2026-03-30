@@ -23,6 +23,7 @@ import BulkSuccess from "@/pages/bulk-success";
 import BulkSession from "@/pages/bulk-session";
 import BulkHistory from "@/pages/bulk-history";
 import BulkSessionDetail from "@/pages/bulk-session-detail";
+import AdminPage from "@/pages/admin";
 import NotFound from "@/pages/not-found";
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
@@ -104,6 +105,8 @@ function App() {
               <Route path="/terms" component={Terms} />
               <Route path="/privacy" component={Privacy} />
               <Route path="/contact" component={Contact} />
+              {/* Admin — own token-based auth */}
+              <Route path="/admin" component={AdminPage} />
               {/* Everything else goes through the auth gate */}
               <Route>
                 <AuthGate>
