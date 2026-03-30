@@ -17,7 +17,6 @@ import {
   AlertCircle,
   ChevronRight,
   Lock,
-  Crown,
   UploadCloud,
   X,
   Play,
@@ -50,11 +49,6 @@ interface BulkStatus {
   showProUpsell: boolean;
 }
 
-interface CreditStatus {
-  availableCredits: number;
-  planAllowance: number;
-  isPro: boolean;
-}
 
 type CvItemStatus = "pending" | "uploading" | "creating" | "analyzing" | "done" | "error";
 
@@ -353,7 +347,6 @@ export default function BulkSession() {
   const [, navigate] = useLocation();
 
   const [status, setStatus] = useState<BulkStatus | null>(null);
-  const [credits, setCredits] = useState<CreditStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [jobTitle, setJobTitle] = useState("");
@@ -421,24 +414,23 @@ export default function BulkSession() {
   }, [user?.id]);
 
   useEffect(() => {
-    Promise.all([
-      authedFetch("/api/billing/bulk-status").then((r) => (r.ok ? r.json() : null)),
-      authedFetch("/api/billing/credits").then((r) => (r.ok ? r.json() : null)),
-    ])
-      .then(([s, c]) => { setStatus(s); setCredits(c); })
+    authedFetch("/api/billing/bulk-status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => setStatus(s))
       .finally(() => setLoading(false));
   }, []);
 
-  const hasAccess = status?.isPro || (status?.activePass && status.activePass.remaining > 0);
-  const remaining = status?.isPro ? (credits?.availableCredits ?? 0) : (status?.activePass?.remaining ?? 0);
-  const limit = status?.isPro ? (credits?.planAllowance ?? 100) : (status?.activePass?.cvLimit ?? 0);
+  // Access requires an active bulk pass — Pro subscription alone is not enough.
+  const hasAccess = !!(status?.activePass && status.activePass.remaining > 0);
+  const remaining = status?.activePass?.remaining ?? 0;
+  const limit = status?.activePass?.cvLimit ?? 0;
   const used = limit - remaining;
 
   // ── Dropzone (multiple files) ─────────────────────────────────────────────
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    // Strict limit: cap additions to remaining slots (non-Pro only)
-    const slotsLeft = status?.isPro ? Infinity : (remaining - queue.filter(i => i.status !== "done").length);
+    // Cap additions to remaining slots
+    const slotsLeft = remaining - queue.filter(i => i.status !== "done").length;
     const allowed = acceptedFiles.slice(0, Math.max(0, slotsLeft));
     const rejected = acceptedFiles.length - allowed.length;
     if (rejected > 0) {
@@ -455,11 +447,11 @@ export default function BulkSession() {
       status: "pending",
     }));
     setQueue((prev) => [...prev, ...newItems]);
-  }, [status?.isPro, remaining, queue]);
+  }, [remaining, queue]);
 
   const activeQueuedCount = queue.filter(i => i.status !== "done").length;
-  const slotsAvailable = status?.isPro ? 999 : Math.max(0, remaining - activeQueuedCount);
-  const dropsDisabled = !status?.isPro && slotsAvailable === 0;
+  const slotsAvailable = Math.max(0, remaining - activeQueuedCount);
+  const dropsDisabled = slotsAvailable === 0;
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -680,16 +672,8 @@ export default function BulkSession() {
           />
         ) : (
           <div className="space-y-5">
-            {/* Pro badge */}
-            {status?.isPro && (
-              <div className="flex items-center gap-2 text-sm text-violet-700 bg-violet-500/5 border border-violet-500/20 rounded-xl px-4 py-3">
-                <Crown className="w-4 h-4" />
-                <span>Pro plan — using credits ({remaining} remaining)</span>
-              </div>
-            )}
-
             {/* Slot progress */}
-            {!status?.isPro && status?.activePass && <SlotProgress used={used} limit={limit} />}
+            {status?.activePass && <SlotProgress used={used} limit={limit} />}
 
             {/* Previous results banner */}
             {completedResults.length > 0 && (
@@ -777,7 +761,7 @@ export default function BulkSession() {
                     <p className="text-sm font-semibold text-foreground mb-1">Drop all candidate CVs here</p>
                     <p className="text-xs text-muted-foreground">
                       PDF, DOCX, DOC or TXT — select multiple files at once
-                      {!status?.isPro && slotsAvailable < 999 && (
+                      {slotsAvailable > 0 && (
                         <span className="block mt-1 font-medium text-amber-600">
                           {slotsAvailable} slot{slotsAvailable !== 1 ? "s" : ""} remaining in this pass
                         </span>
@@ -873,15 +857,13 @@ export default function BulkSession() {
                 View all analyses on dashboard
                 <ChevronRight className="w-4 h-4" />
               </button>
-              {!status?.isPro && (
-                <button
-                  onClick={() => navigate("/bulk")}
-                  className="flex items-center gap-1.5 hover:text-foreground transition-colors"
-                >
-                  Need more slots? Buy another pass
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              )}
+              <button
+                onClick={() => navigate("/bulk")}
+                className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+              >
+                Need more slots? Buy another pass
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}
