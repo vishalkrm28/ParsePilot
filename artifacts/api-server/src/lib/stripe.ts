@@ -1,4 +1,6 @@
 import Stripe from "stripe";
+import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 let _stripe: Stripe | null = null;
 
@@ -24,4 +26,55 @@ export function getStripe(): Stripe {
   });
 
   return _stripe;
+}
+
+/**
+ * Returns a valid Stripe customer ID for the user.
+ * - If no customer ID is stored, creates one and persists it.
+ * - If the stored ID no longer exists in Stripe (e.g. after switching Stripe
+ *   accounts), clears the stale ID, creates a fresh customer, and persists it.
+ */
+export async function ensureStripeCustomer(
+  userId: string,
+  email: string | null,
+): Promise<string> {
+  const stripe = getStripe();
+
+  const [dbUser] = await db
+    .select({ stripeCustomerId: usersTable.stripeCustomerId })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .limit(1);
+
+  let customerId = dbUser?.stripeCustomerId ?? null;
+
+  if (customerId) {
+    try {
+      const existing = await stripe.customers.retrieve(customerId);
+      if ((existing as Stripe.DeletedCustomer).deleted) {
+        customerId = null;
+      }
+    } catch (err) {
+      const stripeErr = err as Stripe.StripeRawError;
+      if (stripeErr.code === "resource_missing") {
+        customerId = null;
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  if (!customerId) {
+    const customer = await stripe.customers.create({
+      email: email ?? undefined,
+      metadata: { userId },
+    });
+    customerId = customer.id;
+    await db
+      .update(usersTable)
+      .set({ stripeCustomerId: customerId })
+      .where(eq(usersTable.id, userId));
+  }
+
+  return customerId;
 }

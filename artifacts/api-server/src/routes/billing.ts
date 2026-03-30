@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, usersTable, applicationsTable } from "@workspace/db";
 import { z } from "zod";
 import type Stripe from "stripe";
-import { getStripe } from "../lib/stripe.js";
+import { getStripe, ensureStripeCustomer } from "../lib/stripe.js";
 import { logger } from "../lib/logger.js";
 import { getUserCredits, FREE_CREDIT_ALLOWANCE, PRO_CREDIT_ALLOWANCE } from "../lib/credits.js";
 import { subscriptionIsActive, hasUnlockedResult } from "../lib/billing.js";
@@ -62,31 +62,7 @@ router.post("/billing/checkout", async (req, res) => {
     const stripe = getStripe();
     const userId = req.user.id;
 
-    // Load current Stripe customer ID from DB
-    const [dbUser] = await db
-      .select({ stripeCustomerId: usersTable.stripeCustomerId, email: usersTable.email })
-      .from(usersTable)
-      .where(eq(usersTable.id, userId))
-      .limit(1);
-
-    if (!dbUser) {
-      res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
-      return;
-    }
-
-    // Create Stripe customer on first checkout, then persist the ID
-    let customerId = dbUser.stripeCustomerId;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: dbUser.email ?? undefined,
-        metadata: { userId },
-      });
-      customerId = customer.id;
-      await db
-        .update(usersTable)
-        .set({ stripeCustomerId: customerId })
-        .where(eq(usersTable.id, userId));
-    }
+    const customerId = await ensureStripeCustomer(userId, req.user.email ?? null);
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -258,30 +234,7 @@ router.post("/billing/unlock", async (req, res) => {
       return;
     }
 
-    // Get or create Stripe customer
-    const [dbUser] = await db
-      .select({ stripeCustomerId: usersTable.stripeCustomerId, email: usersTable.email })
-      .from(usersTable)
-      .where(eq(usersTable.id, userId))
-      .limit(1);
-
-    if (!dbUser) {
-      res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
-      return;
-    }
-
-    let customerId = dbUser.stripeCustomerId;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: dbUser.email ?? undefined,
-        metadata: { userId },
-      });
-      customerId = customer.id;
-      await db
-        .update(usersTable)
-        .set({ stripeCustomerId: customerId })
-        .where(eq(usersTable.id, userId));
-    }
+    const customerId = await ensureStripeCustomer(userId, req.user?.email ?? null);
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,

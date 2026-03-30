@@ -3,7 +3,7 @@ import { and, eq, desc, count, max, avg, sql, inArray } from "drizzle-orm";
 import { db, usersTable, bulkPassesTable, bulkSessionsTable, applicationsTable } from "@workspace/db";
 import { z } from "zod";
 import type Stripe from "stripe";
-import { getStripe } from "../lib/stripe.js";
+import { getStripe, ensureStripeCustomer } from "../lib/stripe.js";
 import { logger } from "../lib/logger.js";
 import {
   BULK_TIERS,
@@ -163,15 +163,7 @@ router.post("/billing/bulk-checkout", async (req, res) => {
       return;
     }
 
-    let customerId = dbUser.stripeCustomerId;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: dbUser.email ?? undefined,
-        metadata: { userId },
-      });
-      customerId = customer.id;
-      await db.update(usersTable).set({ stripeCustomerId: customerId }).where(eq(usersTable.id, userId));
-    }
+    const customerId = await ensureStripeCustomer(userId, dbUser.email ?? null);
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
