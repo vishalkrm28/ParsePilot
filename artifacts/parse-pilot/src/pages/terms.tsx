@@ -87,16 +87,17 @@ const sections: { title: string; content: React.ReactNode }[] = [
       <>
         <p className="mb-4">
           ParsePilot operates on a credit-based system. Each AI analysis consumes one credit.
-          Credits are allocated monthly and do not roll over to the next billing period.
+          Pro plan credits are allocated monthly and do not roll over to the next billing period.
+          Free plan credits are a one-time sign-up allowance and do not reset.
         </p>
 
         {/* Free Plan */}
         <div className="mb-5">
           <p className="font-semibold text-foreground mb-2">Free Plan</p>
           <ul className="list-disc list-inside space-y-1">
-            <li>3 AI analyses per month, reset on the 1st of each month.</li>
+            <li>3 AI analyses included as a one-time allowance when you sign up — these do not reset monthly.</li>
             <li>Results are locked behind a one-time $6.99 per-result unlock fee.</li>
-            <li>Access to keyword gap preview and ATS score only.</li>
+            <li>Access to ATS match score and keyword gap preview only without unlocking.</li>
             <li>Bulk Mode is not available on the Free plan.</li>
             <li>Cover letter generation is not available on the Free plan.</li>
           </ul>
