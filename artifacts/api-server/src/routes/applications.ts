@@ -15,6 +15,7 @@ import { logger } from "../lib/logger.js";
 import { requirePro } from "../middlewares/requirePro.js";
 import { isUserPro, userCanAccessFullResult, hasUnlockedResult } from "../lib/billing.js";
 import { spendCredits, getUserCredits, CREDIT_COSTS } from "../lib/credits.js";
+import { consumeBulkSlot, hasBulkAccess } from "../lib/bulk.js";
 import { applyFreeFilter, applyProPass, applyUnlockPass } from "../lib/preview.js";
 import {
   extractIdentityFromParsedCv,
@@ -419,22 +420,35 @@ router.post("/applications/:id/analyze", async (req, res) => {
       identityResult = await checkAndRecordIdentity(ownerUserId, identity, id);
     }
 
-    // ── 2. Credit gate ──────────────────────────────────────────────────────
+    // ── 2. Credit / bulk-slot gate ───────────────────────────────────────────
     if (ownerUserId) {
-      // Base cost: 1 credit for every CV optimization
-      const baseCost = CREDIT_COSTS.cv_optimization;
-      if (baseCost > 0) {
-        const spend = await spendCredits(ownerUserId, baseCost, "cv_optimization", {
-          applicationId: id,
-        });
-        if (!spend.success) {
-          const balance = await getUserCredits(ownerUserId);
+      if (isBulkSession) {
+        // Bulk session: consume one slot from the user's active bulk pass.
+        // Credits are NOT deducted — the bulk pass is the entitlement.
+        const slotConsumed = await consumeBulkSlot(ownerUserId);
+        if (!slotConsumed) {
           res.status(402).json({
-            error: "You've used all your optimization credits.",
-            code: "CREDITS_EXHAUSTED",
-            remainingCredits: balance?.availableCredits ?? 0,
+            error: "You have no remaining CV slots. Purchase a new Bulk pass to continue.",
+            code: "BULK_SLOTS_EXHAUSTED",
           });
           return;
+        }
+      } else {
+        // Regular analysis: deduct from credit balance
+        const baseCost = CREDIT_COSTS.cv_optimization;
+        if (baseCost > 0) {
+          const spend = await spendCredits(ownerUserId, baseCost, "cv_optimization", {
+            applicationId: id,
+          });
+          if (!spend.success) {
+            const balance = await getUserCredits(ownerUserId);
+            res.status(402).json({
+              error: "You've used all your optimization credits.",
+              code: "CREDITS_EXHAUSTED",
+              remainingCredits: balance?.availableCredits ?? 0,
+            });
+            return;
+          }
         }
       }
 
