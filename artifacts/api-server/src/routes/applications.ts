@@ -422,11 +422,14 @@ router.post("/applications/:id/analyze", async (req, res) => {
 
     // ── 2. Credit / bulk-slot gate ───────────────────────────────────────────
     if (ownerUserId) {
-      if (isBulkSession) {
-        // Bulk session: consume one slot from the user's active bulk pass.
-        // Credits are NOT deducted — the bulk pass is the entitlement.
+      if (isBulkSession && (await hasBulkAccess(ownerUserId))) {
+        // Bulk session with an active bulk pass → consume one slot.
+        // Credits are NOT deducted; the bulk pass is the entitlement.
         const slotConsumed = await consumeBulkSlot(ownerUserId);
         if (!slotConsumed) {
+          // hasBulkAccess said yes but consumeBulkSlot failed — race condition
+          // (another request used the last slot between the two calls). Treat
+          // it as exhausted rather than silently charging credits.
           res.status(402).json({
             error: "You have no remaining CV slots. Purchase a new Bulk pass to continue.",
             code: "BULK_SLOTS_EXHAUSTED",
@@ -434,7 +437,9 @@ router.post("/applications/:id/analyze", async (req, res) => {
           return;
         }
       } else {
-        // Regular analysis: deduct from credit balance
+        // No bulk pass (or not a bulk session) → deduct from credit balance.
+        // This covers: regular single-CV analyses, Pro users using bulk mode
+        // against their monthly 100-credit allowance, and free users.
         const baseCost = CREDIT_COSTS.cv_optimization;
         if (baseCost > 0) {
           const spend = await spendCredits(ownerUserId, baseCost, "cv_optimization", {
