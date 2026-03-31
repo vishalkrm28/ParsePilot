@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, count } from "drizzle-orm";
-import { db, applicationsTable, usersTable } from "@workspace/db";
+import { db, applicationsTable } from "@workspace/db";
 import {
   CreateApplicationBody,
   UpdateApplicationBody,
@@ -623,14 +623,16 @@ router.post("/applications/:id/cover-letter", requirePro, async (req, res) => {
       return;
     }
 
-    // Fetch the user's real name to pin in the cover letter signature
+    // Derive candidate name from the uploaded CV, not the Clerk account.
+    // Priority: parsedCvJson.name (AI-extracted) → first non-blank line of original CV text.
     let candidateName: string | undefined;
-    if (ownerUserId) {
-      const [dbUser] = await db.select().from(usersTable).where(eq(usersTable.id, ownerUserId));
-      const firstName = dbUser?.firstName?.trim() ?? "";
-      const lastName = dbUser?.lastName?.trim() ?? "";
-      const full = [firstName, lastName].filter(Boolean).join(" ");
-      if (full) candidateName = full;
+    const parsedCvForName = app.parsedCvJson as Record<string, unknown> | null;
+    const nameFromParsed = typeof parsedCvForName?.name === "string" ? parsedCvForName.name.trim() : "";
+    if (nameFromParsed) {
+      candidateName = nameFromParsed;
+    } else if (app.originalCvText) {
+      const firstLine = app.originalCvText.split("\n").map((l: string) => l.trim()).find((l: string) => l.length > 0);
+      if (firstLine) candidateName = firstLine;
     }
 
     const coverLetterText = await generateCoverLetter({
