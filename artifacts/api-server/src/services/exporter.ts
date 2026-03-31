@@ -1093,24 +1093,24 @@ body{font-family:'Calibri','Segoe UI',system-ui,-apple-system,Arial,sans-serif;
 @media print{
   body{background:#fff}
   .banner{display:none!important}
-  /* Move margins into content padding so @page margin can be 0,
-     which suppresses the browser's default URL / page-number header+footer */
-  .doc{margin:0;padding:22mm 22mm;box-shadow:none;border-radius:0;width:100%;max-width:100%}
+  /* @page margins handle spacing on every page incl. overflow pages */
+  .doc{margin:0;padding:0;box-shadow:none;border-radius:0;width:100%;max-width:100%}
   .cv-ci a{color:#6B7280!important}
   .cv-section{break-after:avoid;page-break-after:avoid}
   .cv-job-header{break-after:avoid;page-break-after:avoid}
   .cv-edu-institution{break-after:avoid;page-break-after:avoid}
   .cv-bullets li{text-align:left}
 }
-/* margin:0 removes the browser header/footer (URL, page number) strip */
-@page{size:A4;margin:0}
+/* Proper margins applied to every page (including overflow pages).
+   In Chrome print dialog → uncheck "Headers and footers" to hide the URL strip. */
+@page{size:A4;margin:18mm 22mm}
 </style>
 </head>
 <body>
 <div class="banner">
   <div>
     <strong>ParsePilot AI — ${esc(pageTitle)}</strong>
-    <p>Ctrl+P (Cmd+P on Mac) → Save as PDF · Leave margins as "Default"</p>
+    <p>Ctrl+P (Cmd+P on Mac) → Save as PDF · Uncheck "Headers and footers" to hide the URL</p>
   </div>
   <button class="btn" onclick="window.print()">⬇ Save as PDF</button>
 </div>
