@@ -43,6 +43,7 @@ import { UpgradeCTACard } from "@/components/results/upgrade-cta-card";
 import { UpgradeButton } from "@/components/billing/upgrade-button";
 import { UnlockButton } from "@/components/billing/unlock-button";
 import { FreeResultsView } from "@/components/results/free-results-view";
+import { CvRenderer } from "@/components/results/cv-renderer";
 
 // ─── Analysis progress steps shown during loading ─────────────────────────────
 
@@ -284,6 +285,7 @@ export default function ApplicationDetail() {
   // Editable CV state (Pro only — server rejects saves from free users)
   const [editedCv, setEditedCv] = useState<string | null>(null);
   const cvDirty = editedCv !== null;
+  const [isEditingCv, setIsEditingCv] = useState(false);
 
   // Editable cover letter state (Pro only)
   const [editedCover, setEditedCover] = useState<string | null>(null);
@@ -733,7 +735,7 @@ export default function ApplicationDetail() {
                     </Button>
                   </Card>
                 ) : (
-                  /* Pro user — tailored CV fully editable */
+                  /* Pro user — tailored CV with formatted view + optional edit mode */
                   <Card>
                     <CardContent className="p-0">
                       <div className="bg-muted px-6 py-3 border-b border-border flex justify-between items-center rounded-t-2xl">
@@ -741,21 +743,21 @@ export default function ApplicationDetail() {
                           Tailored CV
                           {cvDirty && <span className="ml-2 text-amber-600 font-bold">· Unsaved changes</span>}
                         </span>
-                        <div className="flex gap-2">
-                          {cvDirty && (
+                        <div className="flex gap-2 items-center">
+                          {isEditingCv && cvDirty && (
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => setEditedCv(null)}
+                              onClick={() => { setEditedCv(null); setIsEditingCv(false); }}
                               className="text-muted-foreground"
                             >
                               Discard
                             </Button>
                           )}
-                          {cvDirty && (
+                          {isEditingCv && cvDirty && (
                             <Button
                               size="sm"
-                              onClick={handleSaveCv}
+                              onClick={async () => { await handleSaveCv(); setIsEditingCv(false); }}
                               disabled={saveCvMutation.isPending}
                               className="gap-1.5"
                             >
@@ -767,6 +769,25 @@ export default function ApplicationDetail() {
                               Save
                             </Button>
                           )}
+                          {isEditingCv ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => { setIsEditingCv(false); if (!cvDirty) setEditedCv(null); }}
+                              className="text-muted-foreground"
+                            >
+                              Done
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsEditingCv(true)}
+                              className="text-muted-foreground"
+                            >
+                              Edit
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -776,18 +797,23 @@ export default function ApplicationDetail() {
                           </Button>
                         </div>
                       </div>
-                      <Textarea
-                        value={currentCvText}
-                        onChange={(e) => {
-                          if (e.target.value !== app.tailoredCvText) {
-                            setEditedCv(e.target.value);
-                          } else {
-                            setEditedCv(null);
-                          }
-                        }}
-                        className="min-h-[600px] border-0 rounded-none rounded-b-2xl focus-visible:ring-0 resize-none font-mono text-sm p-6"
-                        placeholder="Tailored CV will appear here after analysis…"
-                      />
+
+                      {isEditingCv ? (
+                        <Textarea
+                          value={currentCvText}
+                          onChange={(e) => {
+                            if (e.target.value !== app.tailoredCvText) {
+                              setEditedCv(e.target.value);
+                            } else {
+                              setEditedCv(null);
+                            }
+                          }}
+                          className="min-h-[600px] border-0 rounded-none rounded-b-2xl focus-visible:ring-0 resize-none font-mono text-sm p-6"
+                          placeholder="Tailored CV will appear here after analysis…"
+                        />
+                      ) : (
+                        <CvRenderer text={currentCvText} className="min-h-[600px] rounded-b-2xl" />
+                      )}
                     </CardContent>
                   </Card>
                 )}
