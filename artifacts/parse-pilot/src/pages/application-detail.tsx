@@ -1421,13 +1421,15 @@ export default function ApplicationDetail() {
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  className="flex-1"
+                  size="sm"
+                  className="flex-1 h-10 text-sm"
                   onClick={() => setExportConfirmUrl(null)}
                 >
                   Review again
                 </Button>
                 <Button
-                  className="flex-1"
+                  size="sm"
+                  className="flex-1 h-10 text-sm"
                   onClick={() => {
                     window.open(exportConfirmUrl, "_blank");
                     setExportConfirmUrl(null);
