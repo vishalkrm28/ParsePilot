@@ -103,6 +103,7 @@ router.get("/_admin/user/:userId/applications", async (req, res) => {
         keywordMatchScore: applicationsTable.keywordMatchScore,
         status: applicationsTable.status,
         createdAt: applicationsTable.createdAt,
+        ipAddress: applicationsTable.ipAddress,
       })
       .from(applicationsTable)
       .where(eq(applicationsTable.userId, userId))
