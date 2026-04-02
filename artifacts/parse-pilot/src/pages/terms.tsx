@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
+import { LogoBrand } from "@/components/brand/logo";
 import { Footer } from "@/components/layout/footer";
 
 const sections: { title: string; content: React.ReactNode }[] = [
@@ -208,8 +209,8 @@ export default function Terms() {
             <ArrowLeft className="w-4 h-4" />
             Back to ResuOne
           </Link>
-          <Link href="/" className="flex items-center">
-            <img src="/resuone-logo.png" alt="ResuOne" className="h-7 w-auto object-contain" />
+          <Link href="/">
+            <LogoBrand size="sm" />
           </Link>
         </div>
       </header>

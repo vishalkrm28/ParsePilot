@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { LogoBrand } from "@/components/brand/logo";
 import { useMutation } from "@tanstack/react-query";
 import { startRecruiterCheckout } from "@/lib/recruiter-api";
 import { CheckCircle2, Users, Zap, Shield, ArrowRight, Loader2 } from "lucide-react";
@@ -48,8 +49,8 @@ export default function RecruiterPricing() {
       {/* Nav */}
       <header className="border-b border-border/40 bg-background/95 backdrop-blur sticky top-0 z-30">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center">
-            <img src="/resuone-logo.png" alt="ResuOne" className="h-8 w-auto object-contain" />
+          <Link href="/">
+            <LogoBrand size="md" />
           </Link>
           <Link href="/recruiter/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             ← Back to Dashboard

@@ -11,6 +11,7 @@ import {
   LayoutGrid,
   CreditCard,
 } from "lucide-react";
+import { LogoBrand } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -63,9 +64,7 @@ export function Sidebar() {
       {/* Brand */}
       <div className="px-5 py-4 border-b border-sidebar-border">
         <Link href="/">
-          <div className="cursor-pointer flex items-center">
-            <img src="/resuone-logo.png" alt="ResuOne" className="h-9 w-auto object-contain" />
-          </div>
+          <LogoBrand size="md" className="cursor-pointer text-sidebar-foreground" />
         </Link>
       </div>
 

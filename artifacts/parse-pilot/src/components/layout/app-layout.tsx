@@ -2,6 +2,7 @@ import { Sidebar } from "./sidebar";
 import { useState } from "react";
 import { Menu } from "lucide-react";
 import { Link } from "wouter";
+import { LogoBrand } from "@/components/brand/logo";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -36,9 +37,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div className="flex items-center">
-            <img src="/resuone-logo.png" alt="ResuOne" className="h-7 w-auto object-contain" />
-          </div>
+          <LogoBrand size="sm" />
           <div className="w-9" /> {/* spacer */}
         </header>
 

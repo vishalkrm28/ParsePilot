@@ -1,3 +1,15 @@
 <svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="180" height="180" rx="36" fill="#FF3C00"/>
+  <!-- Purple rounded square background -->
+  <rect width="180" height="180" rx="40" fill="#6E42F0"/>
+
+  <!-- Document lines (CV representation) -->
+  <!-- Header / name line — full width, thick -->
+  <rect x="38" y="45" width="104" height="18" rx="9" fill="white"/>
+  <!-- Body line 1 — medium -->
+  <rect x="38" y="77" width="72" height="13" rx="6.5" fill="white" fill-opacity="0.78"/>
+  <!-- Body line 2 — slightly longer -->
+  <rect x="38" y="100" width="88" height="13" rx="6.5" fill="white" fill-opacity="0.78"/>
+
+  <!-- ATS checkmark — bottom area -->
+  <path d="M 40 135 L 62 157 L 102 117" stroke="white" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

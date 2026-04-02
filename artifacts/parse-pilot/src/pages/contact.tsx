@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, Mail, Send, CheckCircle } from "lucide-react";
+import { LogoBrand } from "@/components/brand/logo";
 import { Footer } from "@/components/layout/footer";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -70,8 +71,8 @@ export default function Contact() {
       {/* Nav */}
       <header className="border-b border-border/40">
         <div className="max-w-4xl mx-auto px-6 py-3 flex items-center justify-between">
-          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
-            <img src="/resuone-logo.png" alt="ResuOne" className="h-8 w-auto object-contain" />
+          <Link href="/" className="hover:opacity-80 transition-opacity">
+            <LogoBrand size="md" />
           </Link>
           <Link
             href="/"

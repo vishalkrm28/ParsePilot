@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { LogoBrand } from "@/components/brand/logo";
 
 export function Footer() {
   return (
@@ -7,7 +8,7 @@ export function Footer() {
 
         {/* Brand mark */}
         <div className="flex items-center justify-center mb-10">
-          <img src="/resuone-logo.png" alt="ResuOne" className="h-10 w-auto object-contain" />
+          <LogoBrand size="lg" />
         </div>
 
         {/* Main bold statement */}

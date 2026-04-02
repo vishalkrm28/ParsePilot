@@ -2,6 +2,7 @@ import { useAuth } from "@workspace/replit-auth-web";
 import { useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { Footer } from "@/components/layout/footer";
+import { LogoBrand } from "@/components/brand/logo";
 import {
   Sparkles,
   FileText,
@@ -199,9 +200,7 @@ export default function Landing() {
       {/* ── Nav ─────────────────────────────────────────────────────────── */}
       <nav className="border-b border-border/50 sticky top-0 z-50 bg-background/90 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center">
-            <img src="/resuone-logo.png" alt="ResuOne" className="h-9 w-auto object-contain" />
-          </div>
+          <LogoBrand size="md" />
 
           <div className="flex items-center gap-6">
             <a

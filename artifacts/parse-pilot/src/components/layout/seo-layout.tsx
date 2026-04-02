@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Link } from "wouter";
 import { ArrowRight } from "lucide-react";
 import { Footer } from "@/components/layout/footer";
+import { LogoBrand } from "@/components/brand/logo";
 
 interface SeoLayoutProps {
   title: string;
@@ -26,8 +27,8 @@ export function SeoLayout({ title, description, children }: SeoLayoutProps) {
       {/* Nav */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border/40">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center">
-            <img src="/resuone-logo.png" alt="ResuOne" className="h-8 w-auto object-contain" />
+          <Link href="/">
+            <LogoBrand size="md" />
           </Link>
           <div className="flex items-center gap-4 text-sm">
             <Link href="/blog" className="text-muted-foreground hover:text-foreground transition-colors hidden sm:block">Blog</Link>
