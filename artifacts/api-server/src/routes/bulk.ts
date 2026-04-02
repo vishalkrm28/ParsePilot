@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, eq, desc, count, max, avg, sql, inArray } from "drizzle-orm";
-import { db, usersTable, bulkPassesTable, bulkSessionsTable, applicationsTable } from "@workspace/db";
+import { db, usersTable, bulkPassesTable, bulkSessionsTable, applicationsTable, usageBalancesTable } from "@workspace/db";
 import { z } from "zod";
 import type Stripe from "stripe";
 import { getStripe, ensureStripeCustomer } from "../lib/stripe.js";
@@ -96,46 +96,59 @@ router.post("/billing/bulk-checkout", async (req, res) => {
   const userId = req.user.id;
 
   // ── Pro override: use credits instead of Stripe checkout ──────────────────
+  // Only applies when the user has enough credits — otherwise fall through to
+  // Stripe so they can purchase additional capacity with real money.
   const isPro = await isUserPro(userId);
   if (isPro) {
     const creditCost = tierConfig.cvLimit;
-    const result = await spendCredits(userId, creditCost, "cv_optimization", {
-      bulkTier: tier,
-      cvLimit: tierConfig.cvLimit,
-      source: "bulk_pro_override",
-    });
+    const [balance] = await db
+      .select({ availableCredits: usageBalancesTable.availableCredits })
+      .from(usageBalancesTable)
+      .where(eq(usageBalancesTable.userId, userId))
+      .limit(1);
+    const available = balance?.availableCredits ?? 0;
 
-    if (!result.success) {
-      res.status(402).json({
-        error: `Not enough credits. This bulk tier requires ${creditCost} credits but you only have ${result.remaining} remaining.`,
-        code: "CREDITS_EXHAUSTED",
-        creditsRequired: creditCost,
-        creditsAvailable: result.remaining,
+    if (available >= creditCost) {
+      const result = await spendCredits(userId, creditCost, "cv_optimization", {
+        bulkTier: tier,
+        cvLimit: tierConfig.cvLimit,
+        source: "bulk_pro_override",
+      });
+
+      if (!result.success) {
+        res.status(402).json({
+          error: `Not enough credits. This bulk tier requires ${creditCost} credits but you only have ${result.remaining} remaining.`,
+          code: "CREDITS_EXHAUSTED",
+          creditsRequired: creditCost,
+          creditsAvailable: result.remaining,
+        });
+        return;
+      }
+
+      // Record a "paid" bulk pass directly (no Stripe session needed)
+      const [pass] = await db
+        .insert(bulkPassesTable)
+        .values({
+          userId,
+          tier,
+          cvLimit: tierConfig.cvLimit,
+          cvsUsed: 0,
+          status: "paid",
+          amountPaid: 0,
+          currency: "usd",
+        })
+        .returning();
+
+      res.json({
+        mode: "pro_credits",
+        bulkPassId: pass.id,
+        creditCost,
+        remaining: result.remaining,
       });
       return;
     }
-
-    // Record a "paid" bulk pass directly (no Stripe session needed)
-    const [pass] = await db
-      .insert(bulkPassesTable)
-      .values({
-        userId,
-        tier,
-        cvLimit: tierConfig.cvLimit,
-        cvsUsed: 0,
-        status: "paid",
-        amountPaid: 0,
-        currency: "usd",
-      })
-      .returning();
-
-    res.json({
-      mode: "pro_credits",
-      bulkPassId: pass.id,
-      creditCost,
-      remaining: result.remaining,
-    });
-    return;
+    // Not enough credits — fall through to Stripe checkout below
+    logger.info({ userId, creditCost, available }, "Pro bulk: insufficient credits, routing to Stripe");
   }
 
   // ── Standard Stripe checkout ──────────────────────────────────────────────
