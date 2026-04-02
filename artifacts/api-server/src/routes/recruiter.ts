@@ -261,7 +261,7 @@ router.post("/recruiter/candidates/:id/invite", async (req, res) => {
       .where(eq(candidatesTable.id, candidate.id));
 
     // Send email
-    const origin = req.headers.origin ?? `https://parsepilot.io`;
+    const origin = req.headers.origin ?? `https://resuone.com`;
     try {
       await sendInviteEmail({
         to: candidate.email,
@@ -303,7 +303,7 @@ router.post("/recruiter/bulk-invite", async (req, res) => {
   if (!parsed.success) { res.status(400).json({ error: "Validation failed" }); return; }
 
   const results: { id: string; success: boolean; error?: string }[] = [];
-  const origin = req.headers.origin ?? "https://parsepilot.io";
+  const origin = req.headers.origin ?? "https://resuone.com";
 
   for (const candidateId of parsed.data.candidateIds) {
     try {

@@ -48,10 +48,10 @@ router.post("/contact", async (req, res) => {
         });
 
         await transporter.sendMail({
-          from: `"ParsePilot" <${smtpUser}>`,
+          from: `"ResuOne" <${smtpUser}>`,
           to: smtpUser,
           replyTo: email,
-          subject: `New Contact Message from ${name} – ParsePilot`,
+          subject: `New Contact Message from ${name} – ResuOne`,
           text: [
             `Name:    ${name}`,
             `Email:   ${email}`,

@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Sparkles, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Footer } from "@/components/layout/footer";
 
 const sections: { title: string; content: React.ReactNode }[] = [
@@ -7,8 +7,9 @@ const sections: { title: string; content: React.ReactNode }[] = [
     title: "Introduction",
     content: (
       <p>
-        ResuOne provides AI-assisted resume analysis and optimization tools. By using this
-        service, you agree to these terms. If you don't agree, please don't use the service.
+        ResuOne provides AI-assisted resume analysis, optimisation, and recruiter workflow tools.
+        By using this service, you agree to these terms. If you don't agree, please don't use
+        the service.
       </p>
     ),
   },
@@ -16,9 +17,10 @@ const sections: { title: string; content: React.ReactNode }[] = [
     title: "Use of Service",
     content: (
       <ul className="list-disc list-inside space-y-2">
-        <li>Use ResuOne for personal job applications only.</li>
-        <li>Do not copy, resell, or exploit the platform or its outputs.</li>
+        <li>Use ResuOne for lawful purposes only — whether for personal job seeking or legitimate professional recruiting activities.</li>
+        <li>Do not copy, resell, or exploit the platform or its outputs commercially without our consent.</li>
         <li>Do not attempt to reverse-engineer, scrape, or overload the service.</li>
+        <li>Do not upload or process data belonging to individuals without their knowledge and consent.</li>
       </ul>
     ),
   },
@@ -27,12 +29,12 @@ const sections: { title: string; content: React.ReactNode }[] = [
     content: (
       <>
         <p>
-          ResuOne provides suggestions and analysis only. We don't guarantee any specific
-          outcome — including interviews, job offers, or application success.
+          ResuOne provides suggestions and analysis only. We don't guarantee any specific outcome —
+          including interviews, job offers, application success, or recruitment placements.
         </p>
         <p className="mt-3">
-          AI-generated content is a starting point. Always review and personalise what's
-          produced before submitting it.
+          AI-generated content is a starting point. Always review and personalise what's produced
+          before submitting it.
         </p>
       </>
     ),
@@ -42,8 +44,9 @@ const sections: { title: string; content: React.ReactNode }[] = [
     content: (
       <ul className="list-disc list-inside space-y-2">
         <li>You are responsible for reviewing all generated content before use.</li>
-        <li>Do not include false, misleading, or fabricated information in your applications.</li>
+        <li>Do not include false, misleading, or fabricated information in any application or candidate record.</li>
         <li>ResuOne will never invent experience — but you must verify what's produced.</li>
+        <li>If you use Recruiter Mode, you are responsible for ensuring that any candidate data you upload or manage complies with applicable employment and data protection laws.</li>
       </ul>
     ),
   },
@@ -52,12 +55,12 @@ const sections: { title: string; content: React.ReactNode }[] = [
     content: (
       <>
         <p>
-          ResuOne is designed as a CV analysis and optimization tool.
+          ResuOne is designed as a CV analysis and optimisation tool.
         </p>
         <p className="mt-3">
           While we aim to preserve the structure and clarity of your CV, formatting and layout may
-          vary depending on the content and processing. ResuOne does not guarantee exact
-          formatting replication and is not intended to function as a resume builder.
+          vary depending on the content and processing. ResuOne does not guarantee exact formatting
+          replication and is not intended to function as a resume builder.
         </p>
         <p className="mt-3">
           Users are responsible for reviewing and finalizing the formatting before using their CV
@@ -71,8 +74,9 @@ const sections: { title: string; content: React.ReactNode }[] = [
     content: (
       <>
         <p>
-          One-time unlocks and subscription fees are non-refundable unless required by applicable
-          law. Pricing may change over time — we'll communicate any changes in advance.
+          One-time unlocks, subscription fees, and add-on purchases are non-refundable unless
+          required by applicable law. Pricing may change over time — we'll communicate any changes
+          in advance.
         </p>
         <p className="mt-3">
           Payments are processed securely by Stripe. ResuOne does not store your payment card
@@ -98,7 +102,7 @@ const sections: { title: string; content: React.ReactNode }[] = [
             <li>3 AI analyses included as a one-time allowance when you sign up — these do not reset monthly.</li>
             <li>Results are locked behind a one-time $6.99 per-result unlock fee.</li>
             <li>Access to ATS match score and keyword gap preview only without unlocking.</li>
-            <li>Bulk Mode is not available on the Free plan.</li>
+            <li>Bulk Mode and Recruiter Mode are not available on the Free plan.</li>
             <li>Cover letter generation is not available on the Free plan.</li>
           </ul>
         </div>
@@ -111,7 +115,7 @@ const sections: { title: string; content: React.ReactNode }[] = [
             <li>All results fully unlocked — no per-result fees.</li>
             <li>Full access to ATS-optimised CV output, keyword analysis, cover letter generation, and section suggestions.</li>
             <li>Pro is intended for personal use — you may re-analyse your own CV against different job descriptions as many times as you like within your monthly credit allowance.</li>
-            <li>Analysing CVs belonging to other individuals is not permitted under the Pro plan. Use Bulk Mode for multi-candidate analysis.</li>
+            <li>Analysing CVs belonging to other individuals is not permitted under the Pro plan. Use Bulk Mode or Recruiter Mode for multi-candidate workflows.</li>
             <li>Unused monthly credits expire at the end of each billing cycle and do not carry over.</li>
             <li>Pro subscription renews automatically each month until cancelled.</li>
             <li>You may cancel at any time; access continues until the end of the current billing period.</li>
@@ -133,6 +137,21 @@ const sections: { title: string; content: React.ReactNode }[] = [
           </ul>
         </div>
 
+        {/* Recruiter Mode */}
+        <div className="mb-5">
+          <p className="font-semibold text-foreground mb-2">Recruiter Mode</p>
+          <ul className="list-disc list-inside space-y-1">
+            <li>Available as an add-on subscription: Solo ($29.99/month) or Team ($79/month).</li>
+            <li>Provides access to a candidate pipeline, notes timeline, pipeline stage management, and bulk CSV import of candidates.</li>
+            <li>Solo plan is intended for individual recruiters managing their own pipeline.</li>
+            <li>Team plan extends access for collaborative use within a single organisation.</li>
+            <li>Recruiter subscriptions renew automatically each month until cancelled.</li>
+            <li>You may cancel at any time; access continues until the end of the current billing period.</li>
+            <li>You are responsible for ensuring that any personal data of candidates you process through Recruiter Mode is handled in compliance with applicable laws, including GDPR where relevant.</li>
+            <li>Recruiter Mode is not a replacement for professional HR or legal advice.</li>
+          </ul>
+        </div>
+
         {/* General */}
         <div>
           <p className="font-semibold text-foreground mb-2">General Credit Restrictions</p>
@@ -149,9 +168,9 @@ const sections: { title: string; content: React.ReactNode }[] = [
     title: "Limitation of Liability",
     content: (
       <p>
-        ResuOne is not responsible for decisions made based on generated output, or for any
-        direct or indirect losses arising from use of the service. Use it as a tool, not as
-        professional career advice.
+        ResuOne is not responsible for decisions made based on generated output, hiring or
+        employment decisions, or for any direct or indirect losses arising from use of the
+        service. Use it as a tool, not as professional career or HR advice.
       </p>
     ),
   },
@@ -160,7 +179,20 @@ const sections: { title: string; content: React.ReactNode }[] = [
     content: (
       <p>
         We may update these terms over time. Continued use of ResuOne after changes are
-        published constitutes acceptance of the revised terms.
+        published constitutes acceptance of the revised terms. Material changes will be
+        communicated via email or an in-app notice where reasonably practicable.
+      </p>
+    ),
+  },
+  {
+    title: "Contact",
+    content: (
+      <p>
+        For questions about these terms, please contact us at{" "}
+        <a href="mailto:help@resuone.com" className="text-primary underline underline-offset-2">
+          help@resuone.com
+        </a>
+        .
       </p>
     ),
   },
@@ -176,12 +208,9 @@ export default function Terms() {
             <ArrowLeft className="w-4 h-4" />
             Back to ResuOne
           </Link>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
-              <Sparkles className="w-3 h-3 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-sm">ResuOne</span>
-          </div>
+          <Link href="/" className="flex items-center">
+            <img src="/resuone-logo.png" alt="ResuOne" className="h-7 w-auto object-contain" />
+          </Link>
         </div>
       </header>
 
@@ -192,7 +221,7 @@ export default function Terms() {
           <h1 className="text-4xl font-extrabold tracking-tight text-foreground mb-4">
             Terms of Service
           </h1>
-          <p className="text-muted-foreground text-sm">Last updated: March 2026</p>
+          <p className="text-muted-foreground text-sm">Last updated: April 2026</p>
         </div>
 
         <div className="space-y-10">

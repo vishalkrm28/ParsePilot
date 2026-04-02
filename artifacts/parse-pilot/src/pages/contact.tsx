@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Sparkles, ArrowLeft, Mail, Send, CheckCircle } from "lucide-react";
+import { ArrowLeft, Mail, Send, CheckCircle } from "lucide-react";
 import { Footer } from "@/components/layout/footer";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -59,9 +59,9 @@ export default function Contact() {
       setStatus("success");
       setForm({ name: "", email: "", message: "" });
       trackEvent("contact_submitted", { hasUser: !!document.cookie.includes("session") });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStatus("error");
-      setServerError(err.message ?? "Failed to send. Please try again.");
+      setServerError(err instanceof Error ? err.message : "Failed to send. Please try again.");
     }
   };
 
@@ -69,12 +69,9 @@ export default function Contact() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Nav */}
       <header className="border-b border-border/40">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-foreground">ResuOne</span>
+        <div className="max-w-4xl mx-auto px-6 py-3 flex items-center justify-between">
+          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+            <img src="/resuone-logo.png" alt="ResuOne" className="h-8 w-auto object-contain" />
           </Link>
           <Link
             href="/"
@@ -209,11 +206,11 @@ export default function Contact() {
 
               {/* Direct email */}
               <a
-                href="mailto:help@parsepilot.io"
+                href="mailto:help@resuone.com"
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Mail className="w-3.5 h-3.5" />
-                help@parsepilot.io
+                help@resuone.com
               </a>
             </div>
           </form>
@@ -223,8 +220,8 @@ export default function Contact() {
         {status !== "success" && (
           <p className="mt-8 text-xs text-muted-foreground/70 text-center">
             Or email us directly at{" "}
-            <a href="mailto:help@parsepilot.io" className="underline underline-offset-2 hover:text-muted-foreground transition-colors">
-              help@parsepilot.io
+            <a href="mailto:help@resuone.com" className="underline underline-offset-2 hover:text-muted-foreground transition-colors">
+              help@resuone.com
             </a>
           </p>
         )}
