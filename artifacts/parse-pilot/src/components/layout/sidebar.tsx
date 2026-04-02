@@ -8,6 +8,9 @@ import {
   ChevronRight,
   Settings2,
   Users,
+  BriefcaseBusiness,
+  LayoutGrid,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +19,12 @@ const navItems = [
   { href: "/new", label: "New Application", icon: FilePlus2 },
   { href: "/bulk/history", label: "Bulk Mode", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings2 },
+];
+
+const recruiterItems = [
+  { href: "/recruiter/dashboard", label: "Candidates", icon: BriefcaseBusiness },
+  { href: "/recruiter/pipeline", label: "Pipeline", icon: LayoutGrid },
+  { href: "/recruiter/pricing", label: "Recruiter Plans", icon: CreditCard },
 ];
 
 function UserAvatar({ name, imageUrl }: { name: string; imageUrl?: string | null }) {
@@ -102,6 +111,44 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Recruiter section */}
+        <div className="pt-3">
+          <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+            Recruiter
+          </p>
+          {recruiterItems.map(({ href, label, icon: Icon }) => {
+            const isRecruiterActive =
+              href === "/recruiter/dashboard"
+                ? location.startsWith("/recruiter") && !location.startsWith("/recruiter/pricing")
+                : location === href;
+            return (
+              <Link key={href} href={href}>
+                <div
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors group",
+                    isRecruiterActive
+                      ? "bg-primary/15 text-primary"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      "w-4 h-4 flex-shrink-0",
+                      isRecruiterActive
+                        ? "text-primary"
+                        : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground",
+                    )}
+                  />
+                  <span className="flex-1">{label}</span>
+                  {isRecruiterActive && (
+                    <ChevronRight className="w-3.5 h-3.5 text-primary/60" />
+                  )}
+                </div>
+              </Link>
+            );
+          })}
+        </div>
       </nav>
 
       {/* User footer */}

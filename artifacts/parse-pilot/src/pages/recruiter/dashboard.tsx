@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
   getCandidates, getRecruiterAnalytics, updateCandidateStatus,
-  deleteCandidate, sendInvite, bulkInvite, createCandidate
+  deleteCandidate, sendInvite, bulkInvite, createCandidate, getRecruiterAccess
 } from "@/lib/recruiter-api";
 import { Loader2, Users, Mail, CheckCircle2, XCircle, Search, Upload,
   ChevronDown, Trash2, LayoutGrid, BarChart3, Plus, ArrowRight, FileText, Download } from "lucide-react";
@@ -28,6 +28,9 @@ export default function RecruiterDashboard() {
   const [addOpen, setAddOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [analysesImportOpen, setAnalysesImportOpen] = useState(false);
+
+  const { data: accessData } = useQuery({ queryKey: ["recruiter-access"], queryFn: getRecruiterAccess });
+  const hasAccess = accessData?.hasAccess ?? false;
 
   const { data: analytics } = useQuery({ queryKey: ["recruiter-analytics"], queryFn: getRecruiterAnalytics });
   const { data, isLoading } = useQuery({ queryKey: ["candidates"], queryFn: getCandidates });
@@ -99,6 +102,23 @@ export default function RecruiterDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Paywall banner */}
+        {accessData !== undefined && !hasAccess && (
+          <div className="mb-8 rounded-2xl border-2 border-primary/30 bg-gradient-to-r from-primary/5 to-violet-500/5 p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex-1">
+              <p className="font-bold text-foreground text-lg mb-1">Activate Recruiter Mode</p>
+              <p className="text-muted-foreground text-sm">
+                Manage your hiring pipeline, send interview invites, import CVs, and track candidates — all in one place.
+              </p>
+            </div>
+            <Link href="/recruiter/pricing">
+              <button className="shrink-0 flex items-center gap-2 bg-primary text-primary-foreground font-semibold px-5 py-2.5 rounded-xl hover:bg-primary/90 transition-colors text-sm">
+                View Recruiter Plans →
+              </button>
+            </Link>
+          </div>
+        )}
+
         {/* KPI Strip */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {kpis.map(k => (
