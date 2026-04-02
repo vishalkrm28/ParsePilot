@@ -73,6 +73,65 @@ export async function bulkInvite(data: {
   return res.json();
 }
 
+// ─── Notes ───────────────────────────────────────────────────────────────────
+
+export async function getCandidateNotes(candidateId: string) {
+  const res = await authedFetch(`${BASE}/recruiter/candidates/${candidateId}/notes`);
+  if (!res.ok) throw new Error("Failed to load notes");
+  return res.json();
+}
+
+export async function addCandidateNote(candidateId: string, text: string) {
+  const res = await authedFetch(`${BASE}/recruiter/candidates/${candidateId}/notes`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) { const e = await res.json(); throw new Error(e.error ?? "Failed"); }
+  return res.json();
+}
+
+export async function deleteCandidateNote(candidateId: string, noteId: string) {
+  const res = await authedFetch(`${BASE}/recruiter/candidates/${candidateId}/notes/${noteId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete note");
+  return res.json();
+}
+
+// ─── Import from analyses ─────────────────────────────────────────────────────
+
+export async function getImportSources() {
+  const res = await authedFetch(`${BASE}/recruiter/import-sources`);
+  if (!res.ok) throw new Error("Failed to load import sources");
+  return res.json();
+}
+
+export async function importFromAnalyses(applicationIds: string[]) {
+  const res = await authedFetch(`${BASE}/recruiter/import-from-analyses`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ applicationIds }),
+  });
+  if (!res.ok) { const e = await res.json(); throw new Error(e.error ?? "Failed to import"); }
+  return res.json();
+}
+
+// ─── Access check ─────────────────────────────────────────────────────────────
+
+export async function getRecruiterAccess() {
+  const res = await authedFetch(`${BASE}/recruiter/access`);
+  if (!res.ok) return { hasAccess: false };
+  return res.json();
+}
+
+// ─── Recruiter checkout ───────────────────────────────────────────────────────
+
+export async function startRecruiterCheckout(plan: "solo" | "team", successUrl: string, cancelUrl: string) {
+  const res = await authedFetch(`${BASE}/billing/checkout-recruiter`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plan, successUrl, cancelUrl }),
+  });
+  if (!res.ok) { const e = await res.json(); throw new Error(e.error ?? "Checkout failed"); }
+  return res.json();
+}
+
 // Public (no auth)
 export async function getInvitePublic(id: string) {
   const res = await fetch(`${BASE}/invite/${id}`);

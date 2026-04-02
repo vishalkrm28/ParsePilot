@@ -28,6 +28,10 @@ export const usersTable = pgTable("users", {
   subscriptionStatus: varchar("subscription_status"),
   subscriptionPriceId: varchar("subscription_price_id"),
   currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+
+  // Recruiter add-on subscription
+  recruiterSubscriptionStatus: varchar("recruiter_subscription_status"),
+  recruiterSubscriptionId: varchar("recruiter_subscription_id"),
 });
 
 export type UpsertUser = typeof usersTable.$inferInsert;

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import nodemailer from "nodemailer";
-import { db, candidatesTable, invitesTable } from "@workspace/db";
+import { db, candidatesTable, invitesTable, candidateNotesTable, applicationsTable, usersTable } from "@workspace/db";
 import { eq, and, desc, count, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 
@@ -396,6 +396,165 @@ router.post("/invite/:id/respond", async (req, res) => {
     }).where(eq(candidatesTable.id, invite.candidateId));
 
     res.json({ invite: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /recruiter/import-sources (CV analyses available to import) ──────────
+router.get("/recruiter/import-sources", async (req, res) => {
+  const recruiterId = req.user!.id;
+  try {
+    const apps = await db
+      .select({
+        id: applicationsTable.id,
+        jobTitle: applicationsTable.jobTitle,
+        company: applicationsTable.company,
+        keywordMatchScore: applicationsTable.keywordMatchScore,
+        parsedCvJson: applicationsTable.parsedCvJson,
+        matchedKeywords: applicationsTable.matchedKeywords,
+        missingKeywords: applicationsTable.missingKeywords,
+        createdAt: applicationsTable.createdAt,
+      })
+      .from(applicationsTable)
+      .where(and(eq(applicationsTable.userId, recruiterId), eq(applicationsTable.status, "analyzed")))
+      .orderBy(desc(applicationsTable.createdAt))
+      .limit(100);
+
+    // Check which ones are already imported
+    const existingAppIds = await db
+      .select({ applicationId: candidatesTable.applicationId })
+      .from(candidatesTable)
+      .where(and(eq(candidatesTable.recruiterId, recruiterId)));
+    const importedIds = new Set(existingAppIds.map(r => r.applicationId?.toString()));
+
+    const sources = apps.map(app => {
+      const cv = app.parsedCvJson as any;
+      return {
+        id: app.id,
+        name: cv?.name ?? "Unknown",
+        email: cv?.email ?? null,
+        score: app.keywordMatchScore,
+        skills: cv?.skills ?? [],
+        jobTitle: app.jobTitle,
+        company: app.company,
+        alreadyImported: importedIds.has(app.id),
+        createdAt: app.createdAt,
+      };
+    });
+
+    res.json({ sources });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /recruiter/import-from-analyses ─────────────────────────────────────
+const ImportBody = z.object({
+  applicationIds: z.array(z.string().uuid()).min(1).max(50),
+});
+
+router.post("/recruiter/import-from-analyses", async (req, res) => {
+  const recruiterId = req.user!.id;
+  const parsed = ImportBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "Validation failed" }); return; }
+
+  const results: { id: string; success: boolean; candidateId?: string; error?: string }[] = [];
+
+  for (const appId of parsed.data.applicationIds) {
+    try {
+      const [app] = await db
+        .select()
+        .from(applicationsTable)
+        .where(and(eq(applicationsTable.id, appId), eq(applicationsTable.userId, recruiterId)));
+
+      if (!app) { results.push({ id: appId, success: false, error: "Not found" }); continue; }
+
+      const cv = app.parsedCvJson as any;
+      const name = cv?.name ?? "Unknown";
+      const email = cv?.email ?? "";
+      const skills: string[] = cv?.skills ?? [];
+      const experience = (cv?.work_experience ?? [])
+        .slice(0, 2).map((j: any) => `${j.title} at ${j.company}`).join("; ");
+
+      const [candidate] = await db.insert(candidatesTable).values({
+        recruiterId, name, email: email || `unknown-${appId.slice(0, 8)}@import`,
+        score: app.keywordMatchScore ?? undefined,
+        skills,
+        experience: experience || undefined,
+        jobTitle: app.jobTitle,
+        company: app.company,
+        applicationId: app.id as any,
+        parsedCvJson: app.parsedCvJson as any,
+        originalCvText: undefined,
+      }).returning();
+
+      results.push({ id: appId, success: true, candidateId: candidate.id });
+    } catch (err: any) {
+      results.push({ id: appId, success: false, error: err.message });
+    }
+  }
+
+  res.json({ results, imported: results.filter(r => r.success).length });
+});
+
+// ─── GET /recruiter/candidates/:id/notes ──────────────────────────────────────
+router.get("/recruiter/candidates/:id/notes", async (req, res) => {
+  const recruiterId = req.user!.id;
+  try {
+    const notes = await db
+      .select()
+      .from(candidateNotesTable)
+      .where(and(eq(candidateNotesTable.candidateId, req.params.id), eq(candidateNotesTable.recruiterId, recruiterId)))
+      .orderBy(desc(candidateNotesTable.createdAt));
+    res.json({ notes });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /recruiter/candidates/:id/notes ─────────────────────────────────────
+router.post("/recruiter/candidates/:id/notes", async (req, res) => {
+  const recruiterId = req.user!.id;
+  const { text } = req.body;
+  if (!text || typeof text !== "string" || !text.trim()) {
+    res.status(400).json({ error: "Note text is required" }); return;
+  }
+  try {
+    const [note] = await db.insert(candidateNotesTable).values({
+      candidateId: req.params.id, recruiterId, text: text.trim(),
+    }).returning();
+    res.status(201).json({ note });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── DELETE /recruiter/candidates/:id/notes/:noteId ───────────────────────────
+router.delete("/recruiter/candidates/:id/notes/:noteId", async (req, res) => {
+  const recruiterId = req.user!.id;
+  try {
+    await db.delete(candidateNotesTable).where(
+      and(eq(candidateNotesTable.id, req.params.noteId), eq(candidateNotesTable.recruiterId, recruiterId))
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /recruiter/access ────────────────────────────────────────────────────
+router.get("/recruiter/access", async (req, res) => {
+  const recruiterId = req.user!.id;
+  try {
+    const [user] = await db
+      .select({ recruiterSubscriptionStatus: usersTable.recruiterSubscriptionStatus })
+      .from(usersTable)
+      .where(eq(usersTable.id, recruiterId));
+
+    const hasAccess = user?.recruiterSubscriptionStatus === "active" ||
+                      user?.recruiterSubscriptionStatus === "trialing";
+    res.json({ hasAccess });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

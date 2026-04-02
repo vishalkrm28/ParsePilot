@@ -361,4 +361,49 @@ router.post("/billing/cancel-subscription", async (req, res) => {
   }
 });
 
+// ─── POST /billing/checkout-recruiter ────────────────────────────────────────
+router.post("/billing/checkout-recruiter", async (req, res) => {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required", code: "UNAUTHENTICATED" }); return;
+  }
+
+  const parsed = CheckoutBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "successUrl and cancelUrl required", code: "VALIDATION_ERROR" }); return;
+  }
+
+  const { plan = "solo" } = req.body as { plan?: string };
+  const priceId = plan === "team"
+    ? process.env.STRIPE_PRICE_RECRUITER_TEAM
+    : process.env.STRIPE_PRICE_RECRUITER_SOLO;
+
+  if (!priceId) {
+    logger.error({ plan }, "Recruiter Stripe price not configured");
+    res.status(503).json({ error: "Recruiter billing not configured yet", code: "BILLING_NOT_CONFIGURED" }); return;
+  }
+
+  try {
+    const stripe = getStripe();
+    const userId = req.user.id;
+    const customerId = await ensureStripeCustomer(userId, req.user.email ?? null);
+
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      mode: "subscription",
+      line_items: [{ price: priceId, quantity: 1 }],
+      metadata: { userId, plan, product: "recruiter" },
+      success_url: `${parsed.data.successUrl}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: parsed.data.cancelUrl,
+      allow_promotion_codes: true,
+      subscription_data: { metadata: { userId, plan, product: "recruiter" } },
+    });
+
+    if (!session.url) throw new Error("No checkout URL returned");
+    res.json({ url: session.url });
+  } catch (err) {
+    logger.error(stripeErrContext(err), "Failed to create recruiter checkout session");
+    res.status(500).json({ error: "Could not start checkout. Please try again.", code: "CHECKOUT_ERROR" });
+  }
+});
+
 export default router;

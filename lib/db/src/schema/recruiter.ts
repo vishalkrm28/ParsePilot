@@ -50,3 +50,16 @@ export const insertInviteSchema = createInsertSchema(invitesTable).omit({ id: tr
 export const selectInviteSchema = createSelectSchema(invitesTable);
 export type Invite = typeof invitesTable.$inferSelect;
 export type InsertInvite = z.infer<typeof insertInviteSchema>;
+
+// ─── Candidate Notes ──────────────────────────────────────────────────────────
+
+export const candidateNotesTable = pgTable("candidate_notes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  candidateId: uuid("candidate_id").notNull(),
+  recruiterId: text("recruiter_id").notNull(),
+  text: text("text").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const insertCandidateNoteSchema = createInsertSchema(candidateNotesTable).omit({ id: true, createdAt: true });
+export type CandidateNote = typeof candidateNotesTable.$inferSelect;

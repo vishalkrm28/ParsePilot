@@ -1,8 +1,14 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useLocation, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getCandidate, updateCandidateStatus } from "@/lib/recruiter-api";
-import { Loader2, ArrowLeft, Mail, CheckCircle2, XCircle, Star, Clock, BarChart3, Briefcase } from "lucide-react";
+import {
+  getCandidate, updateCandidateStatus,
+  getCandidateNotes, addCandidateNote, deleteCandidateNote,
+} from "@/lib/recruiter-api";
+import {
+  Loader2, ArrowLeft, Mail, CheckCircle2, XCircle, Star, Clock,
+  BarChart3, Briefcase, MessageSquare, Trash2, Send,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { InviteModal } from "./invite-modal";
 import { StatusBadge } from "./status-badge";
@@ -13,11 +19,19 @@ export default function CandidateDetail() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const noteInputRef = useRef<HTMLTextAreaElement>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["candidate", id],
     queryFn: () => getCandidate(id),
   });
+
+  const { data: notesData, isLoading: notesLoading } = useQuery({
+    queryKey: ["candidate-notes", id],
+    queryFn: () => getCandidateNotes(id),
+  });
+  const notes: any[] = notesData?.notes ?? [];
 
   const statusMutation = useMutation({
     mutationFn: (status: string) => updateCandidateStatus(id, status),
@@ -27,6 +41,26 @@ export default function CandidateDetail() {
     },
     onError: () => toast({ title: "Update failed", variant: "destructive" }),
   });
+
+  const addNoteMutation = useMutation({
+    mutationFn: (text: string) => addCandidateNote(id, text),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["candidate-notes", id] });
+      setNoteText("");
+    },
+    onError: () => toast({ title: "Failed to add note", variant: "destructive" }),
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: (noteId: string) => deleteCandidateNote(id, noteId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["candidate-notes", id] }),
+    onError: () => toast({ title: "Failed to delete note", variant: "destructive" }),
+  });
+
+  const handleAddNote = () => {
+    if (!noteText.trim()) return;
+    addNoteMutation.mutate(noteText.trim());
+  };
 
   if (isLoading) return (
     <div className="min-h-screen flex items-center justify-center bg-background">
@@ -48,8 +82,6 @@ export default function CandidateDetail() {
   const parsedCv = candidate.parsedCvJson as any;
   const missingKeywords: string[] = parsedCv?.missing_keywords ?? [];
   const workExp = parsedCv?.work_experience ?? [];
-
-  // Build score breakdown from parsedCv or synthesize
   const scoreBreakdown = candidate.scoringBreakdownJson as any ?? null;
 
   const actionButtons = [
@@ -111,7 +143,6 @@ export default function CandidateDetail() {
                 )}
               </div>
 
-              {/* Score bar */}
               {candidate.score != null && (
                 <div>
                   <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
@@ -128,7 +159,7 @@ export default function CandidateDetail() {
             {scoreBreakdown && (
               <div className="border border-border/40 rounded-2xl p-6">
                 <h2 className="font-bold text-foreground mb-4 flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-primary" /> See Match Breakdown
+                  <BarChart3 className="w-4 h-4 text-primary" /> Match Breakdown
                 </h2>
                 <div className="space-y-3">
                   {Object.entries(scoreBreakdown).map(([key, val]: [string, any]) => {
@@ -222,13 +253,73 @@ export default function CandidateDetail() {
               </div>
             )}
 
-            {/* Notes */}
-            {candidate.notes && (
-              <div className="border border-border/40 rounded-2xl p-6">
-                <h2 className="font-bold text-foreground mb-3">Notes</h2>
-                <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">{candidate.notes}</p>
+            {/* ─── Notes Timeline ─────────────────────────────────────────── */}
+            <div className="border border-border/40 rounded-2xl p-6">
+              <h2 className="font-bold text-foreground mb-5 flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-primary" /> Notes
+                {notes.length > 0 && (
+                  <span className="ml-auto text-xs font-normal text-muted-foreground">{notes.length} note{notes.length !== 1 ? "s" : ""}</span>
+                )}
+              </h2>
+
+              {/* Add note input */}
+              <div className="mb-5">
+                <textarea
+                  ref={noteInputRef}
+                  value={noteText}
+                  onChange={e => setNoteText(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAddNote(); }}
+                  placeholder="Add a private note about this candidate… (Cmd+Enter to save)"
+                  rows={3}
+                  className="w-full resize-none rounded-xl border border-border/60 bg-background px-3.5 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <div className="flex justify-end mt-2">
+                  <button
+                    onClick={handleAddNote}
+                    disabled={!noteText.trim() || addNoteMutation.isPending}
+                    className="flex items-center gap-2 bg-primary text-primary-foreground text-xs font-semibold px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50">
+                    {addNoteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                    Add Note
+                  </button>
+                </div>
               </div>
-            )}
+
+              {/* Timeline */}
+              {notesLoading ? (
+                <div className="flex items-center gap-2 py-4 text-muted-foreground text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading notes…
+                </div>
+              ) : notes.length === 0 ? (
+                <div className="text-center py-6">
+                  <MessageSquare className="w-8 h-8 text-muted-foreground/20 mx-auto mb-2" />
+                  <p className="text-muted-foreground text-sm">No notes yet. Add one above.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {notes.map((note: any) => (
+                    <div key={note.id} className="group flex items-start gap-3 p-3.5 rounded-xl bg-muted/15 hover:bg-muted/25 transition-colors">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                        <MessageSquare className="w-3.5 h-3.5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{note.text}</p>
+                        <p className="text-xs text-muted-foreground/60 mt-1.5">
+                          {new Date(note.createdAt).toLocaleString(undefined, {
+                            dateStyle: "medium", timeStyle: "short",
+                          })}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => { if (confirm("Delete this note?")) deleteNoteMutation.mutate(note.id); }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground/40 hover:text-red-500 p-1 rounded-md"
+                        title="Delete note">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* RIGHT: sticky action panel */}
@@ -246,7 +337,6 @@ export default function CandidateDetail() {
 
               <hr className="border-border/40 my-2" />
 
-              {/* Status override */}
               <div>
                 <p className="text-xs text-muted-foreground mb-2">Override status</p>
                 <select value={candidate.status} onChange={e => statusMutation.mutate(e.target.value)}

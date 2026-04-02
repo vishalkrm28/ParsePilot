@@ -28,6 +28,7 @@ import NotFound from "@/pages/not-found";
 import RecruiterDashboard from "@/pages/recruiter/dashboard";
 import RecruiterPipeline from "@/pages/recruiter/pipeline";
 import CandidateDetail from "@/pages/recruiter/candidate-detail";
+import RecruiterPricing from "@/pages/recruiter/pricing";
 import InviteResponse from "@/pages/invite-response";
 import CvMatchScore from "@/pages/seo/cv-match-score";
 import AtsResumeChecker from "@/pages/seo/ats-resume-checker";
@@ -97,6 +98,7 @@ function AppRouter() {
       <Route path="/bulk/sessions/:id" component={BulkSessionDetail} />
       <Route path="/recruiter/dashboard" component={RecruiterDashboard} />
       <Route path="/recruiter/pipeline" component={RecruiterPipeline} />
+      <Route path="/recruiter/pricing" component={RecruiterPricing} />
       <Route path="/candidate/:id" component={CandidateDetail} />
       <Route component={NotFound} />
     </Switch>

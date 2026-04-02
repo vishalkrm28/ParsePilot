@@ -6,11 +6,13 @@ import {
   deleteCandidate, sendInvite, bulkInvite, createCandidate
 } from "@/lib/recruiter-api";
 import { Loader2, Users, Mail, CheckCircle2, XCircle, Search, Upload,
-  ChevronDown, Trash2, LayoutGrid, BarChart3, Plus, ArrowRight } from "lucide-react";
+  ChevronDown, Trash2, LayoutGrid, BarChart3, Plus, ArrowRight, FileText, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { InviteModal } from "./invite-modal";
 import { StatusBadge } from "./status-badge";
 import { AddCandidateModal } from "./add-candidate-modal";
+import { ImportFromAnalysesModal } from "./import-modal";
+import { CsvImportModal } from "./csv-import-modal";
 
 export default function RecruiterDashboard() {
   const [, navigate] = useLocation();
@@ -24,6 +26,8 @@ export default function RecruiterDashboard() {
   const [inviteTarget, setInviteTarget] = useState<{ id: string; name: string; email: string } | null>(null);
   const [bulkInviteOpen, setBulkInviteOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [analysesImportOpen, setAnalysesImportOpen] = useState(false);
 
   const { data: analytics } = useQuery({ queryKey: ["recruiter-analytics"], queryFn: getRecruiterAnalytics });
   const { data, isLoading } = useQuery({ queryKey: ["candidates"], queryFn: getCandidates });
@@ -77,10 +81,16 @@ export default function RecruiterDashboard() {
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <Users className="w-4 h-4 text-primary" /> Recruiter
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Link href="/recruiter/pipeline" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border/40 rounded-lg px-3 py-1.5">
               <LayoutGrid className="w-3.5 h-3.5" /> Pipeline
             </Link>
+            <button onClick={() => setAnalysesImportOpen(true)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border/40 rounded-lg px-3 py-1.5 hover:border-primary/30 transition-colors">
+              <Download className="w-3.5 h-3.5" /> From Analyses
+            </button>
+            <button onClick={() => setCsvImportOpen(true)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border/40 rounded-lg px-3 py-1.5 hover:border-primary/30 transition-colors">
+              <FileText className="w-3.5 h-3.5" /> CSV Import
+            </button>
             <button onClick={() => setAddOpen(true)} className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-primary/90 transition-colors">
               <Plus className="w-3.5 h-3.5" /> Add Candidate
             </button>
@@ -272,6 +282,30 @@ export default function RecruiterDashboard() {
         qc.invalidateQueries({ queryKey: ["recruiter-analytics"] });
         setAddOpen(false);
       }} />}
+
+      {csvImportOpen && (
+        <CsvImportModal
+          onClose={() => setCsvImportOpen(false)}
+          onImported={(count) => {
+            qc.invalidateQueries({ queryKey: ["candidates"] });
+            qc.invalidateQueries({ queryKey: ["recruiter-analytics"] });
+            toast({ title: `${count} candidates imported`, description: "Added from CSV file" });
+            setCsvImportOpen(false);
+          }}
+        />
+      )}
+
+      {analysesImportOpen && (
+        <ImportFromAnalysesModal
+          onClose={() => setAnalysesImportOpen(false)}
+          onImported={(count) => {
+            qc.invalidateQueries({ queryKey: ["candidates"] });
+            qc.invalidateQueries({ queryKey: ["recruiter-analytics"] });
+            toast({ title: `${count} candidates imported`, description: "Imported from your CV analyses" });
+            setAnalysesImportOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }
