@@ -146,6 +146,13 @@ async function onCheckoutSessionCompleted(session: Stripe.Checkout.Session): Pro
     return;
   }
 
+  // Recruiter add-on subscriptions — must be handled before the generic
+  // subscription path so they write to recruiter fields, not Pro fields.
+  if (session.metadata?.product === "recruiter") {
+    await onRecruiterCheckoutCompleted(session);
+    return;
+  }
+
   if (session.mode !== "subscription") {
     logger.debug({ session_id: session.id }, "Ignoring non-subscription checkout session");
     return;
@@ -550,6 +557,12 @@ async function resolveUser(params: UserResolutionParams): Promise<{ id: string }
 
 /** Write all subscription fields to the DB from a Stripe Subscription object. */
 async function applySubscription(userId: string, subscription: Stripe.Subscription): Promise<void> {
+  // Route recruiter subscriptions to separate fields so they never clobber Pro.
+  if (subscription.metadata?.product === "recruiter") {
+    await applyRecruiterSubscription(userId, subscription);
+    return;
+  }
+
   // Defensive: use first item's price if present
   const priceId = subscription.items?.data?.[0]?.price?.id ?? null;
 
@@ -570,8 +583,6 @@ async function applySubscription(userId: string, subscription: Stripe.Subscripti
     .where(eq(usersTable.id, userId));
 
   // Reset Pro credits when the user is active or trialing.
-  // resetProCreditsIfNeeded is idempotent — it only resets if the billing
-  // period has actually changed (guards against duplicate webhook fires).
   if (subscription.status === "active" || subscription.status === "trialing") {
     const periodStart = subscription.current_period_start
       ? new Date(subscription.current_period_start * 1000)
@@ -582,6 +593,54 @@ async function applySubscription(userId: string, subscription: Stripe.Subscripti
 
     await resetProCreditsIfNeeded(userId, periodStart, periodEnd);
   }
+}
+
+// ─── Recruiter subscription helper ────────────────────────────────────────────
+// Writes only the recruiter-specific columns — never touches Pro subscription fields.
+
+async function applyRecruiterSubscription(userId: string, subscription: Stripe.Subscription): Promise<void> {
+  const plan = (subscription.metadata?.plan ?? "solo") as "solo" | "team";
+  const isActive = subscription.status === "active" || subscription.status === "trialing";
+  await db
+    .update(usersTable)
+    .set({
+      recruiterSubscriptionId: subscription.id,
+      recruiterSubscriptionStatus: isActive ? plan : null,
+    })
+    .where(eq(usersTable.id, userId));
+  logger.info({ userId, plan, status: subscription.status }, "Recruiter subscription applied");
+}
+
+// ─── Recruiter checkout.session.completed ─────────────────────────────────────
+
+async function onRecruiterCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
+  const userId = session.metadata?.userId ?? null;
+  const plan = (session.metadata?.plan ?? "solo") as "solo" | "team";
+  const customerId =
+    typeof session.customer === "string"
+      ? session.customer
+      : (session.customer as Stripe.Customer | Stripe.DeletedCustomer | null)?.id ?? null;
+
+  const user = await resolveUser({ userId, customerId });
+  if (!user) {
+    logger.error({ userId, customerId, session_id: session.id }, "recruiter checkout: could not resolve user");
+    return;
+  }
+
+  const subscriptionId =
+    typeof session.subscription === "string"
+      ? session.subscription
+      : (session.subscription as Stripe.Subscription | null)?.id ?? null;
+
+  await db
+    .update(usersTable)
+    .set({
+      recruiterSubscriptionId: subscriptionId,
+      recruiterSubscriptionStatus: plan,
+    })
+    .where(eq(usersTable.id, user.id));
+
+  logger.info({ userId: user.id, plan, subscriptionId }, "Recruiter subscription activated via checkout");
 }
 
 export default router;
