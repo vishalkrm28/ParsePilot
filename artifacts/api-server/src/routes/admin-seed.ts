@@ -1,8 +1,12 @@
 import { Router } from "express";
-import { db, bulkPassesTable, usersTable, usageBalancesTable, usageEventsTable, applicationsTable } from "@workspace/db";
+import { db, bulkPassesTable, usersTable, usageBalancesTable, usageEventsTable, applicationsTable, contactMessagesTable } from "@workspace/db";
 import { eq, sql, ilike, or, desc, count } from "drizzle-orm";
 import Stripe from "stripe";
 import { logger } from "../lib/logger.js";
+
+const PRO_PRICE = 14.99;
+const RECRUITER_SOLO_PRICE = 29.99;
+const RECRUITER_TEAM_PRICE = 79.00;
 
 const router = Router();
 
@@ -24,14 +28,23 @@ router.get("/_admin/stats", async (req, res) => {
     const [userCount] = await db.select({ count: count() }).from(usersTable);
     const [appCount] = await db.select({ count: count() }).from(applicationsTable);
     const [passCount] = await db.select({ count: count() }).from(bulkPassesTable);
-    const proUsers = await db.execute(sql`
-      SELECT COUNT(*) as count FROM users WHERE subscription_status = 'active'
-    `);
+    const [msgCount] = await db.select({ count: count() }).from(contactMessagesTable);
+    const proResult = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE subscription_status = 'active'`);
+    const recruiterSoloResult = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE recruiter_subscription_status = 'solo'`);
+    const recruiterTeamResult = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE recruiter_subscription_status = 'team'`);
+    const proCount = Number((proResult.rows?.[0] as any)?.count ?? 0);
+    const soloCount = Number((recruiterSoloResult.rows?.[0] as any)?.count ?? 0);
+    const teamCount = Number((recruiterTeamResult.rows?.[0] as any)?.count ?? 0);
+    const mrr = +(proCount * PRO_PRICE + soloCount * RECRUITER_SOLO_PRICE + teamCount * RECRUITER_TEAM_PRICE).toFixed(2);
     res.json({
       totalUsers: Number(userCount?.count ?? 0),
       totalApplications: Number(appCount?.count ?? 0),
       totalBulkPasses: Number(passCount?.count ?? 0),
-      proUsers: Number((proUsers.rows?.[0] as any)?.count ?? 0),
+      totalMessages: Number(msgCount?.count ?? 0),
+      proUsers: proCount,
+      recruiterSoloUsers: soloCount,
+      recruiterTeamUsers: teamCount,
+      mrr,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -275,6 +288,54 @@ router.post("/_admin/grant-pro", async (req, res) => {
 
     logger.info({ userId, revoke }, `Admin ${revoke ? "revoked" : "granted"} Pro subscription`);
     res.json({ success: true, message: revoke ? "Pro revoked" : "Pro granted (1 year)", subscriptionStatus: newStatus });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /_admin/contact-messages ──────────────────────────────────────────
+router.get("/_admin/contact-messages", async (req, res) => {
+  if (!authAdmin(req, res)) return;
+  try {
+    const limit = Math.min(Number(req.query.limit ?? 50), 100);
+    const offset = Number(req.query.offset ?? 0);
+    const messages = await db
+      .select()
+      .from(contactMessagesTable)
+      .orderBy(desc(contactMessagesTable.createdAt))
+      .limit(limit)
+      .offset(offset);
+    const [total] = await db.select({ count: count() }).from(contactMessagesTable);
+    res.json({ messages, total: Number(total?.count ?? 0), limit, offset });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── DELETE /_admin/contact-message/:id ─────────────────────────────────────
+router.delete("/_admin/contact-message/:id", async (req, res) => {
+  if (!authAdmin(req, res)) return;
+  const { id } = req.params;
+  try {
+    await db.delete(contactMessagesTable).where(eq(contactMessagesTable.id, id));
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /_admin/grant-recruiter ───────────────────────────────────────────
+router.post("/_admin/grant-recruiter", async (req, res) => {
+  if (!authAdmin(req, res)) return;
+  const { userId, plan, revoke } = req.body as { userId?: string; plan?: "solo" | "team"; revoke?: boolean };
+  if (!userId) { res.status(400).json({ error: "userId required" }); return; }
+  if (!revoke && !plan) { res.status(400).json({ error: "plan required (solo|team)" }); return; }
+  try {
+    await db.update(usersTable).set({
+      recruiterSubscriptionStatus: revoke ? null : plan!,
+    }).where(eq(usersTable.id, userId));
+    logger.info({ userId, plan, revoke }, `Admin ${revoke ? "revoked" : "granted"} recruiter plan`);
+    res.json({ success: true, message: revoke ? "Recruiter access revoked" : `Recruiter ${plan} granted` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -3,6 +3,7 @@ import {
   Shield, Search, CreditCard, Package, RefreshCw, LogOut,
   CheckCircle, XCircle, Loader2, Trash2, ChevronRight,
   ChevronDown, Users, BarChart3, AlertTriangle, X, FileText, Star,
+  Mail, DollarSign, Briefcase,
 } from "lucide-react";
 
 const STORAGE_KEY = "pp_admin_token";
@@ -40,7 +41,14 @@ interface Application {
 }
 interface Stats {
   totalUsers: number; totalApplications: number;
-  totalBulkPasses: number; proUsers: number;
+  totalBulkPasses: number; totalMessages: number;
+  proUsers: number; recruiterSoloUsers: number; recruiterTeamUsers: number;
+  mrr: number;
+}
+
+interface ContactMessage {
+  id: string; name: string; email: string; message: string;
+  userId: string | null; createdAt: string;
 }
 
 function ConfirmModal({
@@ -86,7 +94,7 @@ export default function AdminPage() {
   const [token, setToken] = useState(() => localStorage.getItem(STORAGE_KEY) ?? "");
   const [tokenInput, setTokenInput] = useState("");
   const [authed, setAuthed] = useState(() => !!localStorage.getItem(STORAGE_KEY));
-  const [tab, setTab] = useState<"users" | "stats">("users");
+  const [tab, setTab] = useState<"users" | "stats" | "messages">("users");
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [confirm, setConfirm] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -187,16 +195,19 @@ export default function AdminPage() {
             <span className="font-semibold text-sm">Admin Panel</span>
           </div>
           <div className="flex gap-1">
-            {(["users", "stats"] as const).map(t => (
+            {([
+              { key: "users", icon: <Users className="w-3.5 h-3.5" />, label: "Users" },
+              { key: "stats", icon: <BarChart3 className="w-3.5 h-3.5" />, label: "Stats" },
+              { key: "messages", icon: <Mail className="w-3.5 h-3.5" />, label: "Messages" },
+            ] as const).map(({ key, icon, label }) => (
               <button
-                key={t}
-                onClick={() => setTab(t)}
+                key={key}
+                onClick={() => setTab(key)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                  tab === t ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-white"
+                  tab === key ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-white"
                 }`}
               >
-                {t === "users" ? <Users className="w-3.5 h-3.5" /> : <BarChart3 className="w-3.5 h-3.5" />}
-                {t.charAt(0).toUpperCase() + t.slice(1)}
+                {icon}{label}
               </button>
             ))}
           </div>
@@ -217,6 +228,9 @@ export default function AdminPage() {
         {tab === "stats" && (
           <StatsTab call={call} />
         )}
+        {tab === "messages" && (
+          <MessagesTab call={call} addToast={addToast} />
+        )}
       </div>
     </div>
   );
@@ -235,21 +249,147 @@ function StatsTab({ call }: { call: any }) {
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-zinc-400" /></div>;
 
-  const cards = [
-    { label: "Total users", value: stats?.totalUsers ?? 0, color: "text-blue-400" },
-    { label: "Pro subscribers", value: stats?.proUsers ?? 0, color: "text-purple-400" },
-    { label: "Total CV analyses", value: stats?.totalApplications ?? 0, color: "text-green-400" },
-    { label: "Bulk passes sold", value: stats?.totalBulkPasses ?? 0, color: "text-orange-400" },
+  const mainCards = [
+    { label: "Total users", value: stats?.totalUsers ?? 0, color: "text-blue-400", fmt: "int" },
+    { label: "Pro subscribers", value: stats?.proUsers ?? 0, color: "text-purple-400", fmt: "int" },
+    { label: "Total CV analyses", value: stats?.totalApplications ?? 0, color: "text-green-400", fmt: "int" },
+    { label: "Bulk passes sold", value: stats?.totalBulkPasses ?? 0, color: "text-orange-400", fmt: "int" },
   ];
 
+  const revenueCards = [
+    { label: "MRR (estimated)", value: stats?.mrr ?? 0, color: "text-emerald-400", fmt: "usd" },
+    { label: "Recruiter Solo", value: stats?.recruiterSoloUsers ?? 0, color: "text-sky-400", fmt: "int" },
+    { label: "Recruiter Team", value: stats?.recruiterTeamUsers ?? 0, color: "text-sky-300", fmt: "int" },
+    { label: "Contact messages", value: stats?.totalMessages ?? 0, color: "text-zinc-400", fmt: "int" },
+  ];
+
+  const fmt = (v: number, f: string) => f === "usd" ? `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : v.toLocaleString();
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-      {cards.map(c => (
-        <div key={c.label} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <p className="text-xs text-zinc-400 uppercase tracking-wide">{c.label}</p>
-          <p className={`text-3xl font-bold mt-2 ${c.color}`}>{c.value.toLocaleString()}</p>
+    <div className="space-y-6">
+      <div>
+        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Usage</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {mainCards.map(c => (
+            <div key={c.label} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+              <p className="text-xs text-zinc-400 uppercase tracking-wide">{c.label}</p>
+              <p className={`text-3xl font-bold mt-2 ${c.color}`}>{fmt(c.value, c.fmt)}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+          <DollarSign className="w-3.5 h-3.5" />Revenue
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {revenueCards.map(c => (
+            <div key={c.label} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+              <p className="text-xs text-zinc-400 uppercase tracking-wide">{c.label}</p>
+              <p className={`text-3xl font-bold mt-2 ${c.color}`}>{fmt(c.value, c.fmt)}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MessagesTab({ call, addToast }: { call: any; addToast: (m: string, t: "success" | "error") => void }) {
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const limit = 50;
+  const [offset, setOffset] = useState(0);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    call(`/_admin/contact-messages?limit=${limit}&offset=${offset}`)
+      .then((r: any) => { setMessages(r.messages); setTotal(r.total); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [call, offset]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const deleteMsg = async (id: string) => {
+    setDeleting(id);
+    try {
+      await call(`/_admin/contact-message/${id}`, { method: "DELETE" });
+      addToast("Message deleted", "success");
+      setMessages(m => m.filter(x => x.id !== id));
+      setTotal(t => t - 1);
+    } catch {
+      addToast("Delete failed", "error");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-zinc-400" /></div>;
+  if (!messages.length) return (
+    <div className="text-center py-16 text-zinc-500">
+      <Mail className="w-8 h-8 mx-auto mb-3 opacity-30" />
+      <p className="text-sm">No contact messages yet</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-zinc-500">{total} message{total !== 1 ? "s" : ""} total</p>
+      {messages.map(msg => (
+        <div key={msg.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div
+            className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-zinc-800/50 transition-colors"
+            onClick={() => setExpanded(expanded === msg.id ? null : msg.id)}
+          >
+            <Mail className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-white">{msg.name}</span>
+                <span className="text-xs text-zinc-500">&lt;{msg.email}&gt;</span>
+              </div>
+              <p className="text-xs text-zinc-400 truncate mt-0.5">{msg.message}</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-xs text-zinc-600">{new Date(msg.createdAt).toLocaleDateString()}</span>
+              <button
+                onClick={e => { e.stopPropagation(); deleteMsg(msg.id); }}
+                disabled={deleting === msg.id}
+                className="p-1 rounded text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              >
+                {deleting === msg.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              </button>
+              {expanded === msg.id ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />}
+            </div>
+          </div>
+          {expanded === msg.id && (
+            <div className="border-t border-zinc-800 px-4 py-3 bg-zinc-800/30 space-y-2">
+              <div className="flex gap-4 text-xs text-zinc-500">
+                <span><span className="text-zinc-600">From: </span>{msg.name} &lt;{msg.email}&gt;</span>
+                <span><span className="text-zinc-600">Sent: </span>{new Date(msg.createdAt).toLocaleString()}</span>
+                {msg.userId && <span><span className="text-zinc-600">User ID: </span><span className="font-mono">{msg.userId}</span></span>}
+              </div>
+              <p className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed border-t border-zinc-700 pt-2">{msg.message}</p>
+              <a
+                href={`mailto:${msg.email}?subject=Re: Your message to ResuOne`}
+                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+              >
+                <Mail className="w-3 h-3" /> Reply via email
+              </a>
+            </div>
+          )}
         </div>
       ))}
+      {total > limit && (
+        <div className="flex justify-center gap-3 pt-2">
+          <button disabled={offset === 0} onClick={() => setOffset(o => Math.max(0, o - limit))} className="text-xs text-zinc-400 hover:text-white disabled:opacity-30">← Prev</button>
+          <span className="text-xs text-zinc-600">{offset + 1}–{Math.min(offset + limit, total)} of {total}</span>
+          <button disabled={offset + limit >= total} onClick={() => setOffset(o => o + limit)} className="text-xs text-zinc-400 hover:text-white disabled:opacity-30">Next →</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -431,6 +571,7 @@ function UserRow({
   }
 
   const isPro = detail?.user?.subscriptionStatus === "active";
+  const recruiterPlan = detail?.user?.recruiterSubscriptionStatus as "solo" | "team" | null | undefined;
 
   async function togglePro() {
     const revoke = isPro;
@@ -444,6 +585,26 @@ function UserRow({
           const data = await call("/_admin/grant-pro", {
             method: "POST",
             body: JSON.stringify({ userId: user.id, revoke }),
+          });
+          addToast(data.message ?? "Done", "success");
+          await refreshDetail();
+        });
+      },
+    );
+  }
+
+  async function toggleRecruiter(plan: "solo" | "team") {
+    const isActive = recruiterPlan === plan;
+    confirmAction(
+      isActive ? `Revoke Recruiter ${plan}?` : `Grant Recruiter ${plan}?`,
+      isActive
+        ? "The user will lose Recruiter Mode access immediately."
+        : `This will grant Recruiter ${plan} access without Stripe payment.`,
+      async () => {
+        await doAction(`recruiter_${plan}`, async () => {
+          const data = await call("/_admin/grant-recruiter", {
+            method: "POST",
+            body: JSON.stringify({ userId: user.id, plan, revoke: isActive }),
           });
           addToast(data.message ?? "Done", "success");
           await refreshDetail();
@@ -522,6 +683,7 @@ function UserRow({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <InfoBox label="Credits" value={detail?.balance?.availableCredits?.toString() ?? "0"} highlight={!detail?.balance?.availableCredits ? "red" : "green"} />
                 <InfoBox label="Subscription" value={detail?.user?.subscriptionStatus ?? "none"} highlight={detail?.user?.subscriptionStatus === "active" ? "green" : undefined} />
+                <InfoBox label="Recruiter" value={recruiterPlan ?? "none"} highlight={recruiterPlan ? "green" : undefined} />
                 <InfoBox label="CV analyses" value={apps.length.toString()} />
                 <InfoBox label="Bulk passes" value={detail?.bulkPasses?.length?.toString() ?? "0"} />
               </div>
@@ -560,6 +722,26 @@ function UserRow({
                   {actionLoading === "pro" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Star className="w-3.5 h-3.5" />}
                   {isPro ? "Revoke Pro" : "Grant Pro"}
                 </button>
+                {(["solo", "team"] as const).map(plan => {
+                  const isActive = recruiterPlan === plan;
+                  const loading = actionLoading === `recruiter_${plan}`;
+                  return (
+                    <button
+                      key={plan}
+                      onClick={() => toggleRecruiter(plan)}
+                      disabled={loading || loadingDetail}
+                      title={isActive ? `Revoke Recruiter ${plan}` : `Grant Recruiter ${plan}`}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors disabled:opacity-50 ${
+                        isActive
+                          ? "bg-sky-900/40 hover:bg-red-900/40 text-sky-300 hover:text-red-300 border border-sky-700/50 hover:border-red-700/50"
+                          : "bg-zinc-800 hover:bg-sky-900/30 text-zinc-400 hover:text-sky-300 border border-zinc-700 hover:border-sky-700/50"
+                      }`}
+                    >
+                      {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Briefcase className="w-3.5 h-3.5" />}
+                      {isActive ? `Revoke ${plan}` : `R. ${plan}`}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Bulk passes */}
