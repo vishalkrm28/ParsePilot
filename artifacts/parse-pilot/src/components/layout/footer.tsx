@@ -6,21 +6,18 @@ export function Footer() {
     <footer className="border-t border-border/40 bg-muted/10">
       <div className="max-w-4xl mx-auto px-6 py-16 text-center">
 
-        {/* Brand mark */}
         <div className="flex items-center justify-center mb-10">
           <LogoBrand size="lg" />
         </div>
 
-        {/* Main bold statement */}
         <p className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground leading-tight mb-4">
-          You're not getting rejected.
+          From CV Analysis to Interview —
           <br />
-          <span className="text-primary">Your CV is.</span> Fix that.
+          <span className="text-primary">In One Flow.</span>
         </p>
 
-        {/* Subline */}
         <p className="text-sm text-muted-foreground mb-10">
-          ATS-friendly &nbsp;•&nbsp; No fake experience added &nbsp;•&nbsp; Edit before export
+          ATS-friendly &nbsp;•&nbsp; No fake experience added &nbsp;•&nbsp; Instant invites
         </p>
 
         {/* SEO tool links */}
@@ -31,28 +28,15 @@ export function Footer() {
           <Link href="/resume-job-match" className="hover:text-muted-foreground transition-colors">Resume vs Job</Link>
           <Link href="/why-resume-rejected" className="hover:text-muted-foreground transition-colors">Why Rejected?</Link>
           <Link href="/blog" className="hover:text-muted-foreground transition-colors">Blog</Link>
+          <Link href="/help" className="hover:text-muted-foreground transition-colors">Help</Link>
         </div>
 
         {/* Legal links */}
-        <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground/60">
-          <Link
-            href="/terms"
-            className="hover:text-muted-foreground transition-colors"
-          >
-            Terms of Service
-          </Link>
-          <Link
-            href="/privacy"
-            className="hover:text-muted-foreground transition-colors"
-          >
-            Privacy Policy
-          </Link>
-          <Link
-            href="/contact"
-            className="hover:text-muted-foreground transition-colors"
-          >
-            Contact
-          </Link>
+        <div className="flex flex-wrap items-center justify-center gap-5 text-xs text-muted-foreground/60">
+          <Link href="/terms" className="hover:text-muted-foreground transition-colors">Terms of Service</Link>
+          <Link href="/privacy" className="hover:text-muted-foreground transition-colors">Privacy Policy</Link>
+          <Link href="/help" className="hover:text-muted-foreground transition-colors">Help Centre</Link>
+          <a href="mailto:help@resuone.com" className="hover:text-muted-foreground transition-colors">help@resuone.com</a>
           <span>© {new Date().getFullYear()} ResuOne</span>
         </div>
 

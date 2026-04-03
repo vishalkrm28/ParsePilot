@@ -18,6 +18,7 @@ import Settings from "@/pages/settings";
 import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
 import Contact from "@/pages/contact";
+import HelpPage from "@/pages/help";
 import BulkPricing from "@/pages/bulk-pricing";
 import BulkSuccess from "@/pages/bulk-success";
 import BulkSession from "@/pages/bulk-session";
@@ -122,6 +123,7 @@ function App() {
               <Route path="/terms" component={Terms} />
               <Route path="/privacy" component={Privacy} />
               <Route path="/contact" component={Contact} />
+              <Route path="/help" component={HelpPage} />
               {/* SEO landing pages */}
               <Route path="/cv-match-score" component={CvMatchScore} />
               <Route path="/ats-resume-checker" component={AtsResumeChecker} />

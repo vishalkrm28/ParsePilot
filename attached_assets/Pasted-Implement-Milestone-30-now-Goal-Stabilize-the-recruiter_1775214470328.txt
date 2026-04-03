@@ -1,0 +1,173 @@
+Implement Milestone 30 now.
+
+Goal:
+Stabilize the recruiter system AND update the homepage to reflect ResuOne as a complete hiring workflow platform.
+
+Focus:
+- trust
+- clarity
+- positioning
+- conversion
+
+--------------------------------------------------
+PART 1 — STABILITY + SUPPORT (KEEP EXISTING)
+--------------------------------------------------
+
+1. Invite status clarity
+2. Invite logs
+3. Error handling
+4. Resend invite
+5. Help page (/help)
+6. Inline help text
+7. Email success feedback
+8. Email preview
+9. Support email: help@resuone.com
+10. Analytics tracking
+
+(No changes from previous version)
+
+--------------------------------------------------
+PART 2 — HOMEPAGE REPOSITIONING (CRITICAL)
+--------------------------------------------------
+
+File:
+/app/page.tsx
+
+--------------------------------------------------
+1. HERO SECTION (TOP)
+--------------------------------------------------
+
+Headline:
+
+“From CV Analysis to Interview — In One Flow”
+
+Subheadline:
+
+Analyze candidates, identify top matches, and invite them instantly. No complex ATS. Just faster hiring decisions.
+
+CTA:
+
+- Analyze CV
+- Start Hiring
+
+--------------------------------------------------
+2. VISUAL / EXAMPLE SCREENS
+--------------------------------------------------
+
+Add section showing:
+
+- CV match score screen
+- Candidate list with scores
+- Invite button / modal
+
+Use:
+
+- clean mock UI screenshots
+- or static demo images
+
+--------------------------------------------------
+3. HOW IT WORKS SECTION
+--------------------------------------------------
+
+Steps:
+
+1. Upload CVs or paste job description
+2. Get match scores and insights
+3. Invite top candidates instantly
+
+--------------------------------------------------
+4. FEATURES SECTION
+--------------------------------------------------
+
+Cards:
+
+- CV Analysis
+  “Understand candidate strengths and gaps instantly”
+
+- Smart Matching
+  “See exactly how candidates match your role”
+
+- Instant Invite
+  “Invite candidates to interviews in one click”
+
+- Simple Workflow
+  “No ATS complexity. Just decisions.”
+
+--------------------------------------------------
+5. TRUST + CLARITY SECTION
+--------------------------------------------------
+
+Add:
+
+“Built for real hiring decisions. No guesswork.”
+
+Optional small text:
+
+“Formatting may vary. Always review before submission.”
+
+--------------------------------------------------
+6. USE CASE SECTION
+--------------------------------------------------
+
+Show:
+
+- Recruiters
+- Startups
+- Universities
+
+Example:
+
+“For recruiters hiring fast”
+“For teams screening candidates at scale”
+
+--------------------------------------------------
+7. CTA SECTION (BOTTOM)
+--------------------------------------------------
+
+Text:
+
+“Start identifying and inviting the right candidates today.”
+
+Buttons:
+
+- Analyze CV
+- Try Recruiter Flow
+
+--------------------------------------------------
+8. FOOTER UPDATE
+--------------------------------------------------
+
+Add:
+
+- Help link → /help
+- Contact → help@resuone.com
+
+--------------------------------------------------
+9. DESIGN RULES
+--------------------------------------------------
+
+- minimal
+- clean
+- no clutter
+- fast loading
+- premium feel
+
+--------------------------------------------------
+10. COPY RULES
+--------------------------------------------------
+
+- no AI jargon
+- no buzzwords
+- simple, direct language
+
+--------------------------------------------------
+11. AFTER IMPLEMENTATION
+--------------------------------------------------
+
+After implementation:
+
+1. Show homepage sections
+2. Show hero + CTA
+3. Show example screens used
+4. Suggest improvements
+5. Suggest conversion optimizations
