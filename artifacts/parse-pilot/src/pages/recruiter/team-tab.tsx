@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getTeam, inviteTeamMember, cancelTeamInvite, removeTeamMember, leaveTeam, startRecruiterCheckout } from "@/lib/recruiter-api";
-import { Users, Mail, X, UserPlus, Clock, CheckCircle2, Crown, LogOut, ArrowRight, Loader2, Lock } from "lucide-react";
+import { getTeam, inviteTeamMember, cancelTeamInvite, removeTeamMember, leaveTeam, startRecruiterCheckout, cancelRecruiterPlan } from "@/lib/recruiter-api";
+import { Users, Mail, X, UserPlus, Clock, CheckCircle2, Crown, LogOut, ArrowRight, Loader2, Lock, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface AccessData {
@@ -21,6 +21,7 @@ export function TeamTab({ accessData }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [inviteEmail, setInviteEmail] = useState("");
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const { data: teamData, isLoading } = useQuery({
     queryKey: ["recruiter-team"],
@@ -68,9 +69,29 @@ export function TeamTab({ accessData }: Props) {
     onError: (err: any) => toast({ title: "Checkout failed", description: err.message, variant: "destructive" }),
   });
 
+  const cancelPlanMutation = useMutation({
+    mutationFn: cancelRecruiterPlan,
+    onSuccess: (data) => {
+      setShowCancelConfirm(false);
+      const until = data.periodEnd
+        ? new Date(data.periodEnd).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+        : "the end of your billing period";
+      toast({
+        title: "Plan cancellation scheduled",
+        description: `You'll keep full access until ${until}. After that your plan and team will be removed.`,
+      });
+      qc.invalidateQueries({ queryKey: ["recruiter-access"] });
+    },
+    onError: (err: any) => {
+      setShowCancelConfirm(false);
+      toast({ title: "Cancellation failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   // ── Solo plan: locked upgrade prompt ──────────────────────────────────────
   if (plan === "solo") {
     return (
+      <>
       <div className="max-w-lg mx-auto text-center py-16 px-6">
         <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-5">
           <Lock className="w-7 h-7 text-primary" />
@@ -96,6 +117,9 @@ export function TeamTab({ accessData }: Props) {
         </button>
         <p className="text-xs text-muted-foreground mt-3">Cancel any time. Your Solo plan balance will be credited.</p>
       </div>
+
+      <CancelPlanSection showConfirm={showCancelConfirm} setShowConfirm={setShowCancelConfirm} isPending={cancelPlanMutation.isPending} onConfirm={() => cancelPlanMutation.mutate()} plan="solo" />
+      </>
     );
   }
 
@@ -248,6 +272,98 @@ export function TeamTab({ accessData }: Props) {
               <p className="text-sm text-muted-foreground">No team members yet. Invite a colleague above to get started.</p>
             </div>
           )}
+        </div>
+      )}
+
+      <CancelPlanSection showConfirm={showCancelConfirm} setShowConfirm={setShowCancelConfirm} isPending={cancelPlanMutation.isPending} onConfirm={() => cancelPlanMutation.mutate()} plan="team" />
+    </div>
+  );
+}
+
+// ─── Cancel Plan Section ──────────────────────────────────────────────────────
+
+function CancelPlanSection({ showConfirm, setShowConfirm, isPending, onConfirm, plan }: {
+  showConfirm: boolean;
+  setShowConfirm: (v: boolean) => void;
+  isPending: boolean;
+  onConfirm: () => void;
+  plan: "solo" | "team";
+}) {
+  const label = plan === "team" ? "Team plan" : "Solo plan";
+  const price = plan === "team" ? "$79/mo" : "$29.99/mo";
+
+  return (
+    <div className="max-w-2xl mx-auto px-0 pb-8 pt-4">
+      <div className="border-t border-border/40 pt-8">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Cancel {label}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              You'll keep access until your billing period ends. Your pipeline data won't be deleted.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowConfirm(true)}
+            className="text-xs text-red-500 hover:text-red-600 font-medium transition-colors shrink-0 underline underline-offset-2"
+          >
+            Cancel plan
+          </button>
+        </div>
+      </div>
+
+      {/* Confirmation dialog overlay */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-background border border-border rounded-2xl shadow-xl max-w-sm w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-foreground">Cancel {label}?</h3>
+                <p className="text-xs text-muted-foreground">{price} · billed monthly</p>
+              </div>
+            </div>
+
+            <div className="bg-muted/30 rounded-xl p-4 mb-5 space-y-2">
+              {plan === "team" && (
+                <div className="flex items-start gap-2 text-sm text-foreground">
+                  <X className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                  Team members will lose access when the period ends
+                </div>
+              )}
+              <div className="flex items-start gap-2 text-sm text-foreground">
+                <X className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                Candidate pipeline and invites become read-only
+              </div>
+              <div className="flex items-start gap-2 text-sm text-foreground">
+                <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                Full access kept until the end of your billing period
+              </div>
+              <div className="flex items-start gap-2 text-sm text-foreground">
+                <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                All your data is preserved — you can re-subscribe at any time
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirm(false)}
+                disabled={isPending}
+                className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-medium hover:bg-muted/30 transition-colors disabled:opacity-50"
+              >
+                Keep my plan
+              </button>
+              <button
+                onClick={onConfirm}
+                disabled={isPending}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Yes, cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -361,6 +361,56 @@ router.post("/billing/cancel-subscription", async (req, res) => {
   }
 });
 
+// ─── POST /billing/cancel-recruiter ──────────────────────────────────────────
+// Cancels the recruiter plan at period end. The user keeps access until the
+// period they've already paid for expires; the webhook clears the status
+// and offboards team members once Stripe fires subscription.deleted.
+
+router.post("/billing/cancel-recruiter", async (req, res) => {
+  if (!req.user) {
+    res.status(401).json({ error: "Authentication required", code: "UNAUTHENTICATED" }); return;
+  }
+
+  try {
+    const [dbUser] = await db
+      .select({
+        recruiterSubscriptionId: usersTable.recruiterSubscriptionId,
+        recruiterSubscriptionStatus: usersTable.recruiterSubscriptionStatus,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user.id))
+      .limit(1);
+
+    if (!dbUser?.recruiterSubscriptionId) {
+      res.status(400).json({ error: "No active recruiter subscription found.", code: "NO_SUBSCRIPTION" }); return;
+    }
+    if (!dbUser.recruiterSubscriptionStatus) {
+      res.status(400).json({ error: "Recruiter plan is already cancelled.", code: "ALREADY_CANCELED" }); return;
+    }
+
+    // Fetch the subscription to check it isn't already set to cancel
+    const sub = await getStripe().subscriptions.retrieve(dbUser.recruiterSubscriptionId);
+    if (sub.cancel_at_period_end) {
+      res.status(400).json({ error: "Recruiter plan is already scheduled for cancellation.", code: "ALREADY_CANCELING" }); return;
+    }
+
+    await getStripe().subscriptions.update(dbUser.recruiterSubscriptionId, {
+      cancel_at_period_end: true,
+    });
+
+    logger.info({ userId: req.user.id, subscriptionId: dbUser.recruiterSubscriptionId }, "Recruiter plan cancellation scheduled at period end");
+    res.json({
+      success: true,
+      cancelAtPeriodEnd: true,
+      periodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
+      message: "Your recruiter plan will cancel at the end of the current billing period. You'll keep full access until then.",
+    });
+  } catch (err) {
+    logger.error(stripeErrContext(err), "Failed to cancel recruiter subscription");
+    res.status(500).json({ error: "Could not cancel recruiter plan. Please try again.", code: "CANCEL_ERROR" });
+  }
+});
+
 // ─── POST /billing/checkout-recruiter ────────────────────────────────────────
 router.post("/billing/checkout-recruiter", async (req, res) => {
   if (!req.user) {

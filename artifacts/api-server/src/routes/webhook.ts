@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import express from "express";
 import type Stripe from "stripe";
 import { and, eq } from "drizzle-orm";
-import { db, usersTable, unlockPurchasesTable, bulkPassesTable } from "@workspace/db";
+import { db, usersTable, unlockPurchasesTable, bulkPassesTable, recruiterTeamInvitesTable } from "@workspace/db";
 import { getStripe } from "../lib/stripe.js";
 import { logger } from "../lib/logger.js";
 import { resetProCreditsIfNeeded } from "../lib/credits.js";
@@ -257,10 +257,18 @@ async function onSubscriptionDeleted(subscription: Stripe.Subscription): Promise
     return;
   }
 
+  // Route recruiter subscriptions to the correct offboarding path — never let
+  // a recruiter deletion clobber the Pro subscription fields.
+  if (subscription.metadata?.product === "recruiter") {
+    await offboardRecruiterSubscription(user.id);
+    logger.info({ userId: user.id, subscriptionId: subscription.id }, "Recruiter subscription deleted — offboarding complete");
+    return;
+  }
+
+  // Pro subscription deletion
   await db
     .update(usersTable)
     .set({
-      // Use the event's actual status (always "canceled" for deleted events, but be explicit)
       subscriptionStatus: subscription.status,
       currentPeriodEnd: subscription.current_period_end
         ? new Date(subscription.current_period_end * 1000)
@@ -271,8 +279,40 @@ async function onSubscriptionDeleted(subscription: Stripe.Subscription): Promise
 
   logger.info(
     { userId: user.id, subscriptionId: subscription.id, status: subscription.status },
-    "Subscription cancelled",
+    "Pro subscription cancelled",
   );
+}
+
+// ─── Recruiter offboarding ─────────────────────────────────────────────────────
+// Clears the owner's recruiter status, removes all team members from the team,
+// and cancels any pending team invites. Safe to call from both the webhook and
+// the cancel-recruiter billing endpoint.
+
+async function offboardRecruiterSubscription(ownerId: string): Promise<void> {
+  // 1. Clear the owner's recruiter plan status
+  await db
+    .update(usersTable)
+    .set({ recruiterSubscriptionStatus: null })
+    .where(eq(usersTable.id, ownerId));
+
+  // 2. Detach all team members from this owner's team
+  await db
+    .update(usersTable)
+    .set({ recruiterTeamId: null })
+    .where(eq(usersTable.recruiterTeamId, ownerId));
+
+  // 3. Cancel all pending team invites so new members can't join a dissolved team
+  await db
+    .update(recruiterTeamInvitesTable)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(
+      and(
+        eq(recruiterTeamInvitesTable.teamOwnerId, ownerId),
+        eq(recruiterTeamInvitesTable.status, "pending"),
+      ),
+    );
+
+  logger.info({ ownerId }, "Recruiter offboarding complete — team cleared, invites cancelled");
 }
 
 // ─── invoice.paid / invoice.payment_succeeded ─────────────────────────────────

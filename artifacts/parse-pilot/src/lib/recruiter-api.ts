@@ -132,6 +132,14 @@ export async function startRecruiterCheckout(plan: "solo" | "team", successUrl: 
   return res.json();
 }
 
+export async function cancelRecruiterPlan(): Promise<{ success: boolean; periodEnd: string | null; message: string }> {
+  const res = await authedFetch(`${BASE}/billing/cancel-recruiter`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) { const e = await res.json(); throw new Error(e.error ?? "Cancellation failed"); }
+  return res.json();
+}
+
 // ─── Public invite (candidate respond) ────────────────────────────────────────
 
 export async function getInvitePublic(id: string) {
