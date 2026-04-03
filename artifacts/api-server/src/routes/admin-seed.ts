@@ -10,9 +10,13 @@ const RECRUITER_TEAM_PRICE = 79.00;
 
 const router = Router();
 
-const ADMIN_TOKEN = process.env["ADMIN_SEED_TOKEN"] ?? "parsepilot-admin-2026";
+const ADMIN_TOKEN = process.env["ADMIN_SEED_TOKEN"];
 
 function authAdmin(req: any, res: any): boolean {
+  if (!ADMIN_TOKEN) {
+    res.status(503).json({ error: "Admin access not configured" });
+    return false;
+  }
   const token = req.headers["x-admin-token"];
   if (token !== ADMIN_TOKEN) {
     res.status(403).json({ error: "Forbidden" });
