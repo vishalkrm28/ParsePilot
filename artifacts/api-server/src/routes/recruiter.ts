@@ -552,9 +552,9 @@ router.get("/recruiter/access", async (req, res) => {
       .from(usersTable)
       .where(eq(usersTable.id, recruiterId));
 
-    const hasAccess = user?.recruiterSubscriptionStatus === "active" ||
-                      user?.recruiterSubscriptionStatus === "trialing";
-    res.json({ hasAccess });
+    const plan = user?.recruiterSubscriptionStatus; // "solo" | "team" | null
+    const hasAccess = plan === "solo" || plan === "team";
+    res.json({ hasAccess, plan: plan ?? null });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
