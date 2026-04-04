@@ -22,6 +22,7 @@ interface BulkTier {
 
 interface BulkStatus {
   isPro: boolean;
+  isRecruiter: boolean;
   activePass: {
     id: string;
     tier: string;
@@ -236,6 +237,11 @@ export default function BulkPricing() {
       .then(([tiersData, statusData]) => {
         setTiers(tiersData.tiers ?? []);
         setStatus(statusData);
+        // Recruiter plan holders already have batch analysis included —
+        // send them straight to the bulk session page, no purchase needed.
+        if (statusData?.isRecruiter) {
+          navigate("/bulk/session");
+        }
       })
       .catch(() => {})
       .finally(() => setLoadingStatus(false));

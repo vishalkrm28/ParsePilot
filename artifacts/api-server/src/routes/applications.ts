@@ -13,7 +13,7 @@ import { calculateMatchScore } from "../lib/scoring/index.js";
 import type { ScoringInput } from "../lib/scoring/scoring-types.js";
 import { logger } from "../lib/logger.js";
 import { requirePro } from "../middlewares/requirePro.js";
-import { isUserPro, userCanAccessFullResult, hasUnlockedResult } from "../lib/billing.js";
+import { isUserPro, userCanAccessFullResult, hasUnlockedResult, isUserRecruiter } from "../lib/billing.js";
 import { spendCredits, getUserCredits, CREDIT_COSTS } from "../lib/credits.js";
 import { consumeBulkSlot } from "../lib/bulk.js";
 import { applyFreeFilter, applyProPass, applyUnlockPass } from "../lib/preview.js";
@@ -405,11 +405,16 @@ router.post("/applications/:id/analyze", async (req, res) => {
     }
 
     // ── Identity check ──────────────────────────────────────────────────────
-    // Skip when the request comes from the bulk session UI — bulk mode is
-    // explicitly for multiple different candidates (recruiters/HR) so identity
-    // switching is expected and must never trigger a warning or penalty.
-    // For regular Pro users the check always runs.
+    // Skip when:
+    //   a) The request comes from the bulk session UI (isBulkSession flag)
+    //   b) The user has a Recruiter Solo or Team plan — they analyze multiple
+    //      different candidates by design so identity switching is expected.
     const isBulkSession = parsed.success && parsed.data.isBulkSession === true;
+    const isRecruiterUser = ownerUserId ? await isUserRecruiter(ownerUserId) : false;
+
+    // Recruiter plan users are always treated as bulk — no identity penalty,
+    // no bulk-pass requirement. The flag unifies both code paths below.
+    const effectiveBulkSession = isBulkSession || isRecruiterUser;
 
     let identityResult = {
       isDifferentIdentity: false,
@@ -417,23 +422,28 @@ router.post("/applications/:id/analyze", async (req, res) => {
       distinctIdentityCount: 0,
     };
 
-    if (ownerUserId && app.parsedCvJson && !isBulkSession) {
+    if (ownerUserId && app.parsedCvJson && !effectiveBulkSession) {
       const identity = extractIdentityFromParsedCv(app.parsedCvJson as any);
       identityResult = await checkAndRecordIdentity(ownerUserId, identity, id);
     }
 
     // ── 2. Credit / bulk-slot gate ───────────────────────────────────────────
     if (ownerUserId) {
-      if (isBulkSession) {
-        // Bulk mode always requires a purchased bulk pass — Pro subscription
-        // alone does NOT grant bulk access. Consume one slot from the pass.
-        const slotConsumed = await consumeBulkSlot(ownerUserId);
-        if (!slotConsumed) {
-          res.status(402).json({
-            error: "You have no remaining CV slots. Purchase a new Bulk pass to continue.",
-            code: "BULK_SLOTS_EXHAUSTED",
-          });
-          return;
+      if (effectiveBulkSession) {
+        if (isRecruiterUser) {
+          // Recruiter Solo/Team plan: batch analysis is included in the plan.
+          // No bulk pass required and no credits consumed.
+          logger.debug({ userId: ownerUserId }, "Recruiter plan — bulk slot skipped");
+        } else {
+          // Regular bulk mode: requires a purchased bulk pass.
+          const slotConsumed = await consumeBulkSlot(ownerUserId);
+          if (!slotConsumed) {
+            res.status(402).json({
+              error: "You have no remaining CV slots. Purchase a new Bulk pass to continue.",
+              code: "BULK_SLOTS_EXHAUSTED",
+            });
+            return;
+          }
         }
       } else {
         // Regular single-CV analysis → deduct from credit balance.
@@ -459,7 +469,7 @@ router.post("/applications/:id/analyze", async (req, res) => {
       // If this user is not Pro, check how many free analyses have already
       // been performed from the same IP across ALL accounts.  Blocks users
       // who register throwaway emails to bypass the 3-credit free limit.
-      if (!isBulkSession) {
+      if (!effectiveBulkSession) {
         const isPro = await isUserPro(ownerUserId);
         if (!isPro && clientIp !== "unknown") {
           const ipCount = await countFreeAnalysesByIp(clientIp);

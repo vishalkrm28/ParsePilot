@@ -11,7 +11,7 @@ import {
   getActiveBulkPass,
   getBulkPassCount,
 } from "../lib/bulk.js";
-import { isUserPro, getUserBillingProfile } from "../lib/billing.js";
+import { isUserPro, getUserBillingProfile, isUserRecruiter } from "../lib/billing.js";
 import { spendCredits } from "../lib/credits.js";
 
 function stripeErrContext(err: unknown): Record<string, unknown> {
@@ -35,14 +35,16 @@ router.get("/billing/bulk-status", async (req, res) => {
   }
 
   try {
-    const [pro, activePass, passCount] = await Promise.all([
+    const [pro, activePass, passCount, recruiter] = await Promise.all([
       isUserPro(req.user.id),
       getActiveBulkPass(req.user.id),
       getBulkPassCount(req.user.id),
+      isUserRecruiter(req.user.id),
     ]);
 
     res.json({
       isPro: pro,
+      isRecruiter: recruiter,
       activePass: activePass
         ? {
             id: activePass.id,

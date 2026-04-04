@@ -3,6 +3,19 @@ import { and, eq } from "drizzle-orm";
 import { hasBulkAccess } from "./bulk.js";
 
 /**
+ * Returns true if the user has an active Recruiter Solo or Team subscription.
+ * Recruiter plan holders get batch CV analysis included — no Bulk Pass needed.
+ */
+export async function isUserRecruiter(userId: string): Promise<boolean> {
+  const [user] = await db
+    .select({ recruiterSubscriptionStatus: usersTable.recruiterSubscriptionStatus })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .limit(1);
+  return !!(user?.recruiterSubscriptionStatus);
+}
+
+/**
  * Returns true if the given Stripe subscription status is considered active.
  * "trialing" is treated as active so trial users retain access.
  */

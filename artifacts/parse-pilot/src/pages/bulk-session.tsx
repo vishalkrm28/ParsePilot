@@ -37,6 +37,7 @@ const SESSION_KEY = "bulk_completed_results";
 
 interface BulkStatus {
   isPro: boolean;
+  isRecruiter: boolean;
   activePass: {
     id: string;
     tier: string;
@@ -420,11 +421,13 @@ export default function BulkSession() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Access requires an active bulk pass — Pro subscription alone is not enough.
-  const hasAccess = !!(status?.activePass && status.activePass.remaining > 0);
-  const remaining = status?.activePass?.remaining ?? 0;
-  const limit = status?.activePass?.cvLimit ?? 0;
-  const used = limit - remaining;
+  // Access: recruiter plan holders get unlimited batch analysis; others need a bulk pass.
+  const isRecruiter = !!(status?.isRecruiter);
+  const hasAccess = isRecruiter || !!(status?.activePass && status.activePass.remaining > 0);
+  // For recruiter users: use a large cap so the dropzone doesn't block uploads.
+  const remaining = isRecruiter ? 50 : (status?.activePass?.remaining ?? 0);
+  const limit = isRecruiter ? 50 : (status?.activePass?.cvLimit ?? 0);
+  const used = isRecruiter ? 0 : (limit - remaining);
 
   // ── Dropzone (multiple files) ─────────────────────────────────────────────
 
@@ -435,8 +438,10 @@ export default function BulkSession() {
     const rejected = acceptedFiles.length - allowed.length;
     if (rejected > 0) {
       toast({
-        title: "Slot limit reached",
-        description: `Your pass has ${remaining} CV slot${remaining !== 1 ? "s" : ""} remaining — only the first ${allowed.length > 0 ? allowed.length : "no"} file${allowed.length !== 1 ? "s" : ""} ${allowed.length > 0 ? "were" : "could be"} added. Buy more slots to analyze more CVs.`,
+        title: "Batch limit reached",
+        description: isRecruiter
+          ? `Up to 50 CVs can be processed per batch. Only the first ${allowed.length > 0 ? allowed.length : "no"} file${allowed.length !== 1 ? "s" : ""} ${allowed.length > 0 ? "were" : "could be"} added. Start a new batch for the rest.`
+          : `Your pass has ${remaining} CV slot${remaining !== 1 ? "s" : ""} remaining — only the first ${allowed.length > 0 ? allowed.length : "no"} file${allowed.length !== 1 ? "s" : ""} ${allowed.length > 0 ? "were" : "could be"} added. Buy more slots to analyze more CVs.`,
         variant: "destructive",
       });
     }
@@ -672,8 +677,20 @@ export default function BulkSession() {
           />
         ) : (
           <div className="space-y-5">
-            {/* Slot progress */}
-            {status?.activePass && <SlotProgress used={used} limit={limit} />}
+            {/* Slot progress / recruiter badge */}
+            {isRecruiter ? (
+              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Users className="w-4.5 h-4.5 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-primary">Recruiter Plan — Unlimited batch analysis</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Analyze as many CVs as you need. No per-batch pass required.</p>
+                </div>
+              </div>
+            ) : status?.activePass ? (
+              <SlotProgress used={used} limit={limit} />
+            ) : null}
 
             {/* Previous results banner */}
             {completedResults.length > 0 && (
