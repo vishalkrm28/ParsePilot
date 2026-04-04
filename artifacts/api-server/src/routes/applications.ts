@@ -429,36 +429,34 @@ router.post("/applications/:id/analyze", async (req, res) => {
 
     // ── 2. Credit / bulk-slot gate ───────────────────────────────────────────
     if (ownerUserId) {
-      if (effectiveBulkSession) {
-        if (isRecruiterUser) {
-          // Recruiter Solo/Team plan: batch analysis is included in the plan.
-          // No bulk pass required and no credits consumed.
-          logger.debug({ userId: ownerUserId }, "Recruiter plan — bulk slot skipped");
-        } else {
-          // Regular bulk mode: requires a purchased bulk pass.
-          const slotConsumed = await consumeBulkSlot(ownerUserId);
-          if (!slotConsumed) {
-            res.status(402).json({
-              error: "You have no remaining CV slots. Purchase a new Bulk pass to continue.",
-              code: "BULK_SLOTS_EXHAUSTED",
-            });
-            return;
-          }
+      if (effectiveBulkSession && !isRecruiterUser) {
+        // Regular bulk mode: requires a purchased bulk pass. Spend one slot.
+        const slotConsumed = await consumeBulkSlot(ownerUserId);
+        if (!slotConsumed) {
+          res.status(402).json({
+            error: "You have no remaining CV slots. Purchase a new Bulk pass to continue.",
+            code: "BULK_SLOTS_EXHAUSTED",
+          });
+          return;
         }
       } else {
-        // Regular single-CV analysis → deduct from credit balance.
-        // Covers: Pro users (100 credits/month) and Free users (3 lifetime).
+        // Single-CV analysis OR recruiter (single or batch).
+        // Recruiter plan holders use their monthly token allowance (1 token = 1 CV).
+        // Free/Pro users use the standard credit balance.
         const baseCost = CREDIT_COSTS.cv_optimization;
         if (baseCost > 0) {
           const spend = await spendCredits(ownerUserId, baseCost, "cv_optimization", {
             applicationId: id,
+            source: isRecruiterUser ? "recruiter" : "standard",
           });
           if (!spend.success) {
-            const balance = await getUserCredits(ownerUserId);
+            const errorMsg = isRecruiterUser
+              ? "You've used all your monthly CV tokens. Your allowance resets at the start of your next billing period."
+              : "You've used all your optimization credits.";
             res.status(402).json({
-              error: "You've used all your optimization credits.",
+              error: errorMsg,
               code: "CREDITS_EXHAUSTED",
-              remainingCredits: balance?.availableCredits ?? 0,
+              remainingCredits: spend.remaining,
             });
             return;
           }

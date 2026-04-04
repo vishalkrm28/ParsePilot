@@ -6,6 +6,8 @@ import { logger } from "./logger.js";
 
 export const FREE_CREDIT_ALLOWANCE = 3;
 export const PRO_CREDIT_ALLOWANCE = 100;
+export const RECRUITER_SOLO_CREDIT_ALLOWANCE = 100;
+export const RECRUITER_TEAM_CREDIT_ALLOWANCE = 400;
 
 export const CREDIT_COSTS = {
   cv_optimization: 1,
@@ -21,6 +23,7 @@ export type CreditEventType =
   | keyof typeof CREDIT_COSTS
   | "credits_init"
   | "credits_reset_pro"
+  | "credits_reset_recruiter"
   | "identity_switch";
 
 // ─── getUserCredits ────────────────────────────────────────────────────────────
@@ -204,4 +207,67 @@ export async function resetProCreditsIfNeeded(
     { userId, periodStart, periodEnd, credits: PRO_CREDIT_ALLOWANCE },
     "Pro credits reset for new billing period",
   );
+}
+
+// ─── resetRecruiterCreditsIfNeeded ────────────────────────────────────────────
+// Called from the webhook when a recruiter subscription becomes active or renews.
+// Grants 100 tokens for Solo plan, 400 for Team plan — monthly, per billing period.
+// Uses the same billingPeriodStart guard as resetProCreditsIfNeeded to prevent
+// double-seeding if the same webhook event fires more than once.
+
+export async function resetRecruiterCreditsIfNeeded(
+  userId: string,
+  plan: "solo" | "team",
+  periodStart: Date,
+  periodEnd: Date,
+): Promise<void> {
+  const allowance =
+    plan === "team" ? RECRUITER_TEAM_CREDIT_ALLOWANCE : RECRUITER_SOLO_CREDIT_ALLOWANCE;
+
+  // Load current balance to check the guard
+  const [balance] = await db
+    .select({ billingPeriodStart: usageBalancesTable.billingPeriodStart })
+    .from(usageBalancesTable)
+    .where(eq(usageBalancesTable.userId, userId))
+    .limit(1);
+
+  if (balance?.billingPeriodStart?.getTime() === periodStart.getTime()) {
+    logger.debug({ userId, plan, periodStart }, "Recruiter credits already seeded for this billing period — skipping");
+    return;
+  }
+
+  const now = new Date();
+
+  await db
+    .insert(usageBalancesTable)
+    .values({
+      userId,
+      availableCredits: allowance,
+      billingPeriodStart: periodStart,
+      billingPeriodEnd: periodEnd,
+      lastResetAt: now,
+    })
+    .onConflictDoUpdate({
+      target: usageBalancesTable.userId,
+      set: {
+        availableCredits: allowance,
+        billingPeriodStart: periodStart,
+        billingPeriodEnd: periodEnd,
+        lastResetAt: now,
+        updatedAt: now,
+      },
+    });
+
+  await db.insert(usageEventsTable).values({
+    userId,
+    type: "credits_reset_recruiter",
+    creditsDelta: allowance,
+    metadata: {
+      plan,
+      periodStart: periodStart.toISOString(),
+      periodEnd: periodEnd.toISOString(),
+    },
+  });
+
+  logger.info({ userId, plan, allowance, periodStart, periodEnd }, "Recruiter tokens reset for new billing period");
 }

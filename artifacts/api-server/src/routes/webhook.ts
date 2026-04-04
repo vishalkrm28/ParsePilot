@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { db, usersTable, unlockPurchasesTable, bulkPassesTable, recruiterTeamInvitesTable } from "@workspace/db";
 import { getStripe } from "../lib/stripe.js";
 import { logger } from "../lib/logger.js";
-import { resetProCreditsIfNeeded } from "../lib/credits.js";
+import { resetProCreditsIfNeeded, resetRecruiterCreditsIfNeeded } from "../lib/credits.js";
 import { isValidTier, BULK_TIERS } from "../lib/bulk.js";
 
 const router: IRouter = Router();
@@ -648,6 +648,19 @@ async function applyRecruiterSubscription(userId: string, subscription: Stripe.S
       recruiterSubscriptionStatus: isActive ? plan : null,
     })
     .where(eq(usersTable.id, userId));
+
+  // Grant/renew monthly CV tokens when the subscription is active or trialing.
+  // 100 tokens for Solo, 400 for Team — reset each billing period.
+  if (isActive) {
+    const periodStart = subscription.current_period_start
+      ? new Date(subscription.current_period_start * 1000)
+      : new Date();
+    const periodEnd = subscription.current_period_end
+      ? new Date(subscription.current_period_end * 1000)
+      : new Date();
+    await resetRecruiterCreditsIfNeeded(userId, plan, periodStart, periodEnd);
+  }
+
   logger.info({ userId, plan, status: subscription.status }, "Recruiter subscription applied");
 }
 

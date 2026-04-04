@@ -12,7 +12,7 @@ import {
   getBulkPassCount,
 } from "../lib/bulk.js";
 import { isUserPro, getUserBillingProfile, isUserRecruiter } from "../lib/billing.js";
-import { spendCredits } from "../lib/credits.js";
+import { spendCredits, getUserCredits, RECRUITER_SOLO_CREDIT_ALLOWANCE, RECRUITER_TEAM_CREDIT_ALLOWANCE } from "../lib/credits.js";
 
 function stripeErrContext(err: unknown): Record<string, unknown> {
   if (err && typeof err === "object" && "type" in err) {
@@ -35,16 +35,36 @@ router.get("/billing/bulk-status", async (req, res) => {
   }
 
   try {
-    const [pro, activePass, passCount, recruiter] = await Promise.all([
+    const [pro, activePass, passCount, recruiterStatus] = await Promise.all([
       isUserPro(req.user.id),
       getActiveBulkPass(req.user.id),
       getBulkPassCount(req.user.id),
       isUserRecruiter(req.user.id),
     ]);
 
+    // For recruiter users, fetch their credit balance so the UI can display
+    // remaining tokens and the monthly limit.
+    let recruiterTokens: { remaining: number; total: number; plan: "solo" | "team" } | null = null;
+    if (recruiterStatus) {
+      const [userRow] = await db
+        .select({ recruiterSubscriptionStatus: usersTable.recruiterSubscriptionStatus })
+        .from(usersTable)
+        .where(eq(usersTable.id, req.user.id))
+        .limit(1);
+      const plan = (userRow?.recruiterSubscriptionStatus ?? "solo") as "solo" | "team";
+      const total = plan === "team" ? RECRUITER_TEAM_CREDIT_ALLOWANCE : RECRUITER_SOLO_CREDIT_ALLOWANCE;
+      const creditBalance = await getUserCredits(req.user.id);
+      recruiterTokens = {
+        remaining: creditBalance?.availableCredits ?? 0,
+        total,
+        plan,
+      };
+    }
+
     res.json({
       isPro: pro,
-      isRecruiter: recruiter,
+      isRecruiter: recruiterStatus,
+      recruiterTokens,
       activePass: activePass
         ? {
             id: activePass.id,

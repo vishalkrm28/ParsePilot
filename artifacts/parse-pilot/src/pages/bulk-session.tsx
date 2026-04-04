@@ -35,9 +35,16 @@ import { useToast } from "@/hooks/use-toast";
 
 const SESSION_KEY = "bulk_completed_results";
 
+interface RecruiterTokens {
+  remaining: number;
+  total: number;
+  plan: "solo" | "team";
+}
+
 interface BulkStatus {
   isPro: boolean;
   isRecruiter: boolean;
+  recruiterTokens: RecruiterTokens | null;
   activePass: {
     id: string;
     tier: string;
@@ -72,6 +79,48 @@ interface CompletedResult {
 }
 
 type PageView = "session" | "results";
+
+// ─── Recruiter token balance ──────────────────────────────────────────────────
+
+function RecruiterTokenBadge({ tokens }: { tokens: { remaining: number; total: number; plan: "solo" | "team" } }) {
+  const pct = Math.round((tokens.remaining / tokens.total) * 100);
+  const isLow = tokens.remaining <= Math.ceil(tokens.total * 0.15);
+  const planLabel = tokens.plan === "team" ? "Recruiter Team" : "Recruiter Solo";
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <p className="font-semibold text-sm">{planLabel} — CV tokens</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {tokens.remaining} remaining of {tokens.total} this month
+          </p>
+        </div>
+        <span className={cn("text-2xl font-extrabold", isLow ? "text-amber-500" : "text-primary")}>
+          {tokens.remaining}/{tokens.total}
+        </span>
+      </div>
+      <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+        <div
+          className={cn("h-full rounded-full transition-all", isLow ? "bg-amber-500" : "bg-primary")}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {isLow && tokens.remaining > 0 && (
+        <p className="text-xs text-amber-600 mt-2 flex items-center gap-1.5">
+          <AlertCircle className="w-3.5 h-3.5" />
+          {tokens.remaining} token{tokens.remaining !== 1 ? "s" : ""} left — resets at your next billing date
+        </p>
+      )}
+      {tokens.remaining === 0 && (
+        <p className="text-xs text-red-600 mt-2 flex items-center gap-1.5">
+          <AlertCircle className="w-3.5 h-3.5" />
+          All tokens used — balance resets at the start of your next billing period
+        </p>
+      )}
+    </div>
+  );
+}
 
 // ─── Slot progress bar ────────────────────────────────────────────────────────
 
@@ -421,13 +470,15 @@ export default function BulkSession() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Access: recruiter plan holders get unlimited batch analysis; others need a bulk pass.
+  // Access: recruiter plan holders use their monthly token allowance; others need a bulk pass.
   const isRecruiter = !!(status?.isRecruiter);
-  const hasAccess = isRecruiter || !!(status?.activePass && status.activePass.remaining > 0);
-  // For recruiter users: use a large cap so the dropzone doesn't block uploads.
-  const remaining = isRecruiter ? 50 : (status?.activePass?.remaining ?? 0);
-  const limit = isRecruiter ? 50 : (status?.activePass?.cvLimit ?? 0);
-  const used = isRecruiter ? 0 : (limit - remaining);
+  const recruiterTokens = status?.recruiterTokens ?? null;
+  const hasAccess = (isRecruiter && (recruiterTokens?.remaining ?? 0) > 0)
+    || !!(status?.activePass && status.activePass.remaining > 0);
+  // Slot counts: recruiter uses their actual token balance; others use their bulk pass.
+  const remaining = isRecruiter ? (recruiterTokens?.remaining ?? 0) : (status?.activePass?.remaining ?? 0);
+  const limit = isRecruiter ? (recruiterTokens?.total ?? 0) : (status?.activePass?.cvLimit ?? 0);
+  const used = limit - remaining;
 
   // ── Dropzone (multiple files) ─────────────────────────────────────────────
 
@@ -657,17 +708,28 @@ export default function BulkSession() {
             <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
               <Lock className="w-6 h-6 text-muted-foreground" />
             </div>
-            <h2 className="text-xl font-bold mb-2">No active bulk pass</h2>
-            <p className="text-muted-foreground text-sm mb-6 max-w-sm mx-auto">
-              Purchase a bulk pass to start analyzing multiple CVs.
-            </p>
-            <button
-              onClick={() => navigate("/bulk")}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
-            >
-              <Users className="w-4 h-4" />
-              View bulk pricing
-            </button>
+            {isRecruiter ? (
+              <>
+                <h2 className="text-xl font-bold mb-2">Monthly tokens used up</h2>
+                <p className="text-muted-foreground text-sm mb-6 max-w-sm mx-auto">
+                  You've used all your CV tokens for this billing period. Your balance resets automatically at the start of your next period.
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold mb-2">No active bulk pass</h2>
+                <p className="text-muted-foreground text-sm mb-6 max-w-sm mx-auto">
+                  Purchase a bulk pass to start analyzing multiple CVs.
+                </p>
+                <button
+                  onClick={() => navigate("/bulk")}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
+                >
+                  <Users className="w-4 h-4" />
+                  View bulk pricing
+                </button>
+              </>
+            )}
           </div>
         ) : view === "results" ? (
           <ResultsView
@@ -677,17 +739,9 @@ export default function BulkSession() {
           />
         ) : (
           <div className="space-y-5">
-            {/* Slot progress / recruiter badge */}
-            {isRecruiter ? (
-              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Users className="w-4.5 h-4.5 text-primary" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-primary">Recruiter Plan — Unlimited batch analysis</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Analyze as many CVs as you need. No per-batch pass required.</p>
-                </div>
-              </div>
+            {/* Slot progress / recruiter token balance */}
+            {isRecruiter && recruiterTokens ? (
+              <RecruiterTokenBadge tokens={recruiterTokens} />
             ) : status?.activePass ? (
               <SlotProgress used={used} limit={limit} />
             ) : null}
