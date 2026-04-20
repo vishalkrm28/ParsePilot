@@ -71,7 +71,13 @@ router.post("/jobs/discover", async (req, res) => {
     remoteOnly,
   });
 
-  if (!skipCache) {
+  // Skip cache when:
+  //  - caller explicitly requests skipCache
+  //  - a country filter is active (stale cache may contain jobs from other countries)
+  //  - AI ranking is requested by an auth'd user (cached path has no matchData)
+  const effectiveSkipCache = skipCache || !!defaultCountry || (aiRanking && !!userId);
+
+  if (!effectiveSkipCache) {
     const cached = await getCachedSearchResult(cacheKey);
     if (cached) {
       const cachedJobs = await getJobsByIds(cached.jobIds);
@@ -91,6 +97,7 @@ router.post("/jobs/discover", async (req, res) => {
           total: cachedJobs.length,
           cached: true,
           aiRanked: false,
+          matchData: {},
           sourceBreakdown: {},
         });
       }
@@ -180,7 +187,7 @@ router.post("/jobs/discover", async (req, res) => {
 
         await saveJobMatchResults({
           userId,
-          candidateProfileId: profile.id,
+          candidateProfileId: resolvedProfile.id,
           recommendations,
           jobIdByCanonicalKey: jobIdByKey,
         });
