@@ -105,7 +105,7 @@ export default function AdminPage() {
   const [token, setToken] = useState(() => localStorage.getItem(STORAGE_KEY) ?? "");
   const [tokenInput, setTokenInput] = useState("");
   const [authed, setAuthed] = useState(() => !!localStorage.getItem(STORAGE_KEY));
-  const [tab, setTab] = useState<"users" | "stats" | "messages" | "metrics">("users");
+  const [tab, setTab] = useState<"users" | "stats" | "messages" | "metrics" | "marketing">("users");
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [confirm, setConfirm] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -211,6 +211,7 @@ export default function AdminPage() {
               { key: "stats", icon: <BarChart3 className="w-3.5 h-3.5" />, label: "Stats" },
               { key: "metrics", icon: <DollarSign className="w-3.5 h-3.5" />, label: "Metrics" },
               { key: "messages", icon: <Mail className="w-3.5 h-3.5" />, label: "Messages" },
+              { key: "marketing", icon: <Zap className="w-3.5 h-3.5" />, label: "Marketing" },
             ] as const).map(({ key, icon, label }) => (
               <button
                 key={key}
@@ -245,6 +246,9 @@ export default function AdminPage() {
         )}
         {tab === "metrics" && (
           <MetricsTab call={call} />
+        )}
+        {tab === "marketing" && (
+          <MarketingTab call={call} />
         )}
       </div>
     </div>
@@ -1211,6 +1215,229 @@ function MetricsTab({ call }: { call: any }) {
           <p className="text-zinc-600 text-xs mt-1">Events are recorded as users interact with AI features.</p>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Marketing Tab ────────────────────────────────────────────────────────────
+
+interface MarketingStats {
+  totals: { leads: number; waitlist: number; funnelEvents: number };
+  leadsByType: { leadType: string; c: number | string }[];
+  waitlistByType: { userType: string; c: number | string }[];
+  topEvents: { eventName: string; c: number | string }[];
+  topUtmCampaigns: { utm: string | null; c: number | string }[];
+  topLeadSources: { source: string | null; c: number | string }[];
+  recentLeads: {
+    id: string; email: string; fullName: string | null; leadType: string;
+    source: string | null; utmCampaign: string | null; createdAt: string;
+  }[];
+  recentWaitlist: {
+    id: string; email: string; fullName: string | null; userType: string;
+    source: string | null; createdAt: string;
+  }[];
+}
+
+function MarketingTab({ call }: { call: any }) {
+  const [data, setData] = useState<MarketingStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    call("/_admin/marketing-stats")
+      .then((d: MarketingStats) => { setData(d); setLoading(false); })
+      .catch((e: Error) => { setError(e.message); setLoading(false); });
+  }, [call]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-zinc-400" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex items-center justify-center py-20 text-zinc-500 text-sm">
+        <AlertTriangle className="w-4 h-4 mr-2 text-red-500" /> {error || "Failed to load marketing stats"}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Totals */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: "Total Leads", value: data.totals.leads, icon: <Mail className="w-4 h-4 text-blue-400" /> },
+          { label: "Waitlist Signups", value: data.totals.waitlist, icon: <Users className="w-4 h-4 text-purple-400" /> },
+          { label: "Funnel Events", value: data.totals.funnelEvents, icon: <Zap className="w-4 h-4 text-yellow-400" /> },
+        ].map(({ label, value, icon }) => (
+          <div key={label} className="bg-zinc-800 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">{icon}<span className="text-xs text-zinc-400">{label}</span></div>
+            <p className="text-2xl font-bold text-white">{value.toLocaleString()}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Leads by type + Waitlist by type */}
+      <div className="grid grid-cols-2 gap-6">
+        <div className="bg-zinc-800 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-zinc-300 mb-3">Leads by type</h3>
+          <table className="w-full text-sm">
+            <tbody>
+              {data.leadsByType.map(r => (
+                <tr key={r.leadType} className="border-b border-zinc-700 last:border-0">
+                  <td className="py-2 text-zinc-300 capitalize">{r.leadType}</td>
+                  <td className="py-2 text-right font-mono text-zinc-400">{Number(r.c)}</td>
+                </tr>
+              ))}
+              {data.leadsByType.length === 0 && (
+                <tr><td colSpan={2} className="py-4 text-center text-zinc-600 text-xs">No leads yet</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="bg-zinc-800 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-zinc-300 mb-3">Waitlist by user type</h3>
+          <table className="w-full text-sm">
+            <tbody>
+              {data.waitlistByType.map(r => (
+                <tr key={r.userType} className="border-b border-zinc-700 last:border-0">
+                  <td className="py-2 text-zinc-300 capitalize">{r.userType}</td>
+                  <td className="py-2 text-right font-mono text-zinc-400">{Number(r.c)}</td>
+                </tr>
+              ))}
+              {data.waitlistByType.length === 0 && (
+                <tr><td colSpan={2} className="py-4 text-center text-zinc-600 text-xs">No signups yet</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Top funnel events + UTM campaigns */}
+      <div className="grid grid-cols-2 gap-6">
+        <div className="bg-zinc-800 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-zinc-300 mb-3">Top funnel events</h3>
+          <table className="w-full text-sm">
+            <tbody>
+              {data.topEvents.map(r => (
+                <tr key={r.eventName} className="border-b border-zinc-700 last:border-0">
+                  <td className="py-2 text-zinc-300 font-mono text-xs">{r.eventName}</td>
+                  <td className="py-2 text-right font-mono text-zinc-400">{Number(r.c)}</td>
+                </tr>
+              ))}
+              {data.topEvents.length === 0 && (
+                <tr><td colSpan={2} className="py-4 text-center text-zinc-600 text-xs">No events yet</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="bg-zinc-800 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-zinc-300 mb-3">Top UTM campaigns</h3>
+          <table className="w-full text-sm">
+            <tbody>
+              {data.topUtmCampaigns.map(r => (
+                <tr key={r.utm} className="border-b border-zinc-700 last:border-0">
+                  <td className="py-2 text-zinc-300 font-mono text-xs">{r.utm ?? "(none)"}</td>
+                  <td className="py-2 text-right font-mono text-zinc-400">{Number(r.c)}</td>
+                </tr>
+              ))}
+              {data.topUtmCampaigns.length === 0 && (
+                <tr><td colSpan={2} className="py-4 text-center text-zinc-600 text-xs">No UTM data yet</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Lead sources */}
+      {data.topLeadSources.length > 0 && (
+        <div className="bg-zinc-800 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-zinc-300 mb-3">Lead sources</h3>
+          <table className="w-full text-sm">
+            <tbody>
+              {data.topLeadSources.map(r => (
+                <tr key={r.source} className="border-b border-zinc-700 last:border-0">
+                  <td className="py-2 text-zinc-300">{r.source ?? "(direct)"}</td>
+                  <td className="py-2 text-right font-mono text-zinc-400">{Number(r.c)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Recent leads */}
+      <div className="bg-zinc-800 rounded-xl p-4">
+        <h3 className="text-sm font-semibold text-zinc-300 mb-3">Recent leads</h3>
+        {data.recentLeads.length === 0 ? (
+          <p className="text-zinc-600 text-xs text-center py-6">No leads captured yet</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-zinc-700 text-zinc-500 text-left">
+                  <th className="pb-2 pr-3">Email</th>
+                  <th className="pb-2 pr-3">Name</th>
+                  <th className="pb-2 pr-3">Type</th>
+                  <th className="pb-2 pr-3">Source</th>
+                  <th className="pb-2">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.recentLeads.map(lead => (
+                  <tr key={lead.id} className="border-b border-zinc-700/50 last:border-0">
+                    <td className="py-2 pr-3 text-zinc-300">{lead.email}</td>
+                    <td className="py-2 pr-3 text-zinc-400">{lead.fullName ?? "—"}</td>
+                    <td className="py-2 pr-3">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-700 text-zinc-300 capitalize">{lead.leadType}</span>
+                    </td>
+                    <td className="py-2 pr-3 text-zinc-500">{lead.source ?? "—"}</td>
+                    <td className="py-2 text-zinc-600">{new Date(lead.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Recent waitlist */}
+      <div className="bg-zinc-800 rounded-xl p-4">
+        <h3 className="text-sm font-semibold text-zinc-300 mb-3">Recent waitlist signups</h3>
+        {data.recentWaitlist.length === 0 ? (
+          <p className="text-zinc-600 text-xs text-center py-6">No waitlist signups yet</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-zinc-700 text-zinc-500 text-left">
+                  <th className="pb-2 pr-3">Email</th>
+                  <th className="pb-2 pr-3">Name</th>
+                  <th className="pb-2 pr-3">Type</th>
+                  <th className="pb-2">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.recentWaitlist.map(signup => (
+                  <tr key={signup.id} className="border-b border-zinc-700/50 last:border-0">
+                    <td className="py-2 pr-3 text-zinc-300">{signup.email}</td>
+                    <td className="py-2 pr-3 text-zinc-400">{signup.fullName ?? "—"}</td>
+                    <td className="py-2 pr-3">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-700 text-zinc-300 capitalize">{signup.userType}</span>
+                    </td>
+                    <td className="py-2 text-zinc-600">{new Date(signup.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

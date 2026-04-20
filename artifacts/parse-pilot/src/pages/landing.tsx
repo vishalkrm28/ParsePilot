@@ -893,6 +893,56 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── Audience split ───────────────────────────────────────────────── */}
+      <section className="max-w-6xl mx-auto px-6 py-20">
+        <div className="text-center mb-12">
+          <p className="text-primary text-sm font-semibold uppercase tracking-wider mb-3">Who is ResuOne for?</p>
+          <h2 className="text-3xl md:text-4xl font-bold">Built for two sides of hiring</h2>
+          <p className="text-muted-foreground mt-3 text-lg">
+            Whether you're looking for a job or looking for the right hire — ResuOne has a dedicated experience for you.
+          </p>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-6">
+          {/* For candidates */}
+          <a
+            href="/for-candidates"
+            className="group bg-card border border-border/60 rounded-2xl p-8 hover:border-primary/40 hover:shadow-md transition-all flex flex-col"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-5">
+              <FileText className="w-6 h-6 text-primary" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground mb-3">For job seekers</h3>
+            <p className="text-muted-foreground text-sm leading-relaxed flex-1">
+              Analyse your CV, generate tailored versions per role, write cover letters, track your applications, and prepare for interviews — all from one dashboard.
+            </p>
+            <div className="mt-6 flex items-center gap-2 text-sm font-semibold text-primary group-hover:gap-3 transition-all">
+              Explore candidate features <ArrowRight className="w-4 h-4" />
+            </div>
+          </a>
+          {/* For recruiters */}
+          <a
+            href="/for-recruiters"
+            className="group bg-card border border-border/60 rounded-2xl p-8 hover:border-purple-400/40 hover:shadow-md transition-all flex flex-col"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center mb-5">
+              <Users className="w-6 h-6 text-purple-600" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground mb-3">For recruiters &amp; hiring teams</h3>
+            <p className="text-muted-foreground text-sm leading-relaxed flex-1">
+              Rank and compare candidates against your job description with AI. Post jobs, manage your pipeline, invite candidates, and collaborate with your team.
+            </p>
+            <div className="mt-6 flex items-center gap-2 text-sm font-semibold text-purple-600 group-hover:gap-3 transition-all">
+              Explore recruiter features <ArrowRight className="w-4 h-4" />
+            </div>
+          </a>
+        </div>
+        <p className="text-center text-sm mt-8">
+          <a href="/pricing" className="text-primary font-medium hover:underline inline-flex items-center gap-1.5">
+            Compare all plans and pricing <ArrowRight className="w-3.5 h-3.5" />
+          </a>
+        </p>
+      </section>
+
       {/* ── FAQ ─────────────────────────────────────────────────────────── */}
       <section>
         <div className="max-w-2xl mx-auto px-6 py-20">

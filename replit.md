@@ -380,6 +380,51 @@ Maximize conversion from free users to paid users ($4 unlock or Pro subscription
 - Trust signals: "No fake experience added · ATS-friendly formatting · Edit before export"
 - No hype language or AI buzzwords
 
+## M39 — Marketing & Growth Layer
+
+### Goal
+Add a full marketing growth layer on top of the existing ResuOne product — enhance only, no rewrites.
+
+### New DB Tables
+- `marketing_leads` — lead capture (email + UTM + source tracking)
+- `waitlist_signups` — early access waitlist (segmented by candidate/recruiter/institution)
+- `funnel_events` — anonymous funnel tracking events
+- `seo_pages` — DB-backed dynamic SEO pages
+
+### New API Routes (`artifacts/api-server/src/routes/marketing.ts`)
+- `POST /marketing/lead-capture` — capture marketing leads
+- `POST /marketing/waitlist` — record waitlist signups (idempotent on duplicate email)
+- `POST /marketing/funnel-event` — fire-and-forget funnel tracking (never fails the client)
+- `GET /marketing/seo-pages` — list published SEO pages
+- `GET /marketing/seo-pages/:slug` — fetch single SEO page by slug
+- `GET /_admin/marketing-stats` — admin stats endpoint (leads, waitlist, events, UTM breakdown)
+
+### New Marketing Pages (`artifacts/parse-pilot/src/pages/marketing/`)
+- `/pricing` — standalone pricing page (Free / Pro $14.99 / Recruiter Solo $29.99 / Recruiter Team $79)
+- `/for-candidates` — candidate-focused landing page
+- `/for-recruiters` — recruiter-focused landing page with demo CTA
+- `/waitlist` — early access waitlist page with tabbed form (candidate/recruiter/institution)
+- `/features` — full features overview page with clickable feature cards
+- `/features/:slug` — 16 individual feature detail pages
+- `/use-cases/:slug` — 5 use case pages (graduate, career-change, multiple-applications, high-volume-recruiting, executive)
+
+### New SEO Page
+- `/seo/:slug` — dynamic DB-backed SEO page (fetches `seo_pages` table at runtime)
+
+### New Marketing Components (`artifacts/parse-pilot/src/components/marketing/`)
+- `section-shell.tsx` + `SectionHeading` — reusable section wrapper
+- `cta-band.tsx` — full-width CTA section
+- `feature-grid.tsx` — responsive feature card grid
+- `lead-form.tsx` — inline email lead capture form
+- `waitlist-form.tsx` — waitlist signup form with name/company fields
+- `faq.tsx` — accordion FAQ section
+
+### Landing Page Enhancement
+- Added "Built for two sides of hiring" audience-split section (for-candidates / for-recruiters split cards + link to /pricing)
+
+### Admin Panel
+- Added **Marketing tab** to admin.tsx showing: totals (leads/waitlist/funnel), leads by type, waitlist by user type, top funnel events, UTM campaign breakdown, lead source breakdown, recent leads table, recent waitlist table
+
 ## Vite Config Note
 
 `artifacts/parse-pilot/vite.config.ts` has `fs.allow` set to include the workspace root's `lib/` and `node_modules/` directories so that workspace packages (e.g. `@workspace/replit-auth-web`) can be resolved by Vite in development.

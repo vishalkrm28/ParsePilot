@@ -15,3 +15,4 @@ export * from "./notifications";
 export * from "./plans";
 export * from "./workspaces";
 export * from "./feature-usage";
+export * from "./marketing";
