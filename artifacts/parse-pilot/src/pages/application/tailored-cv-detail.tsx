@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   getTailoredCv,
@@ -300,17 +299,16 @@ export default function TailoredCvDetailPage() {
               </h3>
               {!generatedLetter ? (
                 <div className="flex items-center gap-3 flex-wrap">
-                  <Select value={coverLetterTone} onValueChange={setCoverLetterTone}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent position="popper" sideOffset={4}>
-                      <SelectItem value="professional">Professional</SelectItem>
-                      <SelectItem value="confident">Confident</SelectItem>
-                      <SelectItem value="warm">Warm</SelectItem>
-                      <SelectItem value="concise">Concise</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <select
+                    value={coverLetterTone}
+                    onChange={(e) => setCoverLetterTone(e.target.value)}
+                    className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring w-44"
+                  >
+                    <option value="professional">Professional</option>
+                    <option value="confident">Confident</option>
+                    <option value="warm">Warm</option>
+                    <option value="concise">Concise</option>
+                  </select>
                   <Button onClick={handleGenerateCoverLetter} disabled={generatingCoverLetter}>
                     {generatingCoverLetter ? (
                       <>
