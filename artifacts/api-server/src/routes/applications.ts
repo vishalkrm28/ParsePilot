@@ -34,20 +34,15 @@ router.get("/applications", async (req, res) => {
     return;
   }
 
-  const { userId } = req.query;
-  if (!userId || typeof userId !== "string") {
-    res.status(400).json({ error: "userId query param is required", code: "MISSING_USER_ID" });
-    return;
-  }
-
-  // ── Ownership gate ─────────────────────────────────────────────────────────
-  // Only the authenticated user may list their own applications.
-  // This prevents user A from listing user B's applications by passing a
-  // different userId in the query string.
-  if (userId !== req.user.id) {
+  // userId query param is optional — defaults to the authenticated user.
+  // If explicitly provided, it must match the authenticated user (prevents
+  // user A from listing user B's applications).
+  const queriedUserId = req.query.userId as string | undefined;
+  if (queriedUserId && queriedUserId !== req.user.id) {
     res.status(403).json({ error: "Access denied", code: "FORBIDDEN" });
     return;
   }
+  const userId = queriedUserId ?? req.user.id;
 
   try {
     const apps = await db
