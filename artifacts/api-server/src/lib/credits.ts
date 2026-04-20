@@ -24,7 +24,9 @@ export type CreditEventType =
   | "credits_init"
   | "credits_reset_pro"
   | "credits_reset_recruiter"
-  | "identity_switch";
+  | "identity_switch"
+  | "job_rec_credits_granted"
+  | "job_rec_credit_spent";
 
 // ─── getUserCredits ────────────────────────────────────────────────────────────
 // Returns the user's current credit balance row, or null if not found.
@@ -270,4 +272,76 @@ export async function resetRecruiterCreditsIfNeeded(
   });
 
   logger.info({ userId, plan, allowance, periodStart, periodEnd }, "Recruiter tokens reset for new billing period");
+}
+
+// ─── Job Recommendation Credits ───────────────────────────────────────────────
+// Separate from AI analysis credits. Granted on every paid unlock or Pro
+// subscription activation. Decremented on each recommendation run.
+
+export const JOB_REC_CREDITS_PER_PURCHASE = 10;
+
+export async function getJobRecCredits(userId: string): Promise<number> {
+  await initFreeCredits(userId);
+  const [balance] = await db
+    .select({ jobRecCredits: usageBalancesTable.jobRecCredits })
+    .from(usageBalancesTable)
+    .where(eq(usageBalancesTable.userId, userId))
+    .limit(1);
+  return balance?.jobRecCredits ?? 0;
+}
+
+export async function grantJobRecCredits(userId: string, amount: number): Promise<void> {
+  await initFreeCredits(userId);
+  await db
+    .update(usageBalancesTable)
+    .set({
+      jobRecCredits: sql`job_rec_credits + ${amount}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(usageBalancesTable.userId, userId));
+
+  await db.insert(usageEventsTable).values({
+    userId,
+    type: "job_rec_credits_granted",
+    creditsDelta: amount,
+    metadata: { amount },
+  });
+
+  logger.info({ userId, amount }, "Job recommendation credits granted");
+}
+
+export async function spendJobRecCredit(
+  userId: string,
+): Promise<{ success: boolean; remaining: number }> {
+  await initFreeCredits(userId);
+
+  const [updated] = await db
+    .update(usageBalancesTable)
+    .set({
+      jobRecCredits: sql`job_rec_credits - 1`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(usageBalancesTable.userId, userId),
+        gte(usageBalancesTable.jobRecCredits, 1),
+      ),
+    )
+    .returning({ jobRecCredits: usageBalancesTable.jobRecCredits });
+
+  if (!updated) {
+    const remaining = await getJobRecCredits(userId);
+    logger.warn({ userId, remaining }, "Job rec credit spend blocked — no credits");
+    return { success: false, remaining };
+  }
+
+  await db.insert(usageEventsTable).values({
+    userId,
+    type: "job_rec_credit_spent",
+    creditsDelta: -1,
+    metadata: null,
+  });
+
+  logger.info({ userId, remaining: updated.jobRecCredits }, "Job rec credit spent");
+  return { success: true, remaining: updated.jobRecCredits };
 }

@@ -10,6 +10,7 @@ import {
   BriefcaseBusiness,
   LayoutGrid,
   CreditCard,
+  Sparkles,
 } from "lucide-react";
 import { LogoBrand } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,7 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/new", label: "New Application", icon: FilePlus2 },
   { href: "/bulk/history", label: "Bulk Mode", icon: Users },
+  { href: "/jobs/recommendations", label: "Find Jobs", icon: Sparkles },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 

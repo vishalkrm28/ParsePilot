@@ -10,6 +10,7 @@ import contactRouter from "./contact.js";
 import adminSeedRouter from "./admin-seed.js";
 import recruiterRouter from "./recruiter.js";
 import recruiterJobsRouter from "./recruiter-jobs.js";
+import jobsRouter from "./jobs.js";
 import publicRouter from "./public.js";
 
 const router: IRouter = Router();
@@ -26,5 +27,6 @@ router.use(contactRouter);
 router.use(adminSeedRouter);
 router.use(recruiterRouter);
 router.use(recruiterJobsRouter);
+router.use(jobsRouter);
 
 export default router;

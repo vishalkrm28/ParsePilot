@@ -615,3 +615,153 @@ Write the cover letter following the exact format specified.`;
   if (!content) throw new Error("AI returned empty cover letter");
   return content;
 }
+
+// ─── normalizeCandidateProfile ─────────────────────────────────────────────────
+// Converts a parsed CV JSON into a compact job-matching profile.
+// Called once per CV; result is stored in candidate_profiles and reused.
+
+export interface CandidateProfileNormalized {
+  candidate_name: string;
+  target_roles: string[];
+  seniority_level: string;
+  years_experience: number;
+  core_skills: string[];
+  tools: string[];
+  industries: string[];
+  preferred_locations: string[];
+  remote_preference: string;
+  education_level: string;
+  keywords: string[];
+}
+
+export async function normalizeCandidateProfile(
+  parsedCvJson: string,
+): Promise<CandidateProfileNormalized> {
+  const SYSTEM_PROMPT = `You are ResuOne AI. Convert the provided parsed CV JSON into a compact job-matching profile.
+
+RULES:
+- Return valid JSON only — no markdown, no code fences
+- Do not invent facts not in the CV
+- Infer target roles conservatively from actual experience
+- Keep skills and keywords concise
+- years_experience must be a number (0 if unknown)
+
+OUTPUT FORMAT (return this exact shape):
+{
+  "candidate_name": "",
+  "target_roles": [],
+  "seniority_level": "",
+  "years_experience": 0,
+  "core_skills": [],
+  "tools": [],
+  "industries": [],
+  "preferred_locations": [],
+  "remote_preference": "",
+  "education_level": "",
+  "keywords": []
+}`;
+
+  const response = await openai.responses.create({
+    model: AI_MODELS.FAST,
+    instructions: SYSTEM_PROMPT,
+    input: [{ role: "user", content: `PARSED CV JSON:\n${parsedCvJson}` }],
+    max_output_tokens: 1024,
+  });
+
+  const raw = response.output_text?.trim() ?? "";
+  const json = raw.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
+
+  try {
+    return JSON.parse(json) as CandidateProfileNormalized;
+  } catch {
+    throw new Error(`normalizeCandidateProfile: AI returned invalid JSON — ${json.slice(0, 200)}`);
+  }
+}
+
+// ─── rerankJobsWithAI ─────────────────────────────────────────────────────────
+// Takes a compact candidate profile + top pre-filtered jobs (max 20) and
+// returns the top 10 ranked with match score, fit reasons, and missing reqs.
+
+export interface JobAIRanking {
+  external_job_id: string;
+  source: string;
+  match_score: number;
+  fit_reasons: string[];
+  missing_requirements: string[];
+  recommendation_summary: string;
+}
+
+export async function rerankJobsWithAI(
+  candidateProfile: CandidateProfileNormalized,
+  jobs: Array<{
+    external_job_id: string;
+    source: string;
+    title: string;
+    company: string;
+    location: string;
+    employment_type: string;
+    remote_type: string;
+    salary_min: number | null;
+    salary_max: number | null;
+    currency: string;
+    description: string;
+  }>,
+): Promise<JobAIRanking[]> {
+  const SYSTEM_PROMPT = `You are ResuOne AI. Rank these open jobs for the given candidate.
+
+RULES:
+- Return valid JSON only — no markdown, no code fences
+- Be realistic, not flattering
+- Prefer jobs matching the candidate's title, skills, seniority, and location
+- Penalize jobs with obvious missing must-have requirements
+- match_score must be an integer 0-100
+- Return top 10 only, ordered by match_score descending
+
+OUTPUT FORMAT:
+{
+  "recommendations": [
+    {
+      "external_job_id": "",
+      "source": "",
+      "match_score": 0,
+      "fit_reasons": [],
+      "missing_requirements": [],
+      "recommendation_summary": ""
+    }
+  ]
+}`;
+
+  const compactJobs = jobs.map((j) => ({
+    id: j.external_job_id,
+    source: j.source,
+    title: j.title,
+    company: j.company,
+    location: j.location,
+    type: j.employment_type,
+    remote: j.remote_type,
+    salary: j.salary_min != null ? `${j.salary_min}–${j.salary_max} ${j.currency}` : null,
+    description: j.description.slice(0, 400),
+  }));
+
+  const response = await openai.responses.create({
+    model: AI_MODELS.MAIN,
+    instructions: SYSTEM_PROMPT,
+    input: [
+      {
+        role: "user",
+        content: `CANDIDATE PROFILE:\n${JSON.stringify(candidateProfile, null, 2)}\n\nOPEN JOBS:\n${JSON.stringify(compactJobs, null, 2)}`,
+      },
+    ],
+    max_output_tokens: 2048,
+  });
+
+  const raw = response.output_text?.trim() ?? "";
+  const json = raw.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
+
+  try {
+    const parsed = JSON.parse(json);
+    return (parsed.recommendations ?? []) as JobAIRanking[];
+  } catch {
+    throw new Error(`rerankJobsWithAI: AI returned invalid JSON — ${json.slice(0, 200)}`);
+  }
+}

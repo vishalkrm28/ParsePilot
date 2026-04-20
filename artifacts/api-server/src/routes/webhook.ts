@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { db, usersTable, unlockPurchasesTable, bulkPassesTable, recruiterTeamInvitesTable } from "@workspace/db";
 import { getStripe } from "../lib/stripe.js";
 import { logger } from "../lib/logger.js";
-import { resetProCreditsIfNeeded, resetRecruiterCreditsIfNeeded } from "../lib/credits.js";
+import { resetProCreditsIfNeeded, resetRecruiterCreditsIfNeeded, grantJobRecCredits, JOB_REC_CREDITS_PER_PURCHASE } from "../lib/credits.js";
 import { isValidTier, BULK_TIERS } from "../lib/bulk.js";
 
 const router: IRouter = Router();
@@ -462,6 +462,11 @@ async function onUnlockCheckoutCompleted(session: Stripe.Checkout.Session): Prom
     { userId, applicationId, sessionId: session.id, amountTotal, paymentStatus },
     "One-time unlock purchase recorded",
   );
+
+  if (paymentStatus === "paid") {
+    await grantJobRecCredits(userId, JOB_REC_CREDITS_PER_PURCHASE);
+    logger.info({ userId }, `${JOB_REC_CREDITS_PER_PURCHASE} job recommendation credits granted for unlock purchase`);
+  }
 }
 
 // ─── bulk_pass checkout ───────────────────────────────────────────────────────
@@ -632,6 +637,7 @@ async function applySubscription(userId: string, subscription: Stripe.Subscripti
       : new Date();
 
     await resetProCreditsIfNeeded(userId, periodStart, periodEnd);
+    await grantJobRecCredits(userId, JOB_REC_CREDITS_PER_PURCHASE);
   }
 }
 

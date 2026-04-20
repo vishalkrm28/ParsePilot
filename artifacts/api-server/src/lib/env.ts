@@ -35,6 +35,18 @@ const OPTIONAL_VARS: { name: string; hint: string }[] = [
     name: "STRIPE_CUSTOMER_PORTAL_RETURN_URL",
     hint: "Billing portal will fall back to the request's Origin header.",
   },
+  {
+    name: "ADZUNA_APP_ID",
+    hint: "Job Recommendations feature requires Adzuna API credentials (ADZUNA_APP_ID + ADZUNA_APP_KEY). Register at developer.adzuna.com.",
+  },
+  {
+    name: "ADZUNA_APP_KEY",
+    hint: "Job Recommendations feature requires Adzuna API credentials (ADZUNA_APP_ID + ADZUNA_APP_KEY). Register at developer.adzuna.com.",
+  },
+  {
+    name: "THE_MUSE_API_KEY",
+    hint: "The Muse API key is optional — the API works without it but at a lower rate limit.",
+  },
 ];
 
 /**

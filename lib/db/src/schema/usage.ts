@@ -19,6 +19,7 @@ export const usageBalancesTable = pgTable("usage_balances", {
   billingPeriodStart: timestamp("billing_period_start", { withTimezone: true }),
   billingPeriodEnd: timestamp("billing_period_end", { withTimezone: true }),
   lastResetAt: timestamp("last_reset_at", { withTimezone: true }),
+  jobRecCredits: integer("job_rec_credits").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
