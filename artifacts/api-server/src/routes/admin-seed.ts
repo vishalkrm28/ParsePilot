@@ -1,5 +1,9 @@
 import { Router } from "express";
-import { db, bulkPassesTable, usersTable, usageBalancesTable, usageEventsTable, applicationsTable, contactMessagesTable } from "@workspace/db";
+import {
+  db, bulkPassesTable, usersTable, usageBalancesTable, usageEventsTable,
+  applicationsTable, contactMessagesTable,
+  savedJobsTable, trackedApplicationsTable, interviewPrepsTable,
+} from "@workspace/db";
 import { eq, sql, ilike, or, desc, count } from "drizzle-orm";
 import Stripe from "stripe";
 import { logger } from "../lib/logger.js";
@@ -33,6 +37,10 @@ router.get("/_admin/stats", async (req, res) => {
     const [appCount] = await db.select({ count: count() }).from(applicationsTable);
     const [passCount] = await db.select({ count: count() }).from(bulkPassesTable);
     const [msgCount] = await db.select({ count: count() }).from(contactMessagesTable);
+    const [savedJobCount] = await db.select({ count: count() }).from(savedJobsTable);
+    const [trackedAppCount] = await db.select({ count: count() }).from(trackedApplicationsTable);
+    const [interviewPrepCount] = await db.select({ count: count() }).from(interviewPrepsTable);
+
     const proResult = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE subscription_status = 'active'`);
     const recruiterSoloResult = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE recruiter_subscription_status = 'solo'`);
     const recruiterTeamResult = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE recruiter_subscription_status = 'team'`);
@@ -40,6 +48,31 @@ router.get("/_admin/stats", async (req, res) => {
     const soloCount = Number((recruiterSoloResult.rows?.[0] as any)?.count ?? 0);
     const teamCount = Number((recruiterTeamResult.rows?.[0] as any)?.count ?? 0);
     const mrr = +(proCount * PRO_PRICE + soloCount * RECRUITER_SOLO_PRICE + teamCount * RECRUITER_TEAM_PRICE).toFixed(2);
+
+    // Tracker pipeline stage breakdown
+    const stageResult = await db.execute(sql`
+      SELECT stage, COUNT(*) as count FROM tracked_applications GROUP BY stage
+    `);
+    const stageBreakdown: Record<string, number> = {};
+    for (const row of (stageResult.rows ?? stageResult) as any[]) {
+      stageBreakdown[row.stage] = Number(row.count);
+    }
+
+    // Credit event type breakdown (last 30 days)
+    const creditResult = await db.execute(sql`
+      SELECT type, COUNT(*) as events, SUM(ABS(credits_delta)) as credits_spent
+      FROM usage_events
+      WHERE created_at >= NOW() - INTERVAL '30 days'
+        AND credits_delta < 0
+      GROUP BY type
+      ORDER BY credits_spent DESC
+    `);
+    const creditBreakdown = ((creditResult.rows ?? creditResult) as any[]).map(r => ({
+      type: r.type,
+      events: Number(r.events),
+      creditsSpent: Number(r.credits_spent),
+    }));
+
     res.json({
       totalUsers: Number(userCount?.count ?? 0),
       totalApplications: Number(appCount?.count ?? 0),
@@ -49,6 +82,11 @@ router.get("/_admin/stats", async (req, res) => {
       recruiterSoloUsers: soloCount,
       recruiterTeamUsers: teamCount,
       mrr,
+      totalSavedJobs: Number(savedJobCount?.count ?? 0),
+      totalTrackedApps: Number(trackedAppCount?.count ?? 0),
+      totalInterviewPreps: Number(interviewPrepCount?.count ?? 0),
+      trackerStageBreakdown: stageBreakdown,
+      creditBreakdown30d: creditBreakdown,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -126,6 +164,77 @@ router.get("/_admin/user/:userId/applications", async (req, res) => {
       .where(eq(applicationsTable.userId, userId))
       .orderBy(desc(applicationsTable.createdAt));
     res.json({ applications: apps });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /_admin/user/:userId/tracker ──────────────────────────────────────
+router.get("/_admin/user/:userId/tracker", async (req, res) => {
+  if (!authAdmin(req, res)) return;
+  const { userId } = req.params;
+  try {
+    const savedJobs = await db
+      .select({
+        id: savedJobsTable.id,
+        jobTitle: savedJobsTable.jobTitle,
+        company: savedJobsTable.company,
+        createdAt: savedJobsTable.createdAt,
+      })
+      .from(savedJobsTable)
+      .where(eq(savedJobsTable.userId, userId))
+      .orderBy(desc(savedJobsTable.createdAt))
+      .limit(20);
+
+    const trackedApps = await db
+      .select({
+        id: trackedApplicationsTable.id,
+        applicationTitle: trackedApplicationsTable.applicationTitle,
+        company: trackedApplicationsTable.company,
+        stage: trackedApplicationsTable.stage,
+        status: trackedApplicationsTable.status,
+        createdAt: trackedApplicationsTable.createdAt,
+        updatedAt: trackedApplicationsTable.updatedAt,
+      })
+      .from(trackedApplicationsTable)
+      .where(eq(trackedApplicationsTable.userId, userId))
+      .orderBy(desc(trackedApplicationsTable.updatedAt))
+      .limit(50);
+
+    const interviewPreps = await db
+      .select({
+        id: interviewPrepsTable.id,
+        prepSummary: interviewPrepsTable.prepSummary,
+        createdAt: interviewPrepsTable.createdAt,
+      })
+      .from(interviewPrepsTable)
+      .where(eq(interviewPrepsTable.userId, userId))
+      .orderBy(desc(interviewPrepsTable.createdAt))
+      .limit(10);
+
+    // Stage breakdown for this user
+    const stageResult = await db.execute(sql`
+      SELECT stage, COUNT(*) as count
+      FROM tracked_applications
+      WHERE user_id = ${userId}
+      GROUP BY stage
+    `);
+    const stageBreakdown: Record<string, number> = {};
+    for (const row of (stageResult.rows ?? stageResult) as any[]) {
+      stageBreakdown[row.stage] = Number(row.count);
+    }
+
+    res.json({
+      savedJobs,
+      trackedApps,
+      interviewPreps,
+      stageBreakdown,
+      counts: {
+        savedJobs: savedJobs.length,
+        trackedApps: trackedApps.length,
+        interviewPreps: interviewPreps.length,
+      },
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

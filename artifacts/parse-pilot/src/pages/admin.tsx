@@ -3,7 +3,7 @@ import {
   Shield, Search, CreditCard, Package, RefreshCw, LogOut,
   CheckCircle, XCircle, Loader2, Trash2, ChevronRight,
   ChevronDown, Users, BarChart3, AlertTriangle, X, FileText, Star,
-  Mail, DollarSign, Briefcase,
+  Mail, DollarSign, Briefcase, Bookmark, LayoutGrid, Sparkles,
 } from "lucide-react";
 
 const STORAGE_KEY = "pp_admin_token";
@@ -44,6 +44,17 @@ interface Stats {
   totalBulkPasses: number; totalMessages: number;
   proUsers: number; recruiterSoloUsers: number; recruiterTeamUsers: number;
   mrr: number;
+  totalSavedJobs: number; totalTrackedApps: number; totalInterviewPreps: number;
+  trackerStageBreakdown: Record<string, number>;
+  creditBreakdown30d: { type: string; events: number; creditsSpent: number }[];
+}
+
+interface TrackerData {
+  savedJobs: { id: string; jobTitle: string; company: string | null; createdAt: string }[];
+  trackedApps: { id: string; applicationTitle: string; company: string | null; stage: string; status: string; createdAt: string; updatedAt: string }[];
+  interviewPreps: { id: string; prepSummary: string | null; createdAt: string }[];
+  stageBreakdown: Record<string, number>;
+  counts: { savedJobs: number; trackedApps: number; interviewPreps: number };
 }
 
 interface ContactMessage {
@@ -236,6 +247,27 @@ export default function AdminPage() {
   );
 }
 
+const STAGE_COLORS: Record<string, string> = {
+  saved: "bg-zinc-600",
+  preparing: "bg-blue-600",
+  applied: "bg-purple-600",
+  screening: "bg-yellow-500",
+  interview: "bg-orange-500",
+  final_round: "bg-pink-500",
+  offer: "bg-green-500",
+  rejected: "bg-red-500",
+  withdrawn: "bg-zinc-500",
+};
+
+const STAGE_ORDER = ["saved","preparing","applied","screening","interview","final_round","offer","rejected","withdrawn"];
+
+const CREDIT_TYPE_LABELS: Record<string, string> = {
+  cv_optimization: "CV Analysis",
+  cover_letter: "Cover Letter",
+  tailored_cv: "Tailored CV",
+  interview_prep: "Interview Prep",
+};
+
 function StatsTab({ call }: { call: any }) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -263,12 +295,25 @@ function StatsTab({ call }: { call: any }) {
     { label: "Contact messages", value: stats?.totalMessages ?? 0, color: "text-zinc-400", fmt: "int" },
   ];
 
+  const trackerCards = [
+    { label: "Saved Jobs", value: stats?.totalSavedJobs ?? 0, color: "text-amber-400", fmt: "int", icon: <Bookmark className="w-3.5 h-3.5" /> },
+    { label: "Tracked Applications", value: stats?.totalTrackedApps ?? 0, color: "text-indigo-400", fmt: "int", icon: <LayoutGrid className="w-3.5 h-3.5" /> },
+    { label: "Interview Preps", value: stats?.totalInterviewPreps ?? 0, color: "text-violet-400", fmt: "int", icon: <Sparkles className="w-3.5 h-3.5" /> },
+    { label: "Contact messages", value: stats?.totalMessages ?? 0, color: "text-zinc-400", fmt: "int", icon: <Mail className="w-3.5 h-3.5" /> },
+  ];
+
   const fmt = (v: number, f: string) => f === "usd" ? `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : v.toLocaleString();
 
+  const stageBreakdown = stats?.trackerStageBreakdown ?? {};
+  const totalTrackedWithStages = Object.values(stageBreakdown).reduce((a, b) => a + b, 0);
+
+  const creditBreakdown = stats?.creditBreakdown30d ?? [];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Usage */}
       <div>
-        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Usage</p>
+        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Platform Usage</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {mainCards.map(c => (
             <div key={c.label} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
@@ -278,6 +323,8 @@ function StatsTab({ call }: { call: any }) {
           ))}
         </div>
       </div>
+
+      {/* Revenue */}
       <div>
         <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
           <DollarSign className="w-3.5 h-3.5" />Revenue
@@ -291,6 +338,79 @@ function StatsTab({ call }: { call: any }) {
           ))}
         </div>
       </div>
+
+      {/* Job Tracker */}
+      <div>
+        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+          <LayoutGrid className="w-3.5 h-3.5" />Job Tracker
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+          {trackerCards.map(c => (
+            <div key={c.label} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+              <p className="text-xs text-zinc-400 uppercase tracking-wide flex items-center gap-1">
+                {c.icon}{c.label}
+              </p>
+              <p className={`text-3xl font-bold mt-2 ${c.color}`}>{fmt(c.value, c.fmt)}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Pipeline stage breakdown */}
+        {totalTrackedWithStages > 0 && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+            <p className="text-xs text-zinc-400 uppercase tracking-wide mb-3">Pipeline Stage Distribution</p>
+            <div className="space-y-2">
+              {STAGE_ORDER.filter(s => stageBreakdown[s]).map(stage => {
+                const n = stageBreakdown[stage] ?? 0;
+                const pct = totalTrackedWithStages > 0 ? Math.round((n / totalTrackedWithStages) * 100) : 0;
+                return (
+                  <div key={stage} className="flex items-center gap-3">
+                    <span className="text-xs text-zinc-400 w-24 capitalize flex-shrink-0">{stage.replace(/_/g, " ")}</span>
+                    <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${STAGE_COLORS[stage] ?? "bg-zinc-600"}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-zinc-400 w-8 text-right flex-shrink-0">{n}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Credit usage breakdown (30d) */}
+      {creditBreakdown.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <CreditCard className="w-3.5 h-3.5" />Credit Usage (last 30 days)
+          </p>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-800">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Feature</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Events</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Credits spent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {creditBreakdown.map((row, i) => (
+                  <tr key={row.type} className={i < creditBreakdown.length - 1 ? "border-b border-zinc-800/50" : ""}>
+                    <td className="px-4 py-3 text-zinc-300">
+                      {CREDIT_TYPE_LABELS[row.type] ?? row.type.replace(/_/g, " ")}
+                    </td>
+                    <td className="px-4 py-3 text-right text-zinc-400">{row.events.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right text-zinc-300 font-medium">{row.creditsSpent.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -500,6 +620,7 @@ function UserRow({
 }) {
   const [detail, setDetail] = useState<UserDetail | null>(null);
   const [apps, setApps] = useState<Application[]>([]);
+  const [trackerData, setTrackerData] = useState<TrackerData | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [credits, setCredits] = useState("10");
@@ -511,8 +632,9 @@ function UserRow({
     Promise.all([
       call(`/_admin/check-user/${user.id}`),
       call(`/_admin/user/${user.id}/applications`),
+      call(`/_admin/user/${user.id}/tracker`),
     ])
-      .then(([d, a]: any) => { setDetail(d); setApps(a.applications); })
+      .then(([d, a, t]: any) => { setDetail(d); setApps(a.applications); setTrackerData(t); })
       .catch((e: any) => addToast(e.message, "error"))
       .finally(() => setLoadingDetail(false));
   }, [expanded, user.id]);
@@ -529,12 +651,14 @@ function UserRow({
   }
 
   async function refreshDetail() {
-    const [d, a]: any = await Promise.all([
+    const [d, a, t]: any = await Promise.all([
       call(`/_admin/check-user/${user.id}`),
       call(`/_admin/user/${user.id}/applications`),
+      call(`/_admin/user/${user.id}/tracker`),
     ]);
     setDetail(d);
     setApps(a.applications);
+    setTrackerData(t);
   }
 
   async function grantCredits() {
@@ -686,6 +810,9 @@ function UserRow({
                 <InfoBox label="Recruiter" value={recruiterPlan ?? "none"} highlight={recruiterPlan ? "green" : undefined} />
                 <InfoBox label="CV analyses" value={apps.length.toString()} />
                 <InfoBox label="Bulk passes" value={detail?.bulkPasses?.length?.toString() ?? "0"} />
+                <InfoBox label="Saved Jobs" value={trackerData?.counts.savedJobs?.toString() ?? "0"} />
+                <InfoBox label="Tracked Apps" value={trackerData?.counts.trackedApps?.toString() ?? "0"} />
+                <InfoBox label="Interview Preps" value={trackerData?.counts.interviewPreps?.toString() ?? "0"} />
               </div>
 
               {/* Actions row */}
@@ -787,6 +914,74 @@ function UserRow({
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tracker: stage breakdown */}
+              {trackerData && Object.keys(trackerData.stageBreakdown).length > 0 && (
+                <div>
+                  <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Pipeline stages</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {STAGE_ORDER.filter(s => trackerData.stageBreakdown[s]).map(stage => (
+                      <span key={stage} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs text-white ${STAGE_COLORS[stage] ?? "bg-zinc-600"}`}>
+                        {stage.replace(/_/g, " ")} <span className="font-semibold">{trackerData.stageBreakdown[stage]}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tracker: tracked applications list */}
+              {trackerData && trackerData.trackedApps.length > 0 && (
+                <div>
+                  <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Tracked applications ({trackerData.trackedApps.length})</p>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {trackerData.trackedApps.map(app => (
+                      <div key={app.id} className="flex items-center gap-2 bg-zinc-800 rounded-lg px-3 py-2">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${STAGE_COLORS[app.stage] ?? "bg-zinc-600"}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-zinc-300 truncate">{app.applicationTitle}{app.company ? ` @ ${app.company}` : ""}</p>
+                          <p className="text-xs text-zinc-500">{app.stage.replace(/_/g, " ")} · {new Date(app.updatedAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tracker: saved jobs */}
+              {trackerData && trackerData.savedJobs.length > 0 && (
+                <div>
+                  <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Saved jobs ({trackerData.savedJobs.length})</p>
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                    {trackerData.savedJobs.map(job => (
+                      <div key={job.id} className="flex items-center gap-2 bg-zinc-800 rounded-lg px-3 py-2">
+                        <Bookmark className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-zinc-300 truncate">{job.jobTitle}{job.company ? ` @ ${job.company}` : ""}</p>
+                          <p className="text-xs text-zinc-500">{new Date(job.createdAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tracker: interview preps */}
+              {trackerData && trackerData.interviewPreps.length > 0 && (
+                <div>
+                  <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Interview preps ({trackerData.interviewPreps.length})</p>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                    {trackerData.interviewPreps.map(prep => (
+                      <div key={prep.id} className="flex items-center gap-2 bg-zinc-800 rounded-lg px-3 py-2">
+                        <Sparkles className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-zinc-300 truncate">{prep.prepSummary ?? "Interview prep generated"}</p>
+                          <p className="text-xs text-zinc-500">{new Date(prep.createdAt).toLocaleDateString()}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
