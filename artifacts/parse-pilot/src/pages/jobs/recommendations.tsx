@@ -275,7 +275,7 @@ export default function JobRecommendations() {
             <div>
               <p className="font-medium text-amber-800">No recommendation credits remaining</p>
               <p className="text-amber-700 mt-0.5">
-                Unlock a CV analysis ($6.99) to receive 10 job recommendation searches, or upgrade to Pro.
+                Pro users get 10 fresh searches every day. Not on Pro? Unlock a CV analysis ($6.99) to receive 10 one-time searches.
               </p>
             </div>
           </div>

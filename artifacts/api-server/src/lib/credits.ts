@@ -1,5 +1,6 @@
 import { and, eq, gte, sql } from "drizzle-orm";
-import { db, usageBalancesTable, usageEventsTable } from "@workspace/db";
+import { db, usageBalancesTable, usageEventsTable, usersTable } from "@workspace/db";
+import { subscriptionIsActive } from "./billing.js";
 import { logger } from "./logger.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -344,4 +345,57 @@ export async function spendJobRecCredit(
 
   logger.info({ userId, remaining: updated.jobRecCredits }, "Job rec credit spent");
   return { success: true, remaining: updated.jobRecCredits };
+}
+
+// ─── resetDailyJobRecCreditsIfNeeded ──────────────────────────────────────────
+// Pro users receive 10 job recommendation credits every calendar day (UTC).
+// Called at the start of every /jobs/recommend and /jobs/credits request.
+// Safe to call multiple times — the date guard makes it idempotent within a day.
+
+export const JOB_REC_DAILY_ALLOWANCE = 10;
+
+export async function resetDailyJobRecCreditsIfNeeded(userId: string): Promise<void> {
+  // 1. Check if the user has an active Pro subscription
+  const [user] = await db
+    .select({ subscriptionStatus: usersTable.subscriptionStatus })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .limit(1);
+
+  if (!user || !subscriptionIsActive(user.subscriptionStatus)) return;
+
+  // 2. Load current balance — check when credits were last reset
+  await initFreeCredits(userId);
+  const [balance] = await db
+    .select({ jobRecCreditsResetAt: usageBalancesTable.jobRecCreditsResetAt })
+    .from(usageBalancesTable)
+    .where(eq(usageBalancesTable.userId, userId))
+    .limit(1);
+
+  const todayUtc = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  const lastResetDay = balance?.jobRecCreditsResetAt
+    ? balance.jobRecCreditsResetAt.toISOString().slice(0, 10)
+    : null;
+
+  if (lastResetDay === todayUtc) return; // Already reset today — nothing to do
+
+  // 3. Reset to daily allowance
+  const now = new Date();
+  await db
+    .update(usageBalancesTable)
+    .set({
+      jobRecCredits: JOB_REC_DAILY_ALLOWANCE,
+      jobRecCreditsResetAt: now,
+      updatedAt: now,
+    })
+    .where(eq(usageBalancesTable.userId, userId));
+
+  await db.insert(usageEventsTable).values({
+    userId,
+    type: "job_rec_credits_granted",
+    creditsDelta: JOB_REC_DAILY_ALLOWANCE,
+    metadata: { reason: "daily_pro_reset", date: todayUtc },
+  });
+
+  logger.info({ userId, credits: JOB_REC_DAILY_ALLOWANCE, date: todayUtc }, "Daily job rec credits reset for Pro user");
 }

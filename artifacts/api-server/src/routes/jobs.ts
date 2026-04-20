@@ -12,6 +12,7 @@ import { logger } from "../lib/logger.js";
 import {
   getJobRecCredits,
   spendJobRecCredit,
+  resetDailyJobRecCreditsIfNeeded,
 } from "../lib/credits.js";
 import { normalizeCandidateProfile, rerankJobsWithAI } from "../services/ai.js";
 import { fetchAdzunaJobs } from "../lib/jobs/providers/adzuna.js";
@@ -28,6 +29,7 @@ router.get("/jobs/credits", authMiddleware, async (req, res) => {
   const userId = req.auth?.userId;
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
+  await resetDailyJobRecCreditsIfNeeded(userId);
   const credits = await getJobRecCredits(userId);
   res.json({ jobRecCredits: credits });
 });
@@ -110,11 +112,14 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
     roleType?: string;
   };
 
+  // ── Daily Pro reset (no-op for non-Pro users) ────────────────────────────────
+  await resetDailyJobRecCreditsIfNeeded(userId);
+
   // ── Credit check ────────────────────────────────────────────────────────────
   const credits = await getJobRecCredits(userId);
   if (credits < 1) {
     res.status(402).json({
-      error: "No job recommendation credits. Unlock a CV analysis to receive 10 recommendations.",
+      error: "No job recommendation credits remaining for today. Pro users get 10 fresh credits every day. Non-Pro users can unlock credits by purchasing a CV analysis.",
       code: "NO_JOB_REC_CREDITS",
     });
     return;
