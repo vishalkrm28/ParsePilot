@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { db, candidateProfilesTable, discoveredJobsTable } from "@workspace/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { logger } from "../lib/logger.js";
 import { discoverJobsFromSources } from "../lib/jobs/job-sources.js";
@@ -178,12 +178,19 @@ router.post("/jobs/discover", async (req, res) => {
           remoteOnly,
         });
 
-        // Build canonical_key → stored DB id map
-        const jobIdByKey = new Map<string, string>();
-        for (let i = 0; i < deduped.length; i++) {
-          const canonicalKey = (deduped[i].metadata?.canonicalKey as string) ?? deduped[i].externalId;
-          if (storedIds[i]) jobIdByKey.set(canonicalKey, storedIds[i]);
-        }
+        // Build a reliable canonical_key → stored DB id map.
+        // We query the DB directly because PostgreSQL's RETURNING after
+        // ON CONFLICT DO UPDATE does not guarantee the same row order as input.
+        const canonicalKeys = unifiedJobs
+          .map((j) => (j.metadata?.canonicalKey as string) ?? j.externalId)
+          .filter(Boolean);
+        const jobRows = canonicalKeys.length
+          ? await db
+              .select({ id: discoveredJobsTable.id, canonicalKey: discoveredJobsTable.canonicalKey })
+              .from(discoveredJobsTable)
+              .where(inArray(discoveredJobsTable.canonicalKey, canonicalKeys))
+          : [];
+        const jobIdByKey = new Map(jobRows.map((r) => [r.canonicalKey, r.id]));
 
         await saveJobMatchResults({
           userId,

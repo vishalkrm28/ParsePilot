@@ -306,7 +306,14 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
   for (const term of searchTerms) {
     try {
       const results = await fetchAdzunaJobs({ what: term, where: preferredLocation, country: adzunaCountry, resultsPerPage: 20 });
-      rawJobs.push(...results.map(normalizeAdzunaJob));
+      // Post-filter by country code from location.area[0] — Adzuna sometimes
+      // returns multinational listings with a different country's location even
+      // when querying a specific country endpoint.
+      const countryFiltered = results.filter((job) => {
+        const areaCountry = (job.location?.area?.[0] ?? "").toLowerCase();
+        return !areaCountry || areaCountry === adzunaCountry;
+      });
+      rawJobs.push(...countryFiltered.map(normalizeAdzunaJob));
     } catch (err) {
       logger.warn({ err, term }, "Adzuna fetch failed for term — skipping");
     }
