@@ -1,19 +1,17 @@
 import { Router, type IRouter } from "express";
-import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNotNull } from "drizzle-orm";
 import {
   db,
   applicationsTable,
   candidateProfilesTable,
   externalJobsCacheTable,
   jobRecommendationsTable,
+  usersTable,
 } from "@workspace/db";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { logger } from "../lib/logger.js";
-import {
-  getJobRecCredits,
-  spendJobRecCredit,
-  resetDailyJobRecCreditsIfNeeded,
-} from "../lib/credits.js";
+import { getJobRecCredits, spendJobRecCredit } from "../lib/credits.js";
+import { subscriptionIsActive } from "../lib/billing.js";
 import { normalizeCandidateProfile, rerankJobsWithAI } from "../services/ai.js";
 import { fetchAdzunaJobs } from "../lib/jobs/providers/adzuna.js";
 import { fetchMuseJobs } from "../lib/jobs/providers/muse.js";
@@ -22,16 +20,71 @@ import { prefilterJobs } from "../lib/jobs/ranking.js";
 
 const router: IRouter = Router();
 
+const PRO_DAILY_LIMIT_PER_CV = 10;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Returns start-of-today in UTC as a Date (00:00:00.000Z). */
+function todayUtcStart(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
+/** How many recommendation runs have been made for this (user, application) today. */
+async function countCvRunsToday(userId: string, applicationId: string | null): Promise<number> {
+  const since = todayUtcStart();
+  const conditions = [
+    eq(candidateProfilesTable.userId, userId),
+    gte(candidateProfilesTable.createdAt, since),
+  ];
+  if (applicationId) {
+    conditions.push(eq(candidateProfilesTable.sourceApplicationId, applicationId));
+  } else {
+    // "most recent CV" path — count runs where sourceApplicationId IS NULL (treated as one bucket)
+    conditions.push(eq(candidateProfilesTable.sourceApplicationId, ""));
+  }
+
+  const [row] = await db
+    .select({ total: count() })
+    .from(candidateProfilesTable)
+    .where(and(...conditions));
+  return row?.total ?? 0;
+}
+
+/** True if the user has an active Pro subscription. */
+async function checkIsPro(userId: string): Promise<boolean> {
+  const [user] = await db
+    .select({ subscriptionStatus: usersTable.subscriptionStatus })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .limit(1);
+  return subscriptionIsActive(user?.subscriptionStatus);
+}
+
 // ─── GET /api/jobs/credits ────────────────────────────────────────────────────
-// Returns the user's remaining job recommendation credits.
+// Returns credit / quota info for the current user.
+// Query param: ?applicationId=<uuid> — when provided, also returns how many
+// searches have been done for that CV today (Pro users).
 
 router.get("/jobs/credits", authMiddleware, async (req, res) => {
   const userId = req.auth?.userId;
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  await resetDailyJobRecCreditsIfNeeded(userId);
-  const credits = await getJobRecCredits(userId);
-  res.json({ jobRecCredits: credits });
+  const applicationId = (req.query.applicationId as string | undefined) ?? null;
+  const isPro = await checkIsPro(userId);
+
+  if (isPro) {
+    const runsToday = applicationId ? await countCvRunsToday(userId, applicationId) : 0;
+    res.json({
+      isProUser: true,
+      dailyLimitPerCv: PRO_DAILY_LIMIT_PER_CV,
+      runsUsedTodayForCv: runsToday,
+      remainingForCv: Math.max(0, PRO_DAILY_LIMIT_PER_CV - runsToday),
+    });
+  } else {
+    const credits = await getJobRecCredits(userId);
+    res.json({ isProUser: false, jobRecCredits: credits });
+  }
 });
 
 // ─── GET /api/jobs/recommendations ────────────────────────────────────────────
@@ -69,7 +122,6 @@ router.get("/jobs/recommendations", authMiddleware, async (req, res) => {
     )
     .limit(100);
 
-  // Group by profile
   const grouped: Record<string, {
     profile: typeof rows[0]["profile"];
     recommendations: Array<typeof rows[0]["rec"] & { job: typeof rows[0]["job"] }>;
@@ -86,13 +138,10 @@ router.get("/jobs/recommendations", authMiddleware, async (req, res) => {
 
 // ─── POST /api/jobs/recommend ─────────────────────────────────────────────────
 // Main recommendation endpoint.
-// 1. Verify job rec credits
-// 2. Build / reuse candidate profile
-// 3. Fetch + cache jobs from Adzuna (+ Muse fallback)
-// 4. Pre-filter locally, AI-rerank top 20 → top 10
-// 5. Persist recommendations
-// 6. Deduct 1 job rec credit
-// 7. Return top 10
+//
+// Credit / quota rules:
+//   Pro users   → 10 searches per CV per day (tracked via candidate_profiles count)
+//   Non-Pro     → deducts 1 from global job_rec_credits pool (from unlock purchases)
 
 router.post("/jobs/recommend", authMiddleware, async (req, res) => {
   const userId = req.auth?.userId;
@@ -112,25 +161,46 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
     roleType?: string;
   };
 
-  // ── Daily Pro reset (no-op for non-Pro users) ────────────────────────────────
-  await resetDailyJobRecCreditsIfNeeded(userId);
+  // ── Determine Pro status and enforce quota ───────────────────────────────────
+  const isPro = await checkIsPro(userId);
 
-  // ── Credit check ────────────────────────────────────────────────────────────
-  const credits = await getJobRecCredits(userId);
-  if (credits < 1) {
-    res.status(402).json({
-      error: "No job recommendation credits remaining for today. Pro users get 10 fresh credits every day. Non-Pro users can unlock credits by purchasing a CV analysis.",
-      code: "NO_JOB_REC_CREDITS",
-    });
-    return;
+  if (isPro) {
+    if (!applicationId) {
+      res.status(422).json({
+        error: "Please select a CV to get job recommendations.",
+        code: "NO_CV_SELECTED",
+      });
+      return;
+    }
+    const runsToday = await countCvRunsToday(userId, applicationId);
+    if (runsToday >= PRO_DAILY_LIMIT_PER_CV) {
+      res.status(429).json({
+        error: `You've used all ${PRO_DAILY_LIMIT_PER_CV} searches for this CV today. Try again tomorrow or select a different CV.`,
+        code: "CV_DAILY_LIMIT_REACHED",
+        remainingForCv: 0,
+        runsUsedTodayForCv: runsToday,
+      });
+      return;
+    }
+  } else {
+    // Non-Pro: check global job rec credits (from unlock purchases)
+    const credits = await getJobRecCredits(userId);
+    if (credits < 1) {
+      res.status(402).json({
+        error: "No job recommendation credits. Unlock a CV analysis ($6.99) to receive 10 searches.",
+        code: "NO_JOB_REC_CREDITS",
+      });
+      return;
+    }
   }
 
   // ── Resolve source application ───────────────────────────────────────────────
   let parsedCvJson: unknown = null;
+  let resolvedApplicationId = applicationId ?? null;
 
   if (applicationId) {
     const [app] = await db
-      .select({ parsedCvJson: applicationsTable.parsedCvJson, userId: applicationsTable.userId })
+      .select({ parsedCvJson: applicationsTable.parsedCvJson })
       .from(applicationsTable)
       .where(
         and(
@@ -146,9 +216,9 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
     }
     parsedCvJson = app.parsedCvJson;
   } else {
-    // Use the most recent analyzed application for this user
+    // Non-Pro fallback: use most recent analyzed application
     const [latest] = await db
-      .select({ parsedCvJson: applicationsTable.parsedCvJson })
+      .select({ id: applicationsTable.id, parsedCvJson: applicationsTable.parsedCvJson })
       .from(applicationsTable)
       .where(
         and(
@@ -167,6 +237,7 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
       return;
     }
     parsedCvJson = latest.parsedCvJson;
+    resolvedApplicationId = latest.id;
   }
 
   // ── Build normalized candidate profile ──────────────────────────────────────
@@ -179,26 +250,20 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
     return;
   }
 
-  // Merge user-provided preferences into the profile
   if (preferredLocation) {
-    normalizedProfile.preferred_locations = [
-      preferredLocation,
-      ...normalizedProfile.preferred_locations,
-    ];
+    normalizedProfile.preferred_locations = [preferredLocation, ...normalizedProfile.preferred_locations];
   }
   if (remotePreference) normalizedProfile.remote_preference = remotePreference;
-  if (roleType) {
-    normalizedProfile.target_roles = [roleType, ...normalizedProfile.target_roles];
-  }
+  if (roleType) normalizedProfile.target_roles = [roleType, ...normalizedProfile.target_roles];
 
   const preferences = { preferredLocation, country, remotePreference, roleType };
 
-  // ── Persist candidate profile ────────────────────────────────────────────────
+  // ── Persist candidate profile (this also records the run for quota tracking) ─
   const [savedProfile] = await db
     .insert(candidateProfilesTable)
     .values({
       userId,
-      sourceApplicationId: applicationId ?? null,
+      sourceApplicationId: resolvedApplicationId,
       parsedCv: parsedCvJson as Record<string, unknown>,
       normalizedProfile: normalizedProfile as unknown as Record<string, unknown>,
       preferences: preferences as Record<string, unknown>,
@@ -215,19 +280,13 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
 
   for (const term of searchTerms) {
     try {
-      const results = await fetchAdzunaJobs({
-        what: term,
-        where: preferredLocation,
-        country,
-        resultsPerPage: 20,
-      });
+      const results = await fetchAdzunaJobs({ what: term, where: preferredLocation, country, resultsPerPage: 20 });
       rawJobs.push(...results.map(normalizeAdzunaJob));
     } catch (err) {
       logger.warn({ err, term }, "Adzuna fetch failed for term — skipping");
     }
   }
 
-  // Muse fallback / supplement (no location filter in Muse)
   if (rawJobs.length < 20 && topRoles.length > 0) {
     try {
       const museResults = await fetchMuseJobs({ category: topRoles[0], page: 1 });
@@ -245,8 +304,7 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
     return;
   }
 
-  // ── Cache jobs (upsert) ──────────────────────────────────────────────────────
-  // Deduplicate locally before inserting
+  // ── Deduplicate + cache jobs ─────────────────────────────────────────────────
   const seen = new Set<string>();
   const uniqueJobs = rawJobs.filter((j) => {
     const key = `${j.source}:${j.external_job_id}`;
@@ -255,10 +313,7 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
     return true;
   });
 
-  // Upsert jobs — update fetched_at on conflict so 12-hour staleness check works
-  const TWELVE_HOURS_AGO = new Date(Date.now() - 12 * 60 * 60 * 1000);
-
-  const cachedIds: Record<string, string> = {}; // "source:ext_id" → DB id
+  const cachedIds: Record<string, string> = {};
 
   for (const job of uniqueJobs) {
     const [row] = await db
@@ -295,10 +350,9 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
     if (row) cachedIds[`${job.source}:${job.external_job_id}`] = row.id;
   }
 
-  // ── Pre-filter ───────────────────────────────────────────────────────────────
+  // ── Pre-filter + AI reranking ────────────────────────────────────────────────
   const prefiltered = prefilterJobs(normalizedProfile, uniqueJobs).slice(0, 20);
 
-  // ── AI reranking ─────────────────────────────────────────────────────────────
   let aiRankings: Awaited<ReturnType<typeof rerankJobsWithAI>>;
   try {
     aiRankings = await rerankJobsWithAI(normalizedProfile, prefiltered);
@@ -308,14 +362,13 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
     return;
   }
 
-  // ── Spend 1 job rec credit ───────────────────────────────────────────────────
-  const { success: creditSpent } = await spendJobRecCredit(userId);
-  if (!creditSpent) {
-    res.status(402).json({
-      error: "No job recommendation credits remaining.",
-      code: "NO_JOB_REC_CREDITS",
-    });
-    return;
+  // ── Spend credit (non-Pro only — Pro uses per-CV count already recorded above) ─
+  if (!isPro) {
+    const { success } = await spendJobRecCredit(userId);
+    if (!success) {
+      res.status(402).json({ error: "No job recommendation credits remaining.", code: "NO_JOB_REC_CREDITS" });
+      return;
+    }
   }
 
   // ── Persist recommendations ──────────────────────────────────────────────────
@@ -366,16 +419,27 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
     }
   }
 
-  const remainingCredits = await getJobRecCredits(userId);
-
-  res.json({
+  // ── Build response ───────────────────────────────────────────────────────────
+  const responseBase = {
     profileId: savedProfile.id,
     candidateName: normalizedProfile.candidate_name,
     targetRoles: normalizedProfile.target_roles,
     recommendations: savedRecs,
     totalJobsFetched: uniqueJobs.length,
-    remainingCredits,
-  });
+  };
+
+  if (isPro) {
+    const runsAfter = await countCvRunsToday(userId, resolvedApplicationId);
+    res.json({
+      ...responseBase,
+      isProUser: true,
+      runsUsedTodayForCv: runsAfter,
+      remainingForCv: Math.max(0, PRO_DAILY_LIMIT_PER_CV - runsAfter),
+    });
+  } else {
+    const remainingCredits = await getJobRecCredits(userId);
+    res.json({ ...responseBase, isProUser: false, remainingCredits });
+  }
 });
 
 export default router;

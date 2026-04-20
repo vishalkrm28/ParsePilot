@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import {
   recommendJobs,
   type JobResult,
   type RecommendResponse,
+  type CreditsResponse,
 } from "@/lib/jobs-api";
 import { authedFetch } from "@/lib/authed-fetch";
 import {
@@ -23,6 +24,8 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
+  FileText,
+  RefreshCcw,
 } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "/api";
@@ -34,16 +37,15 @@ interface Application {
   createdAt: string;
 }
 
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
 function MatchScoreBar({ score }: { score: number }) {
   const color =
     score >= 70 ? "bg-green-500" : score >= 45 ? "bg-yellow-500" : "bg-red-400";
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${color}`}
-          style={{ width: `${score}%` }}
-        />
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${score}%` }} />
       </div>
       <span className="text-sm font-semibold w-10 text-right">{score}%</span>
     </div>
@@ -181,12 +183,18 @@ function JobCard({ rec }: { rec: JobResult }) {
   );
 }
 
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function JobRecommendations() {
   const { toast } = useToast();
 
-  const [credits, setCredits] = useState<number | null>(null);
+  const [creditsInfo, setCreditsInfo] = useState<CreditsResponse | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [selectedApp, setSelectedApp] = useState<string>("__latest__");
+
+  // Pro users must explicitly select a CV; non-Pro can use "__latest__" as fallback
+  const [selectedApp, setSelectedApp] = useState<string>("");
+  const [isProUser, setIsProUser] = useState<boolean | null>(null);
+
   const [preferredLocation, setPreferredLocation] = useState("");
   const [country, setCountry] = useState("gb");
   const [remotePreference, setRemotePreference] = useState("any");
@@ -197,13 +205,23 @@ export default function JobRecommendations() {
   const [result, setResult] = useState<RecommendResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Fetch credit info (re-runs when selected CV changes) ──────────────────
+  const refreshCredits = useCallback(async (appId?: string | null) => {
+    try {
+      const data = await getJobRecCredits(appId ?? null);
+      setCreditsInfo(data);
+      setIsProUser(data.isProUser);
+    } catch {
+      // non-fatal
+    }
+  }, []);
+
+  // ── Initial load: applications list + credit info ─────────────────────────
   useEffect(() => {
-    getJobRecCredits()
-      .then((d) => setCredits(d.jobRecCredits))
-      .catch(() => setCredits(0));
+    refreshCredits(null);
 
     authedFetch(`${BASE}/applications`)
-      .then((r) => (r.ok ? r.json() : []))
+      .then((r) => (r.ok ? r.json() : {}))
       .then((data) => {
         const apps: Application[] = Array.isArray(data.applications)
           ? data.applications
@@ -211,32 +229,99 @@ export default function JobRecommendations() {
           ? data
           : [];
         setApplications(apps);
+        // Pre-select the most recent app once we know Pro status
+        if (apps.length > 0) {
+          setSelectedApp(apps[0].id);
+        }
       })
       .catch(() => {});
-  }, []);
+  }, [refreshCredits]);
 
+  // ── Refresh per-CV quota whenever the selected CV changes (Pro only) ──────
+  useEffect(() => {
+    if (isProUser && selectedApp && selectedApp !== "__latest__") {
+      refreshCredits(selectedApp);
+    }
+  }, [selectedApp, isProUser, refreshCredits]);
+
+  // ── Derived quota values ──────────────────────────────────────────────────
+  const proRemaining =
+    creditsInfo?.isProUser ? creditsInfo.remainingForCv : null;
+  const proRunsUsed =
+    creditsInfo?.isProUser ? creditsInfo.runsUsedTodayForCv : null;
+  const freeCredits =
+    creditsInfo && !creditsInfo.isProUser ? creditsInfo.jobRecCredits : null;
+
+  const cvDailyLimitReached = isProUser === true && proRemaining === 0;
+  const noFreeCredits = isProUser === false && freeCredits === 0;
+  const proNoCvSelected = isProUser === true && !selectedApp;
+
+  const canSearch =
+    !loading &&
+    !cvDailyLimitReached &&
+    !noFreeCredits &&
+    !proNoCvSelected;
+
+  // ── Form submit ───────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!canSearch) return;
+
     setLoading(true);
     setError(null);
     setResult(null);
 
     try {
+      const appId =
+        isProUser
+          ? selectedApp // Pro: always pass explicit CV ID
+          : selectedApp && selectedApp !== "__latest__"
+          ? selectedApp
+          : undefined;
+
       const res = await recommendJobs({
-        applicationId: selectedApp !== "__latest__" ? selectedApp : undefined,
+        applicationId: appId,
         preferredLocation: preferredLocation.trim() || undefined,
         country,
         remotePreference: remotePreference !== "any" ? remotePreference : undefined,
         roleType: roleType.trim() || undefined,
       });
+
       setResult(res);
-      setCredits(res.remainingCredits);
-      toast({ title: `${res.recommendations.length} jobs matched for you`, description: `${res.remainingCredits} recommendations remaining` });
+
+      // Refresh quota badge from response
+      if (res.isProUser) {
+        setCreditsInfo({
+          isProUser: true,
+          dailyLimitPerCv: 10,
+          runsUsedTodayForCv: res.runsUsedTodayForCv,
+          remainingForCv: res.remainingForCv,
+        });
+        toast({
+          title: `${res.recommendations.length} jobs matched`,
+          description: `${res.remainingForCv} of 10 searches remaining for this CV today`,
+        });
+      } else {
+        setCreditsInfo({ isProUser: false, jobRecCredits: res.remainingCredits });
+        toast({
+          title: `${res.recommendations.length} jobs matched`,
+          description: `${res.remainingCredits} search${res.remainingCredits === 1 ? "" : "es"} remaining`,
+        });
+      }
     } catch (err: any) {
       const msg = err?.message ?? "Something went wrong";
       setError(msg);
-      if (err?.code === "NO_JOB_REC_CREDITS") {
-        toast({ variant: "destructive", title: "No recommendation credits", description: "Unlock a CV analysis to receive 10 job recommendations." });
+
+      if (err?.code === "CV_DAILY_LIMIT_REACHED") {
+        toast({ variant: "destructive", title: "Daily limit reached", description: msg });
+        setCreditsInfo({
+          isProUser: true,
+          dailyLimitPerCv: 10,
+          runsUsedTodayForCv: 10,
+          remainingForCv: 0,
+        });
+      } else if (err?.code === "NO_JOB_REC_CREDITS") {
+        toast({ variant: "destructive", title: "No recommendation credits", description: "Unlock a CV analysis to receive 10 searches." });
       } else {
         toast({ variant: "destructive", title: "Failed to get recommendations", description: msg });
       }
@@ -247,9 +332,47 @@ export default function JobRecommendations() {
 
   const filtered = result?.recommendations.filter((r) => r.matchScore >= minScore) ?? [];
 
+  // ── Credit badge text ─────────────────────────────────────────────────────
+  function CreditBadge() {
+    if (!creditsInfo) return null;
+
+    if (creditsInfo.isProUser) {
+      const shown = selectedApp && selectedApp !== "__latest__";
+      if (!shown) {
+        return (
+          <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-sm">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            <span className="text-muted-foreground">10 searches / CV / day</span>
+          </div>
+        );
+      }
+      const remaining = creditsInfo.remainingForCv;
+      const used = creditsInfo.runsUsedTodayForCv;
+      return (
+        <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${remaining === 0 ? "bg-amber-50 border border-amber-200" : "bg-muted"}`}>
+          <TrendingUp className={`w-4 h-4 ${remaining === 0 ? "text-amber-500" : "text-primary"}`} />
+          <span className={`font-medium ${remaining === 0 ? "text-amber-700" : ""}`}>{remaining}</span>
+          <span className="text-muted-foreground">/ 10 today</span>
+          {used > 0 && (
+            <span className="text-xs text-muted-foreground">({used} used)</span>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-sm">
+        <TrendingUp className="w-4 h-4 text-primary" />
+        <span className="font-medium">{creditsInfo.jobRecCredits}</span>
+        <span className="text-muted-foreground">searches left</span>
+      </div>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="max-w-5xl mx-auto px-4 py-8">
+        {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -257,25 +380,44 @@ export default function JobRecommendations() {
               Find Matching Jobs
             </h1>
             <p className="text-muted-foreground mt-1 text-sm">
-              AI-powered job recommendations based on your CV and preferences
+              AI-powered recommendations based on your CV and preferences.
+              {isProUser && " Each CV gets 10 searches per day."}
             </p>
           </div>
-          {credits !== null && (
-            <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-sm">
-              <TrendingUp className="w-4 h-4 text-primary" />
-              <span className="font-medium">{credits}</span>
-              <span className="text-muted-foreground">searches left</span>
-            </div>
-          )}
+          <CreditBadge />
         </div>
 
-        {credits === 0 && (
+        {/* ── Pro: must select a CV ── */}
+        {isProUser && !selectedApp && applications.length > 0 && (
+          <div className="mb-6 flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+            <FileText className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+            <p className="text-blue-800">
+              Select which CV you'd like job recommendations for — each CV has its own independent daily quota of 10 searches.
+            </p>
+          </div>
+        )}
+
+        {/* ── No free credits (non-Pro) ── */}
+        {noFreeCredits && (
           <div className="mb-6 flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm">
             <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
             <div>
-              <p className="font-medium text-amber-800">No recommendation credits remaining</p>
+              <p className="font-medium text-amber-800">No recommendation searches remaining</p>
               <p className="text-amber-700 mt-0.5">
-                Pro users get 10 fresh searches every day. Not on Pro? Unlock a CV analysis ($6.99) to receive 10 one-time searches.
+                Unlock a CV analysis ($6.99) to receive 10 one-time searches, or upgrade to Pro for 10 searches per CV per day.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Pro CV daily limit reached ── */}
+        {cvDailyLimitReached && (
+          <div className="mb-6 flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+            <RefreshCcw className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium text-amber-800">Daily limit reached for this CV</p>
+              <p className="text-amber-700 mt-0.5">
+                You've used all 10 searches for this CV today. Try again tomorrow, or switch to a different CV to get another 10 searches.
               </p>
             </div>
           </div>
@@ -284,27 +426,50 @@ export default function JobRecommendations() {
         <form onSubmit={handleSubmit}>
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="text-base">Search Preferences</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                Choose a CV &amp; Set Preferences
+              </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {applications.length > 0 && (
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium mb-1.5">CV to use</label>
-                  <Select value={selectedApp} onValueChange={setSelectedApp}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select application" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__latest__">Most recent CV</SelectItem>
-                      {applications.slice(0, 20).map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.jobTitle} @ {a.company}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              {/* CV selector — always shown, required label for Pro */}
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium mb-1.5">
+                  CV to use
+                  {isProUser && (
+                    <span className="ml-2 text-xs font-normal text-primary">(each CV has its own daily quota)</span>
+                  )}
+                  {!isProUser && (
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">(optional)</span>
+                  )}
+                </label>
+                <Select
+                  value={selectedApp}
+                  onValueChange={setSelectedApp}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={applications.length === 0 ? "No CVs found — analyse one first" : "Select a CV…"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {!isProUser && (
+                      <SelectItem value="__latest__">Most recent CV (auto)</SelectItem>
+                    )}
+                    {applications.slice(0, 20).map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.jobTitle} @ {a.company}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {isProUser && selectedApp && selectedApp !== "__latest__" && proRemaining !== null && (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    {proRunsUsed} search{proRunsUsed === 1 ? "" : "es"} used today for this CV ·{" "}
+                    <span className={proRemaining === 0 ? "text-amber-600 font-medium" : "text-foreground"}>
+                      {proRemaining} remaining
+                    </span>
+                  </p>
+                )}
+              </div>
 
               <div>
                 <label className="block text-sm font-medium mb-1.5">
@@ -367,7 +532,7 @@ export default function JobRecommendations() {
 
           <Button
             type="submit"
-            disabled={loading || credits === 0}
+            disabled={!canSearch}
             className="w-full sm:w-auto"
           >
             {loading ? (
@@ -378,7 +543,13 @@ export default function JobRecommendations() {
             ) : (
               <>
                 <Sparkles className="w-4 h-4 mr-2" />
-                Find My Jobs {credits !== null && credits > 0 ? `(${credits} left)` : ""}
+                {isProUser
+                  ? proRemaining !== null
+                    ? `Find My Jobs (${proRemaining} left today)`
+                    : "Find My Jobs"
+                  : freeCredits !== null && freeCredits > 0
+                  ? `Find My Jobs (${freeCredits} left)`
+                  : "Find My Jobs"}
               </>
             )}
           </Button>
@@ -411,10 +582,7 @@ export default function JobRecommendations() {
 
               <div className="flex items-center gap-2">
                 <label className="text-xs text-muted-foreground">Min score</label>
-                <Select
-                  value={String(minScore)}
-                  onValueChange={(v) => setMinScore(Number(v))}
-                >
+                <Select value={String(minScore)} onValueChange={(v) => setMinScore(Number(v))}>
                   <SelectTrigger className="w-24 h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
