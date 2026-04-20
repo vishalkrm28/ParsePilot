@@ -3,7 +3,7 @@ import {
   Shield, Search, CreditCard, Package, RefreshCw, LogOut,
   CheckCircle, XCircle, Loader2, Trash2, ChevronRight,
   ChevronDown, Users, BarChart3, AlertTriangle, X, FileText, Star,
-  Mail, DollarSign, Briefcase, Bookmark, LayoutGrid, Sparkles,
+  Mail, DollarSign, Briefcase, Bookmark, LayoutGrid, Sparkles, Building2, Zap,
 } from "lucide-react";
 
 const STORAGE_KEY = "pp_admin_token";
@@ -105,7 +105,7 @@ export default function AdminPage() {
   const [token, setToken] = useState(() => localStorage.getItem(STORAGE_KEY) ?? "");
   const [tokenInput, setTokenInput] = useState("");
   const [authed, setAuthed] = useState(() => !!localStorage.getItem(STORAGE_KEY));
-  const [tab, setTab] = useState<"users" | "stats" | "messages">("users");
+  const [tab, setTab] = useState<"users" | "stats" | "messages" | "metrics">("users");
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [confirm, setConfirm] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -209,6 +209,7 @@ export default function AdminPage() {
             {([
               { key: "users", icon: <Users className="w-3.5 h-3.5" />, label: "Users" },
               { key: "stats", icon: <BarChart3 className="w-3.5 h-3.5" />, label: "Stats" },
+              { key: "metrics", icon: <DollarSign className="w-3.5 h-3.5" />, label: "Metrics" },
               { key: "messages", icon: <Mail className="w-3.5 h-3.5" />, label: "Messages" },
             ] as const).map(({ key, icon, label }) => (
               <button
@@ -241,6 +242,9 @@ export default function AdminPage() {
         )}
         {tab === "messages" && (
           <MessagesTab call={call} addToast={addToast} />
+        )}
+        {tab === "metrics" && (
+          <MetricsTab call={call} />
         )}
       </div>
     </div>
@@ -1020,5 +1024,193 @@ function ActionBtn({
       {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : icon}
       {label}
     </button>
+  );
+}
+
+// ─── M38 Metrics Tab ──────────────────────────────────────────────────────────
+
+function MetricsTab({ call }: { call: any }) {
+  const [metrics, setMetrics] = useState<any>(null);
+  const [usage, setUsage] = useState<any>(null);
+  const [workspaces, setWorkspaces] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [snapshotting, setSnapshotting] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [m, u, ws] = await Promise.all([
+        call("/_admin/metrics?days=30"),
+        call("/_admin/usage-breakdown?days=30"),
+        call("/_admin/workspaces-overview").catch(() => ({ workspaces: [] })),
+      ]);
+      setMetrics(m);
+      setUsage(u);
+      setWorkspaces(ws.workspaces ?? []);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, [call]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleSnapshot() {
+    setSnapshotting(true);
+    await call("/_admin/snapshot-metrics", { method: "POST" }).catch(() => {});
+    setSnapshotting(false);
+  }
+
+  if (loading) {
+    return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-zinc-400" /></div>;
+  }
+
+  const kpiCards = [
+    { label: "Total Users", value: metrics?.userStats?.totalUsers ?? 0, icon: <Users className="w-4 h-4 text-blue-400" />, color: "text-blue-400" },
+    { label: "New Users (30d)", value: metrics?.userStats?.newUsers ?? 0, icon: <Users className="w-4 h-4 text-green-400" />, color: "text-green-400" },
+    { label: "Active Subscriptions", value: metrics?.subStats?.activeSubscriptions ?? 0, icon: <CreditCard className="w-4 h-4 text-purple-400" />, color: "text-purple-400" },
+    { label: "MRR (estimated)", value: `$${(metrics?.mrr ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: <DollarSign className="w-4 h-4 text-emerald-400" />, color: "text-emerald-400" },
+    { label: "Credits Used (30d)", value: metrics?.creditStats?.creditsUsedLast30d ?? 0, icon: <Zap className="w-4 h-4 text-yellow-400" />, color: "text-yellow-400" },
+    { label: "Total Workspaces", value: metrics?.wsStats?.totalWorkspaces ?? 0, icon: <Building2 className="w-4 h-4 text-sky-400" />, color: "text-sky-400" },
+  ];
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-white">Platform Metrics (last 30 days)</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={load}
+            className="flex items-center gap-1.5 text-zinc-400 hover:text-white text-sm px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </button>
+          <button
+            onClick={handleSnapshot}
+            disabled={snapshotting}
+            className="flex items-center gap-1.5 text-zinc-400 hover:text-white text-sm px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors disabled:opacity-50"
+          >
+            {snapshotting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BarChart3 className="w-3.5 h-3.5" />}
+            Snapshot Today
+          </button>
+        </div>
+      </div>
+
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {kpiCards.map(card => (
+          <div key={card.label} className="bg-zinc-800 rounded-xl p-4 space-y-2">
+            {card.icon}
+            <p className={`text-xl font-bold ${card.color}`}>{card.value}</p>
+            <p className="text-xs text-zinc-500">{card.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Feature usage breakdown */}
+      {usage?.byFeature && usage.byFeature.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-yellow-400" /> Feature Usage Breakdown
+          </h3>
+          <div className="bg-zinc-800 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="border-b border-zinc-700">
+                <tr>
+                  <th className="text-left px-4 py-2 text-xs text-zinc-400">Feature</th>
+                  <th className="text-right px-4 py-2 text-xs text-zinc-400">Events</th>
+                  <th className="text-right px-4 py-2 text-xs text-zinc-400">Credits</th>
+                  <th className="text-right px-4 py-2 text-xs text-zinc-400">Est. AI Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usage.byFeature.map((r: any) => (
+                  <tr key={r.featureKey} className="border-b border-zinc-700/50 last:border-0 hover:bg-zinc-700/30">
+                    <td className="px-4 py-2 text-zinc-300 capitalize">{String(r.featureKey).replace(/_/g, " ")}</td>
+                    <td className="px-4 py-2 text-right text-zinc-300">{r.events}</td>
+                    <td className="px-4 py-2 text-right text-yellow-400">{r.creditsSpent}</td>
+                    <td className="px-4 py-2 text-right text-zinc-400">${Number(r.estimatedCost).toFixed(4)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Recent feature events */}
+      {usage?.recent && usage.recent.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-sky-400" /> Recent Feature Events
+          </h3>
+          <div className="bg-zinc-800 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="border-b border-zinc-700">
+                <tr>
+                  <th className="text-left px-4 py-2 text-xs text-zinc-400">Feature</th>
+                  <th className="text-left px-4 py-2 text-xs text-zinc-400">User</th>
+                  <th className="text-right px-4 py-2 text-xs text-zinc-400">Credits</th>
+                  <th className="text-right px-4 py-2 text-xs text-zinc-400">When</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usage.recent.slice(0, 20).map((e: any) => (
+                  <tr key={e.id} className="border-b border-zinc-700/50 last:border-0 hover:bg-zinc-700/30">
+                    <td className="px-4 py-2 text-zinc-300 capitalize">{String(e.featureKey).replace(/_/g, " ")}</td>
+                    <td className="px-4 py-2 text-zinc-500 text-xs truncate max-w-[120px]">{e.userId ?? "—"}</td>
+                    <td className="px-4 py-2 text-right text-yellow-400">{e.creditsUsed ?? 0}</td>
+                    <td className="px-4 py-2 text-right text-zinc-500 text-xs">
+                      {new Date(e.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Workspaces */}
+      {workspaces.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-sky-400" /> Workspaces ({workspaces.length})
+          </h3>
+          <div className="bg-zinc-800 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="border-b border-zinc-700">
+                <tr>
+                  <th className="text-left px-4 py-2 text-xs text-zinc-400">Name</th>
+                  <th className="text-left px-4 py-2 text-xs text-zinc-400">Slug</th>
+                  <th className="text-left px-4 py-2 text-xs text-zinc-400">Plan</th>
+                  <th className="text-left px-4 py-2 text-xs text-zinc-400">Type</th>
+                  <th className="text-right px-4 py-2 text-xs text-zinc-400">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workspaces.map((ws: any) => (
+                  <tr key={ws.id} className="border-b border-zinc-700/50 last:border-0 hover:bg-zinc-700/30">
+                    <td className="px-4 py-2 text-zinc-300">{ws.name}</td>
+                    <td className="px-4 py-2 text-zinc-500 text-xs">/{ws.slug}</td>
+                    <td className="px-4 py-2 text-purple-400 text-xs capitalize">{ws.planCode?.replace(/_/g, " ")}</td>
+                    <td className="px-4 py-2 text-zinc-400 text-xs capitalize">{ws.workspaceType?.replace(/_/g, " ")}</td>
+                    <td className="px-4 py-2 text-right text-zinc-500 text-xs">
+                      {new Date(ws.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {usage?.byFeature?.length === 0 && workspaces.length === 0 && (
+        <div className="text-center py-12">
+          <BarChart3 className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
+          <p className="text-zinc-500 text-sm">No feature usage events logged yet.</p>
+          <p className="text-zinc-600 text-xs mt-1">Events are recorded as users interact with AI features.</p>
+        </div>
+      )}
+    </div>
   );
 }

@@ -18,6 +18,7 @@ import {
   Mic,
   Bell,
   Link2,
+  Building2,
 } from "lucide-react";
 import { LogoBrand } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,8 @@ const navItems = [
   { href: "/bulk/history", label: "Bulk Mode", icon: Users },
   { href: "/jobs/recommendations", label: "Find Jobs", icon: Sparkles },
   { href: "/notifications", label: "Notifications", icon: Bell },
+  { href: "/billing", label: "Billing & Plan", icon: CreditCard },
+  { href: "/workspaces", label: "Workspaces", icon: Building2 },
   { href: "/integrations", label: "Integrations", icon: Link2 },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];

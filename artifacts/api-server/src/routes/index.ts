@@ -21,6 +21,7 @@ import notificationsRouter from "./notifications.js";
 import smartActionsRouter from "./smart-actions.js";
 import calendarRouter from "./calendar.js";
 import emailSyncRouter from "./email-sync.js";
+import workspacesRouter from "./workspaces.js";
 import publicRouter from "./public.js";
 
 const router: IRouter = Router();
@@ -48,5 +49,6 @@ router.use(notificationsRouter);
 router.use(smartActionsRouter);
 router.use(calendarRouter);
 router.use(emailSyncRouter);
+router.use(workspacesRouter);
 
 export default router;

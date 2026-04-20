@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
-import { db, usersTable, applicationsTable } from "@workspace/db";
+import { eq, desc } from "drizzle-orm";
+import { db, usersTable, applicationsTable, plansTable, featureEntitlementsTable, usageEventsTable } from "@workspace/db";
 import { z } from "zod";
 import type Stripe from "stripe";
 import { getStripe, ensureStripeCustomer } from "../lib/stripe.js";
@@ -8,6 +8,7 @@ import { logger } from "../lib/logger.js";
 import { getUserCredits, FREE_CREDIT_ALLOWANCE, PRO_CREDIT_ALLOWANCE } from "../lib/credits.js";
 import { subscriptionIsActive, hasUnlockedResult } from "../lib/billing.js";
 import { hasBulkAccess } from "../lib/bulk.js";
+import { checkEntitlementForUser, getCreditCostForFeature } from "../lib/billing/entitlements.js";
 
 /**
  * Extract a structured log context from a Stripe SDK error so we get
@@ -453,6 +454,88 @@ router.post("/billing/checkout-recruiter", async (req, res) => {
   } catch (err) {
     logger.error(stripeErrContext(err), "Failed to create recruiter checkout session");
     res.status(500).json({ error: "Could not start checkout. Please try again.", code: "CHECKOUT_ERROR" });
+  }
+});
+
+// ─── GET /billing/plans ───────────────────────────────────────────────────────
+// Returns all active plans with their feature entitlements (no auth required).
+
+router.get("/billing/plans", async (_req, res) => {
+  try {
+    const plans = await db
+      .select()
+      .from(plansTable)
+      .where(eq(plansTable.isActive, true));
+
+    const enriched = await Promise.all(
+      plans.map(async (plan) => {
+        const entitlements = await db
+          .select({ featureKey: featureEntitlementsTable.featureKey, featureValue: featureEntitlementsTable.featureValue })
+          .from(featureEntitlementsTable)
+          .where(eq(featureEntitlementsTable.planId, plan.id));
+        return { ...plan, entitlements };
+      }),
+    );
+
+    res.json({ plans: enriched });
+  } catch (err) {
+    logger.error({ err }, "Failed to list plans");
+    res.status(500).json({ error: "Could not load plans" });
+  }
+});
+
+// ─── GET /billing/credit-balance ──────────────────────────────────────────────
+// Richer credit balance including lifetime totals and recent transactions.
+
+router.get("/billing/credit-balance", async (req, res) => {
+  if (!req.user) { res.status(401).json({ error: "Authentication required" }); return; }
+  try {
+    const balance = await getUserCredits(req.user.id);
+    const recentEvents = await db
+      .select()
+      .from(usageEventsTable)
+      .where(eq(usageEventsTable.userId, req.user.id))
+      .orderBy(desc(usageEventsTable.createdAt))
+      .limit(20);
+
+    res.json({
+      balance: balance?.availableCredits ?? 0,
+      lifetimeAllocated: null,
+      lifetimeUsed: balance?.lifetimeCreditsUsed ?? 0,
+      billingPeriodEnd: balance?.billingPeriodEnd?.toISOString() ?? null,
+      recentTransactions: recentEvents.map((e) => ({
+        id: e.id,
+        type: e.type,
+        creditsDelta: e.creditsDelta,
+        createdAt: e.createdAt,
+        metadata: e.metadata,
+      })),
+    });
+  } catch (err) {
+    logger.error({ err }, "Failed to fetch credit balance");
+    res.status(500).json({ error: "Could not load credit balance" });
+  }
+});
+
+// ─── POST /billing/check-entitlement ─────────────────────────────────────────
+// Check whether the authenticated user can access a given feature.
+
+const CheckEntitlementBody = z.object({
+  featureKey: z.string().min(1),
+  workspaceId: z.string().optional(),
+});
+
+router.post("/billing/check-entitlement", async (req, res) => {
+  if (!req.user) { res.status(401).json({ error: "Authentication required" }); return; }
+  const parsed = CheckEntitlementBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "featureKey is required" }); return; }
+
+  try {
+    const result = await checkEntitlementForUser(req.user.id, parsed.data.featureKey);
+    res.json(result);
+  } catch (err) {
+    logger.error({ err }, "Entitlement check failed");
+    res.status(500).json({ error: "Could not check entitlement" });
   }
 });
 

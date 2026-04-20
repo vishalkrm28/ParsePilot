@@ -3,10 +3,21 @@ import {
   db, bulkPassesTable, usersTable, usageBalancesTable, usageEventsTable,
   applicationsTable, contactMessagesTable,
   savedJobsTable, trackedApplicationsTable, interviewPrepsTable,
+  featureUsageEventsTable, workspacesTable,
 } from "@workspace/db";
-import { eq, sql, ilike, or, desc, count } from "drizzle-orm";
+import { eq, sql, ilike, or, desc, count, gte } from "drizzle-orm";
 import Stripe from "stripe";
 import { logger } from "../lib/logger.js";
+import {
+  getUserStats,
+  getSubscriptionStats,
+  getCreditsStats,
+  getFeatureUsageBreakdown,
+  getWorkspaceStats,
+  getRecentFeatureUsageEvents,
+  estimateMrr,
+  snapshotTodayMetrics,
+} from "../lib/admin/admin-metrics.js";
 
 const PRO_PRICE = 14.99;
 const RECRUITER_SOLO_PRICE = 29.99;
@@ -515,6 +526,85 @@ router.post("/_admin/fix-user-migration", async (req, res) => {
 
     logger.info({ old_id, new_id }, "Admin fix-user-migration complete");
     res.json({ success: true, report });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── M38 Admin Metrics Routes ─────────────────────────────────────────────────
+
+// GET /_admin/metrics — aggregated platform KPIs (user/subscription/credit/workspace)
+router.get("/_admin/metrics", async (req, res) => {
+  if (!authAdmin(req, res)) return;
+  try {
+    const days = Number(req.query.days ?? 30);
+    const [userStats, subStats, creditStats, wsStats, mrr] = await Promise.all([
+      getUserStats(days),
+      getSubscriptionStats(),
+      getCreditsStats(days),
+      getWorkspaceStats(),
+      estimateMrr(),
+    ]);
+    res.json({ userStats, subStats, creditStats, wsStats, mrr, periodDays: days });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /_admin/usage-breakdown — feature usage events breakdown
+router.get("/_admin/usage-breakdown", async (req, res) => {
+  if (!authAdmin(req, res)) return;
+  try {
+    const days = Number(req.query.days ?? 30);
+    const [byFeature, recent] = await Promise.all([
+      getFeatureUsageBreakdown(days),
+      getRecentFeatureUsageEvents(50),
+    ]);
+    res.json({ byFeature, recent, periodDays: days });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /_admin/revenue-summary — MRR estimate + subscription breakdown
+router.get("/_admin/revenue-summary", async (req, res) => {
+  if (!authAdmin(req, res)) return;
+  try {
+    const [subStats, mrr] = await Promise.all([getSubscriptionStats(), estimateMrr()]);
+    res.json({ mrr, ...subStats });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /_admin/workspaces-overview — workspace list with member counts
+router.get("/_admin/workspaces-overview", async (req, res) => {
+  if (!authAdmin(req, res)) return;
+  try {
+    const workspaces = await db
+      .select({
+        id: workspacesTable.id,
+        name: workspacesTable.name,
+        slug: workspacesTable.slug,
+        planCode: workspacesTable.planCode,
+        workspaceType: workspacesTable.workspaceType,
+        createdAt: workspacesTable.createdAt,
+      })
+      .from(workspacesTable)
+      .orderBy(desc(workspacesTable.createdAt))
+      .limit(100);
+    res.json({ workspaces });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /_admin/snapshot-metrics — compute and store today's metric snapshot
+router.post("/_admin/snapshot-metrics", async (req, res) => {
+  if (!authAdmin(req, res)) return;
+  try {
+    const result = await snapshotTodayMetrics();
+    res.json({ success: true, snapshot: result });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
