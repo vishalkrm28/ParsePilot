@@ -28,7 +28,10 @@ import {
   FileText,
   RefreshCcw,
   MailOpen,
+  Bookmark,
+  BookmarkCheck,
 } from "lucide-react";
+import { saveJob } from "@/lib/tracker-api";
 
 const BASE = import.meta.env.VITE_API_URL ?? "/api";
 
@@ -68,7 +71,35 @@ function JobCard({
   onTailor: (rec: JobResult, mode: "tailor" | "cover-letter") => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
   const { job } = rec;
+
+  async function handleSaveJob() {
+    setSaving(true);
+    try {
+      const { alreadySaved } = await saveJob({
+        externalJobCacheId: job.id ?? null,
+        jobTitle: job.title,
+        company: job.company ?? null,
+        location: job.location ?? null,
+        employmentType: job.employment_type ?? null,
+        remoteType: job.remote_type ?? null,
+        salaryMin: job.salary_min ? Number(job.salary_min) : null,
+        salaryMax: job.salary_max ? Number(job.salary_max) : null,
+        currency: job.currency ?? null,
+        applyUrl: job.apply_url ?? null,
+        jobSnapshot: job as unknown as Record<string, unknown>,
+      });
+      setSaved(true);
+      toast({ title: alreadySaved ? "Already saved" : "Job saved to tracker", description: "View it in Saved Jobs." });
+    } catch {
+      toast({ variant: "destructive", title: "Failed to save job" });
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const salaryText =
     job.salary_min && job.salary_max
@@ -205,6 +236,22 @@ function JobCard({
             >
               <MailOpen className="w-3.5 h-3.5 mr-1.5" />
               Cover Letter
+            </Button>
+            <Button
+              size="sm"
+              variant={saved ? "default" : "outline"}
+              className="text-xs h-8 px-3"
+              onClick={handleSaveJob}
+              disabled={saving || saved}
+              title="Save job to tracker"
+            >
+              {saving ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : saved ? (
+                <BookmarkCheck className="w-3.5 h-3.5" />
+              ) : (
+                <Bookmark className="w-3.5 h-3.5" />
+              )}
             </Button>
           </div>
         </div>

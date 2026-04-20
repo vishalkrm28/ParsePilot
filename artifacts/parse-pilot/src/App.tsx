@@ -46,6 +46,12 @@ import ResumeJobMatch from "@/pages/seo/resume-job-match";
 import WhyResumeRejected from "@/pages/seo/why-resume-rejected";
 import BlogIndex from "@/pages/blog/index";
 import BlogPost from "@/pages/blog/post";
+import TrackerPipeline from "@/pages/tracker/pipeline";
+import SavedJobsPage from "@/pages/tracker/saved-jobs";
+import AppDetailPage from "@/pages/tracker/app-detail";
+import InterviewPrepsPage from "@/pages/tracker/interview-preps";
+import InterviewPrepDetailPage from "@/pages/tracker/interview-prep-detail";
+import GenerateInterviewPrepPage from "@/pages/tracker/generate-interview-prep";
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
 
@@ -116,6 +122,12 @@ function AppRouter() {
       <Route path="/recruiter/jobs/:jobId" component={RecruiterJobDetail} />
       <Route path="/recruiter/jobs" component={RecruiterJobs} />
       <Route path="/candidate/:id" component={CandidateDetail} />
+      <Route path="/tracker/saved" component={SavedJobsPage} />
+      <Route path="/tracker/interview-prep/generate" component={GenerateInterviewPrepPage} />
+      <Route path="/tracker/interview-prep/:id" component={InterviewPrepDetailPage} />
+      <Route path="/tracker/interview-preps" component={InterviewPrepsPage} />
+      <Route path="/tracker/:id" component={AppDetailPage} />
+      <Route path="/tracker" component={TrackerPipeline} />
       <Route component={NotFound} />
     </Switch>
   );

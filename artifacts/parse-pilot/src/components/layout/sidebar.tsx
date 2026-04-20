@@ -13,6 +13,7 @@ import {
   Sparkles,
   FileText,
   MailOpen,
+  Bookmark,
 } from "lucide-react";
 import { LogoBrand } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,12 @@ const navItems = [
 const applicationItems = [
   { href: "/application/tailored-cvs", label: "Tailored CVs", icon: FileText },
   { href: "/application/cover-letters", label: "Cover Letters", icon: MailOpen },
+];
+
+const trackerItems = [
+  { href: "/tracker", label: "Pipeline", icon: LayoutGrid },
+  { href: "/tracker/saved", label: "Saved Jobs", icon: Bookmark },
+  { href: "/tracker/interview-preps", label: "Interview Preps", icon: Sparkles },
 ];
 
 const recruiterItems = [
@@ -121,6 +128,42 @@ export function Sidebar() {
           </p>
           {applicationItems.map(({ href, label, icon: Icon }) => {
             const isActive = location.startsWith(href);
+            return (
+              <Link key={href} href={href}>
+                <div
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors group",
+                    isActive
+                      ? "bg-primary/15 text-primary"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      "w-4 h-4 flex-shrink-0",
+                      isActive
+                        ? "text-primary"
+                        : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground",
+                    )}
+                  />
+                  <span className="flex-1">{label}</span>
+                  {isActive && <ChevronRight className="w-3.5 h-3.5 text-primary/60" />}
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Job Tracker section */}
+        <div className="pt-3">
+          <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+            Job Tracker
+          </p>
+          {trackerItems.map(({ href, label, icon: Icon }) => {
+            const isActive =
+              href === "/tracker"
+                ? location === "/tracker" || location.startsWith("/tracker/") && !location.startsWith("/tracker/saved") && !location.startsWith("/tracker/interview")
+                : location.startsWith(href);
             return (
               <Link key={href} href={href}>
                 <div

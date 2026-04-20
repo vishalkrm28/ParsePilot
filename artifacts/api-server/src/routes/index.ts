@@ -12,6 +12,8 @@ import recruiterRouter from "./recruiter.js";
 import recruiterJobsRouter from "./recruiter-jobs.js";
 import jobsRouter from "./jobs.js";
 import applicationRouter from "./application.js";
+import trackerRouter from "./tracker.js";
+import interviewPrepRouter from "./interview-prep.js";
 import publicRouter from "./public.js";
 
 const router: IRouter = Router();
@@ -30,5 +32,7 @@ router.use(recruiterRouter);
 router.use(recruiterJobsRouter);
 router.use(jobsRouter);
 router.use(applicationRouter);
+router.use(trackerRouter);
+router.use(interviewPrepRouter);
 
 export default router;
