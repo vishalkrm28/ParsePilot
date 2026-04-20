@@ -17,6 +17,10 @@ import interviewPrepRouter from "./interview-prep.js";
 import emailsRouter from "./emails.js";
 import interviewsRouter from "./interviews.js";
 import mockInterviewRouter from "./mock-interview.js";
+import notificationsRouter from "./notifications.js";
+import smartActionsRouter from "./smart-actions.js";
+import calendarRouter from "./calendar.js";
+import emailSyncRouter from "./email-sync.js";
 import publicRouter from "./public.js";
 
 const router: IRouter = Router();
@@ -40,5 +44,9 @@ router.use(interviewPrepRouter);
 router.use(emailsRouter);
 router.use(interviewsRouter);
 router.use(mockInterviewRouter);
+router.use(notificationsRouter);
+router.use(smartActionsRouter);
+router.use(calendarRouter);
+router.use(emailSyncRouter);
 
 export default router;

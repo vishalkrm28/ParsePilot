@@ -16,6 +16,8 @@ import {
   Bookmark,
   Mail,
   Mic,
+  Bell,
+  Link2,
 } from "lucide-react";
 import { LogoBrand } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
@@ -25,6 +27,8 @@ const navItems = [
   { href: "/new", label: "New Application", icon: FilePlus2 },
   { href: "/bulk/history", label: "Bulk Mode", icon: Users },
   { href: "/jobs/recommendations", label: "Find Jobs", icon: Sparkles },
+  { href: "/notifications", label: "Notifications", icon: Bell },
+  { href: "/integrations", label: "Integrations", icon: Link2 },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 

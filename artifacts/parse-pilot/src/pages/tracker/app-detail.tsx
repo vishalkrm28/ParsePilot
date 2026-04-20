@@ -76,6 +76,14 @@ import {
   INTERVIEW_TYPE_LABELS,
   SESSION_TYPE_LABELS,
 } from "@/lib/mock-interview-api";
+import {
+  generateSmartActions,
+  listSmartActions,
+  acceptSmartAction,
+  dismissSmartAction,
+  syncInterviewToCalendar,
+  type SmartActionSuggestion,
+} from "@/lib/notifications-api";
 
 const STAGE_COLORS: Record<ApplicationStage, string> = {
   saved: "bg-gray-100 text-gray-700 border-gray-200",
@@ -153,13 +161,19 @@ export default function AppDetailPage() {
   const [mockQuestionCount, setMockQuestionCount] = useState<5 | 8 | 10>(8);
   const [creatingMockSession, setCreatingMockSession] = useState(false);
 
+  // M37: Smart actions
+  const [smartActions, setSmartActions] = useState<SmartActionSuggestion[]>([]);
+  const [generatingSmartActions, setGeneratingSmartActions] = useState(false);
+  const [syncingInterviewId, setSyncingInterviewId] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     try {
-      const [data, drafts, ivs, mocks] = await Promise.all([
+      const [data, drafts, ivs, mocks, actions] = await Promise.all([
         getTrackedApp(id!),
         listEmailDrafts(id!).catch(() => ({ drafts: [] })),
         listInterviews(id!).catch(() => ({ interviews: [] })),
         listMockSessions(id!).catch(() => ({ sessions: [] })),
+        listSmartActions({ applicationId: id!, status: "pending" }).catch(() => []),
       ]);
       setApp(data.app);
       setTailoredCv(data.tailoredCv);
@@ -170,6 +184,7 @@ export default function AppDetailPage() {
       setEmailDrafts(drafts.drafts.filter((d: EmailDraft) => d.status !== "archived"));
       setInterviews(ivs.interviews);
       setMockSessions(mocks.sessions);
+      setSmartActions(actions);
     } catch {
       toast({ variant: "destructive", title: "Failed to load application" });
     } finally {
@@ -342,6 +357,63 @@ export default function AppDetailPage() {
       toast({ variant: "destructive", title: "Failed to create session", description: e.message });
     } finally {
       setCreatingMockSession(false);
+    }
+  }
+
+  // M37: Smart actions handlers
+  async function handleGenerateSmartActions() {
+    if (!app) return;
+    setGeneratingSmartActions(true);
+    try {
+      const suggestions = await generateSmartActions(app.id);
+      setSmartActions(suggestions);
+      toast({ title: `${suggestions.length} smart action${suggestions.length !== 1 ? "s" : ""} generated` });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Failed to generate smart actions", description: e.message });
+    } finally {
+      setGeneratingSmartActions(false);
+    }
+  }
+
+  async function handleAcceptSmartAction(id: string) {
+    try {
+      await acceptSmartAction(id);
+      setSmartActions(prev => prev.filter(s => s.id !== id));
+      toast({ title: "Suggestion accepted — reminder created" });
+    } catch {
+      toast({ variant: "destructive", title: "Failed to accept suggestion" });
+    }
+  }
+
+  async function handleDismissSmartAction(id: string) {
+    try {
+      await dismissSmartAction(id);
+      setSmartActions(prev => prev.filter(s => s.id !== id));
+    } catch {
+      toast({ variant: "destructive", title: "Failed to dismiss suggestion" });
+    }
+  }
+
+  async function handleSyncToCalendar(iv: ApplicationInterview) {
+    if (!app) return;
+    setSyncingInterviewId(iv.id);
+    try {
+      const result = await syncInterviewToCalendar({
+        provider: "google",
+        applicationId: app.id,
+        interviewId: iv.id,
+        title: iv.title,
+        scheduledAt: new Date(iv.scheduledAt).toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        location: iv.location,
+        meetingUrl: iv.meetingUrl,
+        notes: iv.notes,
+      });
+      toast({ title: result.message });
+    } catch {
+      toast({ variant: "destructive", title: "Failed to create sync record" });
+    } finally {
+      setSyncingInterviewId(null);
     }
   }
 
@@ -749,6 +821,21 @@ export default function AppDetailPage() {
                       {iv.meetingUrl && (
                         <a href={iv.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-primary hover:underline block truncate">{iv.meetingUrl}</a>
                       )}
+                      {iv.status === "scheduled" && (
+                        <button
+                          onClick={() => handleSyncToCalendar(iv)}
+                          disabled={syncingInterviewId === iv.id}
+                          className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                          title="Save sync record for Google Calendar"
+                        >
+                          {syncingInterviewId === iv.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Calendar className="w-3 h-3" />
+                          )}
+                          Sync to calendar
+                        </button>
+                      )}
                     </div>
                     {iv.status === "scheduled" && (
                       <button
@@ -1042,6 +1129,68 @@ export default function AppDetailPage() {
                   <Archive className="w-3.5 h-3.5 mr-2" />
                   Archive Application
                 </Button>
+              </CardContent>
+            </Card>
+
+            {/* M37: Smart Actions */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    Smart Actions
+                    {smartActions.length > 0 && (
+                      <span className="text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5">{smartActions.length}</span>
+                    )}
+                  </CardTitle>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs gap-1 text-primary"
+                    onClick={handleGenerateSmartActions}
+                    disabled={generatingSmartActions}
+                  >
+                    {generatingSmartActions ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    {generatingSmartActions ? "Generating…" : "Generate"}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {smartActions.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">
+                    Click Generate to get AI-suggested next steps for this application.
+                  </p>
+                )}
+                {smartActions.map(sa => (
+                  <div key={sa.id} className="rounded-lg border border-border bg-muted/30 p-2.5 space-y-1.5">
+                    <p className="text-xs font-medium leading-snug">{sa.title}</p>
+                    <p className="text-[11px] text-muted-foreground leading-snug">{sa.description}</p>
+                    {sa.suggestedDeadline && (
+                      <p className="text-[11px] text-orange-600">
+                        By {new Date(sa.suggestedDeadline).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                      </p>
+                    )}
+                    <div className="flex gap-1.5 pt-0.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-[11px] h-6 px-2 gap-1"
+                        onClick={() => handleAcceptSmartAction(sa.id)}
+                      >
+                        <CheckCircle2 className="w-3 h-3 text-green-600" />
+                        Accept
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-[11px] h-6 px-2 text-muted-foreground"
+                        onClick={() => handleDismissSmartAction(sa.id)}
+                      >
+                        Dismiss
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           </div>

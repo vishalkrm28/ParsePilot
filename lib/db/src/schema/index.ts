@@ -11,3 +11,4 @@ export * from "./tailoring";
 export * from "./tracker";
 export * from "./emails";
 export * from "./mock-interview";
+export * from "./notifications";
