@@ -47,11 +47,7 @@ async function resolvePlanCodeForUser(userId: string): Promise<string> {
     return user.recruiterTeamId ? "recruiter_team" : "recruiter_solo";
   }
 
-  const proActive =
-    subscriptionIsActive(user.subscriptionStatus ?? null) &&
-    (!user.currentPeriodEnd || user.currentPeriodEnd > new Date());
-
-  return proActive ? "pro" : "free";
+  return subscriptionIsActive(user.subscriptionStatus ?? null) ? "pro" : "free";
 }
 
 // ─── getActivePlanForUser ─────────────────────────────────────────────────────

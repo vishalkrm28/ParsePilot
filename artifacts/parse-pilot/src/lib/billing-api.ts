@@ -74,6 +74,7 @@ export async function checkEntitlement(featureKey: string, workspaceId?: string)
 export async function getBillingStatus() {
   return apiFetch<{
     isPro: boolean;
+    isRecruiter: boolean;
     hasBulkAccess: boolean;
     subscriptionStatus: string | null;
     subscriptionPriceId: string | null;

@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
+import { useBillingStatus } from "@/hooks/use-billing-status";
 import {
   LayoutDashboard,
   FilePlus2,
@@ -80,6 +81,8 @@ function UserAvatar({ name, imageUrl }: { name: string; imageUrl?: string | null
 export function Sidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  const { status: billingStatus } = useBillingStatus();
+  const isRecruiter = billingStatus?.isRecruiter ?? false;
 
   const displayName =
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
@@ -201,43 +204,45 @@ export function Sidebar() {
           })}
         </div>
 
-        {/* Recruiter section */}
-        <div className="pt-3">
-          <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-            Recruiter
-          </p>
-          {recruiterItems.map(({ href, label, icon: Icon }) => {
-            const isRecruiterActive =
-              href === "/recruiter/dashboard"
-                ? location.startsWith("/recruiter") && !location.startsWith("/recruiter/pricing")
-                : location === href;
-            return (
-              <Link key={href} href={href}>
-                <div
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors group",
-                    isRecruiterActive
-                      ? "bg-primary/15 text-primary"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                  )}
-                >
-                  <Icon
+        {/* Recruiter section — only shown to users with an active recruiter plan */}
+        {isRecruiter && (
+          <div className="pt-3">
+            <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+              Recruiter
+            </p>
+            {recruiterItems.map(({ href, label, icon: Icon }) => {
+              const isRecruiterActive =
+                href === "/recruiter/dashboard"
+                  ? location.startsWith("/recruiter") && !location.startsWith("/recruiter/pricing")
+                  : location === href;
+              return (
+                <Link key={href} href={href}>
+                  <div
                     className={cn(
-                      "w-4 h-4 flex-shrink-0",
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors group",
                       isRecruiterActive
-                        ? "text-primary"
-                        : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground",
+                        ? "bg-primary/15 text-primary"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
                     )}
-                  />
-                  <span className="flex-1">{label}</span>
-                  {isRecruiterActive && (
-                    <ChevronRight className="w-3.5 h-3.5 text-primary/60" />
-                  )}
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+                  >
+                    <Icon
+                      className={cn(
+                        "w-4 h-4 flex-shrink-0",
+                        isRecruiterActive
+                          ? "text-primary"
+                          : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground",
+                      )}
+                    />
+                    <span className="flex-1">{label}</span>
+                    {isRecruiterActive && (
+                      <ChevronRight className="w-3.5 h-3.5 text-primary/60" />
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </nav>
 
       {/* User footer */}

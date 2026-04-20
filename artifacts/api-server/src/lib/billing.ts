@@ -26,26 +26,22 @@ export function subscriptionIsActive(status: string | null | undefined): boolean
 /**
  * Looks up a ParsePilot user by their internal user ID (from Replit Auth)
  * and returns whether they have an active Pro subscription.
+ *
+ * Trusts Stripe's subscriptionStatus as the source of truth. Stripe only marks
+ * a subscription "active" when payment has succeeded; it transitions to
+ * "past_due" or "canceled" when payment fails or the subscription ends. We do
+ * NOT apply a secondary currentPeriodEnd date guard here because that causes
+ * false negatives when a webhook is delayed after a successful renewal.
  */
 export async function isUserPro(userId: string): Promise<boolean> {
   const [user] = await db
-    .select({
-      subscriptionStatus: usersTable.subscriptionStatus,
-      currentPeriodEnd: usersTable.currentPeriodEnd,
-    })
+    .select({ subscriptionStatus: usersTable.subscriptionStatus })
     .from(usersTable)
     .where(eq(usersTable.id, userId))
     .limit(1);
 
   if (!user) return false;
-
-  if (!subscriptionIsActive(user.subscriptionStatus)) return false;
-
-  // Guard against stale status: treat subscription as expired if the
-  // period has ended and Stripe hasn't sent a webhook update yet.
-  if (user.currentPeriodEnd && user.currentPeriodEnd < new Date()) return false;
-
-  return true;
+  return subscriptionIsActive(user.subscriptionStatus);
 }
 
 /**

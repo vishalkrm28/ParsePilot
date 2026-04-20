@@ -107,6 +107,7 @@ router.get("/billing/status", async (req, res) => {
         subscriptionStatus: usersTable.subscriptionStatus,
         subscriptionPriceId: usersTable.subscriptionPriceId,
         currentPeriodEnd: usersTable.currentPeriodEnd,
+        recruiterSubscriptionStatus: usersTable.recruiterSubscriptionStatus,
       })
       .from(usersTable)
       .where(eq(usersTable.id, req.user.id))
@@ -117,14 +118,18 @@ router.get("/billing/status", async (req, res) => {
       return;
     }
 
-    const isPro =
-      (dbUser.subscriptionStatus === "active" || dbUser.subscriptionStatus === "trialing") &&
-      (!dbUser.currentPeriodEnd || dbUser.currentPeriodEnd > new Date());
+    // Trust Stripe's subscriptionStatus as the source of truth.
+    // Stripe only marks a subscription "active" when payment has succeeded.
+    // We do NOT apply a date guard here because a delayed webhook after a
+    // successful Stripe renewal would incorrectly strip Pro access.
+    const isPro = subscriptionIsActive(dbUser.subscriptionStatus);
+    const isRecruiter = subscriptionIsActive(dbUser.recruiterSubscriptionStatus);
 
     const bulkAccess = await hasBulkAccess(req.user.id);
 
     res.json({
       isPro,
+      isRecruiter,
       hasBulkAccess: bulkAccess,
       subscriptionStatus: dbUser.subscriptionStatus ?? null,
       subscriptionPriceId: dbUser.subscriptionPriceId ?? null,

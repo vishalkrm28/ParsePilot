@@ -3,6 +3,7 @@ import { authedFetch } from "@/lib/authed-fetch";
 
 export interface BillingStatus {
   isPro: boolean;
+  isRecruiter: boolean;
   hasBulkAccess: boolean;
   subscriptionStatus: string | null;
   currentPeriodEnd: string | null;
