@@ -304,7 +304,7 @@ export default function TailoredCvDetailPage() {
                     <SelectTrigger className="w-48">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent position="popper" sideOffset={4}>
                       <SelectItem value="professional">Professional</SelectItem>
                       <SelectItem value="confident">Confident</SelectItem>
                       <SelectItem value="warm">Warm</SelectItem>

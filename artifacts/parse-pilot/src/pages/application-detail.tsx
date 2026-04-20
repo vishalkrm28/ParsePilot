@@ -142,14 +142,15 @@ function LockedCoverLetterSection() {
             </div>
 
             <div className="space-y-2 opacity-40 pointer-events-none select-none" aria-hidden="true">
-              {(["professional", "enthusiastic", "concise"] as const).map((t) => (
+              {(["professional", "confident", "warm", "concise"] as const).map((t) => (
                 <label key={t} className="flex items-center gap-3 p-3 rounded-lg border border-border">
                   <div className="w-4 h-4 rounded-full border-2 border-muted-foreground/40" />
                   <div>
                     <span className="capitalize font-medium text-sm block">{t}</span>
                     <span className="text-xs text-muted-foreground">
                       {t === "professional" && "Formal, polished, measured"}
-                      {t === "enthusiastic" && "Warm, energetic, excited"}
+                      {t === "confident" && "Assertive, direct, impactful"}
+                      {t === "warm" && "Friendly, personable, engaging"}
                       {t === "concise" && "Brief, direct, 3 paragraphs"}
                     </span>
                   </div>
@@ -411,7 +412,7 @@ export default function ApplicationDetail() {
 
   const [activeTab, setActiveTab] = useState<TabId>("cv");
   const [missingAnswers, setMissingAnswers] = useState<Record<string, string>>({});
-  const [coverTone, setCoverTone] = useState<"professional" | "enthusiastic" | "concise">("professional");
+  const [coverTone, setCoverTone] = useState<"professional" | "confident" | "warm" | "concise">("professional");
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [analyzeErrorCode, setAnalyzeErrorCode] = useState<string | null>(null);
 
@@ -1346,7 +1347,7 @@ export default function ApplicationDetail() {
                           <div>
                             <h3 className="font-bold text-lg mb-2">Tone</h3>
                             <div className="space-y-2">
-                              {(["professional", "enthusiastic", "concise"] as const).map((t) => (
+                              {(["professional", "confident", "warm", "concise"] as const).map((t) => (
                                 <label
                                   key={t}
                                   className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:bg-secondary transition-colors"
@@ -1362,7 +1363,8 @@ export default function ApplicationDetail() {
                                     <span className="capitalize font-medium text-sm block">{t}</span>
                                     <span className="text-xs text-muted-foreground">
                                       {t === "professional" && "Formal, polished, measured"}
-                                      {t === "enthusiastic" && "Warm, energetic, excited"}
+                                      {t === "confident" && "Assertive, direct, impactful"}
+                                      {t === "warm" && "Friendly, personable, engaging"}
                                       {t === "concise" && "Brief, direct, 3 paragraphs"}
                                     </span>
                                   </div>
