@@ -348,7 +348,11 @@ export default function JobRecommendations() {
         });
       }
     } catch (err: any) {
-      const msg = err?.message ?? "Something went wrong";
+      const raw = err?.message ?? "Something went wrong";
+      const msg =
+        err?.status === 401 || raw === "Unauthorized"
+          ? "Your session has expired. Please refresh the page and sign in again."
+          : raw;
       setError(msg);
 
       if (err?.code === "CV_DAILY_LIMIT_REACHED") {
@@ -532,37 +536,39 @@ export default function JobRecommendations() {
 
               <div>
                 <label className="block text-sm font-medium mb-1.5">Country</label>
-                <Select value={country} onValueChange={setCountry}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="gb">United Kingdom</SelectItem>
-                    <SelectItem value="us">United States</SelectItem>
-                    <SelectItem value="au">Australia</SelectItem>
-                    <SelectItem value="ca">Canada</SelectItem>
-                    <SelectItem value="de">Germany</SelectItem>
-                    <SelectItem value="fr">France</SelectItem>
-                    <SelectItem value="nl">Netherlands</SelectItem>
-                    <SelectItem value="se">Sweden</SelectItem>
-                    <SelectItem value="sg">Singapore</SelectItem>
-                    <SelectItem value="in">India</SelectItem>
-                    <SelectItem value="nz">New Zealand</SelectItem>
-                    <SelectItem value="za">South Africa</SelectItem>
-                    <SelectItem value="br">Brazil</SelectItem>
-                  </SelectContent>
-                </Select>
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="gb">United Kingdom</option>
+                  <option value="us">United States</option>
+                  <option value="au">Australia</option>
+                  <option value="ca">Canada</option>
+                  <option value="de">Germany</option>
+                  <option value="fr">France</option>
+                  <option value="nl">Netherlands</option>
+                  <option value="se">Sweden</option>
+                  <option value="sg">Singapore</option>
+                  <option value="in">India</option>
+                  <option value="nz">New Zealand</option>
+                  <option value="za">South Africa</option>
+                  <option value="br">Brazil</option>
+                </select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-1.5">Work arrangement</label>
-                <Select value={remotePreference} onValueChange={setRemotePreference}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any">Any</SelectItem>
-                    <SelectItem value="remote">Remote only</SelectItem>
-                    <SelectItem value="hybrid">Hybrid</SelectItem>
-                    <SelectItem value="onsite">On-site</SelectItem>
-                  </SelectContent>
-                </Select>
+                <select
+                  value={remotePreference}
+                  onChange={(e) => setRemotePreference(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="any">Any</option>
+                  <option value="remote">Remote only</option>
+                  <option value="hybrid">Hybrid</option>
+                  <option value="onsite">On-site</option>
+                </select>
               </div>
 
               <div>
