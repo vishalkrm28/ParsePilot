@@ -30,6 +30,21 @@ function todayUtcStart(): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
+/**
+ * Maps a free-text job title to a valid The Muse category slug.
+ * Only returns categories confirmed to have active listings.
+ * Returns undefined to fall back to general (no-category) search.
+ */
+function mapRoleToMuseCategory(role: string): string | undefined {
+  if (!role) return undefined;
+  const r = role.toLowerCase();
+  if (/software|engineer|developer|backend|frontend|full.?stack|sre|devops|platform/.test(r)) return "Software Engineering";
+  if (/project manager|program manager|scrum|agile/.test(r)) return "Project Management";
+  if (/sales|account exec|business dev|bdr|sdr/.test(r)) return "Sales";
+  if (/manager|director|vp |vice president|head of|lead|recruit|talent|hr |human res|people ops/.test(r)) return "Management";
+  return undefined;
+}
+
 /** How many recommendation runs have been made for this (user, application) today. */
 async function countCvRunsToday(userId: string, applicationId: string | null): Promise<number> {
   const since = todayUtcStart();
@@ -297,19 +312,32 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
     }
   }
 
-  // Always try The Muse as a supplementary source (it's country-agnostic)
-  if (rawJobs.length < 30 && topRoles.length > 0) {
-    try {
-      const museResults = await fetchMuseJobs({ category: topRoles[0], page: 1 });
-      rawJobs.push(...museResults.map(normalizeMuseJob));
-    } catch (err) {
-      logger.warn({ err }, "The Muse fetch failed — skipping");
+  // Always try The Muse as a fallback/supplementary source (works without API key)
+  if (rawJobs.length < 40) {
+    const museCategory = mapRoleToMuseCategory(topRoles[0] ?? "");
+    const musePages = rawJobs.length === 0 ? [1, 2] : [1];
+    for (const page of musePages) {
+      try {
+        const museResults = await fetchMuseJobs({ category: museCategory, page });
+        rawJobs.push(...museResults.map(normalizeMuseJob));
+      } catch (err) {
+        logger.warn({ err, page, museCategory }, "The Muse fetch failed — skipping");
+      }
+    }
+    // If category-filtered still empty, fetch general recent jobs from The Muse
+    if (rawJobs.length === 0) {
+      try {
+        const museResults = await fetchMuseJobs({ page: 1 });
+        rawJobs.push(...museResults.map(normalizeMuseJob));
+      } catch (err) {
+        logger.warn({ err }, "The Muse general fetch failed — skipping");
+      }
     }
   }
 
   if (rawJobs.length === 0) {
     res.status(502).json({
-      error: "Could not fetch any jobs from the job boards. Try a different country or location.",
+      error: "Could not fetch any jobs from the job boards. Please try again.",
       code: "NO_JOBS_FETCHED",
     });
     return;
