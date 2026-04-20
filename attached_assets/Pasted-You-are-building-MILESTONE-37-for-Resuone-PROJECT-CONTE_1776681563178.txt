@@ -1,0 +1,635 @@
+You are building MILESTONE 37 for Resuone.
+
+PROJECT CONTEXT
+Resuone already has or is implementing:
+- Next.js App Router
+- Supabase
+- Anthropic Claude integration
+- CV parsing
+- CV vs job analysis
+- recruiter workflows
+- open job recommendations
+- tailored CV generation
+- cover letter generation
+- application tracker
+- saved jobs
+- interview prep
+- follow-up email drafts
+- interview scheduling
+- mock interview sessions
+
+Now build the notification and sync layer so users can stay on top of interviews, follow-ups, deadlines, and communication timing.
+
+PRIMARY GOAL
+Create a workflow where the user can:
+1. connect calendar and email providers later-ready
+2. manage reminders inside Resuone first
+3. receive smart reminders for applications and interviews
+4. sync interview events to Google Calendar
+5. create Gmail-ready email drafts or save sync-ready outbound records
+6. get AI-suggested reminder timing and follow-up timing
+7. centralize all reminders, upcoming events, and action prompts
+
+USER JOURNEY
+1. User opens an application
+2. User sees:
+   - follow up due soon
+   - interview coming up
+   - no thank-you email drafted yet
+   - reminder suggestions
+3. User can:
+   - create reminder
+   - accept AI-suggested reminder
+   - sync interview to calendar
+   - create Gmail-ready draft metadata
+4. User opens a notifications center
+5. User sees:
+   - upcoming reminders
+   - overdue actions
+   - interview events
+   - follow-up recommendations
+6. User marks items complete, snoozes them, or converts them into calendar/email actions
+
+IMPORTANT RULES
+- Build internal reminder system first
+- Keep Google Calendar and Gmail integration modular and optional
+- Do not assume provider is connected
+- All sync code must be isolated behind service/helper functions
+- Do not actually send emails automatically in this milestone
+- Do not auto-create external calendar events without user action
+- AI timing suggestions must be advisory, not forced
+- Save all reminders, sync states, and action suggestions in Supabase
+- Keep architecture ready for future OAuth integrations
+
+TECH STACK
+- Next.js App Router
+- TypeScript
+- Supabase
+- Anthropic Claude
+- Zod
+- Existing Resuone UI system
+
+BUILD THE FOLLOWING
+
+1) DATABASE TABLES
+Create and use these Supabase tables:
+
+notification_preferences
+- id uuid primary key default gen_random_uuid()
+- user_id uuid not null unique
+- email_enabled boolean default true
+- in_app_enabled boolean default true
+- reminder_lead_hours integer default 24
+- interview_lead_hours integer default 24
+- follow_up_default_days integer default 5
+- created_at timestamptz default now()
+- updated_at timestamptz default now()
+
+notification_items
+- id uuid primary key default gen_random_uuid()
+- user_id uuid not null
+- application_id uuid references applications(id) on delete cascade
+- reminder_id uuid references application_reminders(id) on delete set null
+- interview_id uuid references application_interviews(id) on delete set null
+- type text not null
+- title text not null
+- body text
+- action_label text
+- action_url text
+- priority text default 'medium'
+- status text default 'pending'
+- due_at timestamptz
+- snoozed_until timestamptz
+- created_at timestamptz default now()
+- updated_at timestamptz default now()
+
+calendar_sync_connections
+- id uuid primary key default gen_random_uuid()
+- user_id uuid not null
+- provider text not null
+- provider_email text
+- status text default 'not_connected'
+- external_calendar_id text
+- metadata jsonb default '{}'::jsonb
+- created_at timestamptz default now()
+- updated_at timestamptz default now()
+
+calendar_sync_events
+- id uuid primary key default gen_random_uuid()
+- user_id uuid not null
+- application_id uuid references applications(id) on delete set null
+- interview_id uuid references application_interviews(id) on delete cascade
+- provider text not null
+- external_event_id text
+- sync_status text default 'pending'
+- synced_at timestamptz
+- payload jsonb default '{}'::jsonb
+- created_at timestamptz default now()
+- updated_at timestamptz default now()
+
+email_sync_connections
+- id uuid primary key default gen_random_uuid()
+- user_id uuid not null
+- provider text not null
+- provider_email text
+- status text default 'not_connected'
+- metadata jsonb default '{}'::jsonb
+- created_at timestamptz default now()
+- updated_at timestamptz default now()
+
+email_outbound_records
+- id uuid primary key default gen_random_uuid()
+- user_id uuid not null
+- application_id uuid references applications(id) on delete cascade
+- email_draft_id uuid references application_email_drafts(id) on delete set null
+- provider text
+- sync_status text default 'draft_only'
+- recipient_email text
+- subject text not null
+- body_text text not null
+- sent_at timestamptz
+- metadata jsonb default '{}'::jsonb
+- created_at timestamptz default now()
+- updated_at timestamptz default now()
+
+smart_action_suggestions
+- id uuid primary key default gen_random_uuid()
+- user_id uuid not null
+- application_id uuid references applications(id) on delete cascade
+- suggestion_type text not null
+- title text not null
+- description text
+- suggested_at timestamptz not null
+- status text default 'pending'
+- payload jsonb default '{}'::jsonb
+- created_at timestamptz default now()
+- updated_at timestamptz default now()
+
+Add indexes where appropriate on:
+- user_id
+- application_id
+- due_at
+- status
+- suggested_at
+
+2) ENUM / VALUE MODELS
+
+Allowed notification type values:
+- reminder_due
+- follow_up_due
+- interview_upcoming
+- thank_you_needed
+- deadline_approaching
+- prep_recommended
+- draft_ready
+
+Allowed notification priority values:
+- low
+- medium
+- high
+- urgent
+
+Allowed notification status values:
+- pending
+- completed
+- dismissed
+- snoozed
+
+Allowed provider values:
+- google
+- gmail
+- outlook
+- internal
+
+Allowed connection status values:
+- not_connected
+- connected
+- expired
+- error
+
+Allowed sync status values:
+- pending
+- synced
+- failed
+- draft_only
+
+Allowed suggestion_type values:
+- follow_up_time
+- thank_you_time
+- interview_prep_time
+- mock_interview_time
+- deadline_warning
+- asset_missing
+
+Create Zod enums for all of these.
+
+3) NEW FILES AND FOLDERS
+Create:
+
+lib/notifications/notification-schemas.ts
+lib/notifications/notification-helpers.ts
+lib/notifications/notification-prompts.ts
+lib/notifications/reminder-engine.ts
+lib/notifications/smart-actions.ts
+
+lib/integrations/calendar-schemas.ts
+lib/integrations/calendar-helpers.ts
+lib/integrations/google-calendar.ts
+
+lib/integrations/email-schemas.ts
+lib/integrations/email-helpers.ts
+lib/integrations/gmail.ts
+
+app/api/notifications/preferences/route.ts
+app/api/notifications/list/route.ts
+app/api/notifications/create/route.ts
+app/api/notifications/update-status/route.ts
+app/api/notifications/snooze/route.ts
+
+app/api/smart-actions/generate/route.ts
+app/api/smart-actions/list/route.ts
+app/api/smart-actions/accept/route.ts
+app/api/smart-actions/dismiss/route.ts
+
+app/api/calendar/connect-status/route.ts
+app/api/calendar/create-event/route.ts
+app/api/calendar/list-synced-events/route.ts
+
+app/api/email/connect-status/route.ts
+app/api/email/create-outbound-record/route.ts
+app/api/email/list-outbound-records/route.ts
+
+app/notifications/page.tsx
+app/settings/notifications/page.tsx
+app/integrations/page.tsx
+
+4) NOTIFICATION PREFERENCES
+Create preferences route:
+app/api/notifications/preferences/route.ts
+
+Support:
+GET:
+- return user preferences
+POST:
+- update user preferences
+
+Fields:
+{
+  "userId": "...",
+  "emailEnabled": true,
+  "inAppEnabled": true,
+  "reminderLeadHours": 24,
+  "interviewLeadHours": 24,
+  "followUpDefaultDays": 5
+}
+
+5) NOTIFICATION ITEM CREATION
+Create notification item route:
+app/api/notifications/create/route.ts
+
+Input:
+{
+  "userId": "...",
+  "applicationId": "...",
+  "reminderId": "...",
+  "interviewId": "...",
+  "type": "follow_up_due",
+  "title": "Follow up with Microsoft application",
+  "body": "It has been 5 days since you applied.",
+  "actionLabel": "Draft follow-up",
+  "actionUrl": "/applications/123",
+  "priority": "high",
+  "dueAt": "2026-05-08T09:00:00.000Z"
+}
+
+Rules:
+- validate types and enums
+- store item
+- status defaults to pending
+
+6) NOTIFICATION CENTER
+Create:
+app/api/notifications/list/route.ts
+app/api/notifications/update-status/route.ts
+app/api/notifications/snooze/route.ts
+app/notifications/page.tsx
+
+List page sections:
+- overdue
+- today
+- upcoming
+- completed recently
+
+Each item shows:
+- title
+- body
+- due time
+- application/company
+- priority
+- action button
+- snooze button
+- mark complete
+- dismiss
+
+Snooze input:
+{
+  "notificationItemId": "...",
+  "snoozedUntil": "2026-05-08T16:00:00.000Z"
+}
+
+7) REMINDER ENGINE
+Create:
+lib/notifications/reminder-engine.ts
+
+Add helper functions:
+- buildInterviewReminderNotification()
+- buildFollowUpReminderNotification()
+- buildThankYouNotification()
+- buildDeadlineNotification()
+- createNotificationFromReminder()
+- createNotificationFromInterview()
+
+Logic:
+- if interview scheduled, create upcoming interview notification based on interviewLeadHours
+- if application is applied and no follow-up exists after X days, generate follow-up due notification
+- if interview marked completed and no thank-you draft exists, generate thank-you-needed notification
+- if application deadline exists in future milestones, keep helper ready for deadline warning
+
+8) SMART ACTION SUGGESTIONS
+Create AI-guided suggestion layer.
+
+Create:
+app/api/smart-actions/generate/route.ts
+app/api/smart-actions/list/route.ts
+app/api/smart-actions/accept/route.ts
+app/api/smart-actions/dismiss/route.ts
+lib/notifications/smart-actions.ts
+lib/notifications/notification-prompts.ts
+
+Prompt helper:
+buildSmartActionSuggestionPrompt({
+  application,
+  stage,
+  appliedAt,
+  interviews,
+  reminders,
+  existingDrafts,
+  latestInterviewPrep
+})
+
+Expected JSON output:
+{
+  "suggestions": [
+    {
+      "suggestion_type": "follow_up_time",
+      "title": "",
+      "description": "",
+      "suggested_at": "",
+      "payload": {}
+    }
+  ]
+}
+
+Rules:
+- suggestions must be practical and grounded
+- do not create nonsense reminders
+- suggest timing for:
+  - follow-up
+  - thank-you
+  - interview prep
+  - mock interview
+  - asset missing warning
+- suggestions are advisory only
+
+Accept suggestion behavior:
+- if follow_up_time, create reminder and notification
+- if thank_you_time, create reminder
+- if mock_interview_time, create reminder
+- if asset_missing, create notification item only
+
+9) CALENDAR INTEGRATION LAYER
+Build internal provider abstraction first.
+
+Create:
+lib/integrations/calendar-schemas.ts
+lib/integrations/calendar-helpers.ts
+lib/integrations/google-calendar.ts
+app/api/calendar/connect-status/route.ts
+app/api/calendar/create-event/route.ts
+app/api/calendar/list-synced-events/route.ts
+
+For this milestone:
+- do not implement full OAuth unless already available
+- build placeholders and service interfaces
+- allow internal “sync-ready” flow
+- if provider not connected, still create sync record with pending/not_connected state
+
+Create event input:
+{
+  "userId": "...",
+  "provider": "google",
+  "applicationId": "...",
+  "interviewId": "...",
+  "title": "Hiring Manager Interview",
+  "scheduledAt": "2026-05-03T13:00:00.000Z",
+  "timezone": "Europe/Stockholm",
+  "location": "Microsoft Teams",
+  "meetingUrl": "",
+  "notes": "Focus on operational ownership."
+}
+
+Behavior:
+1. validate provider
+2. check connection status
+3. if not connected:
+   - create calendar_sync_events row with sync_status = pending
+   - return sync-ready response
+4. if connected:
+   - pass through provider adapter
+   - save external_event_id and synced_at
+5. create timeline event for calendar sync attempt if helpful
+
+Google calendar helper should expose interface like:
+- createCalendarEvent()
+- getCalendarConnectionStatus()
+
+Return mock-safe result if connection unavailable.
+
+10) EMAIL / GMAIL INTEGRATION LAYER
+Build email sync-ready abstraction.
+
+Create:
+lib/integrations/email-schemas.ts
+lib/integrations/email-helpers.ts
+lib/integrations/gmail.ts
+app/api/email/connect-status/route.ts
+app/api/email/create-outbound-record/route.ts
+app/api/email/list-outbound-records/route.ts
+
+Create outbound record input:
+{
+  "userId": "...",
+  "applicationId": "...",
+  "emailDraftId": "...",
+  "provider": "gmail",
+  "recipientEmail": "recruiter@example.com",
+  "subject": "...",
+  "bodyText": "..."
+}
+
+Behavior:
+- save outbound email record
+- if provider not connected, sync_status = draft_only
+- if later connected, architecture should support real draft creation
+- do not actually send email in this milestone
+
+Gmail helper should expose interface like:
+- getEmailConnectionStatus()
+- createProviderDraft()
+
+Return safe placeholder result if not connected.
+
+11) INTEGRATIONS PAGE
+Create:
+app/integrations/page.tsx
+
+Show cards for:
+- Google Calendar
+- Gmail
+- Outlook (placeholder)
+
+Each card shows:
+- connection status
+- provider email if connected
+- supported actions
+- coming soon where needed
+
+Do not fake real connections.
+If OAuth not implemented, show:
+- Not connected
+- Sync-ready architecture in place
+
+12) SETTINGS — NOTIFICATIONS PAGE
+Create:
+app/settings/notifications/page.tsx
+
+Show:
+- in-app notifications toggle
+- email notifications toggle
+- interview reminder lead time
+- follow-up default days
+- save preferences button
+
+Make it clean and easy.
+
+13) APPLICATION PAGE INTEGRATION
+On app/applications/[id]/page.tsx add:
+- create reminder
+- view related notifications
+- generate smart actions
+- list accepted/pending smart suggestions
+- sync interview to calendar
+- create outbound email record from draft
+
+14) HELPER FUNCTIONS
+Create in lib/notifications/notification-helpers.ts:
+- buildNotificationTitle()
+- priorityFromType()
+- isOverdue()
+- groupNotificationsByDateBucket()
+- nextRelevantActionLabel()
+
+Create in lib/notifications/smart-actions.ts:
+- shouldSuggestFollowUp()
+- shouldSuggestThankYou()
+- shouldSuggestMockInterview()
+- buildSuggestionPayload()
+- acceptSuggestionToReminder()
+
+Create in lib/integrations/calendar-helpers.ts:
+- buildCalendarEventPayload()
+- normalizeCalendarStatus()
+- providerSupportsCalendarSync()
+
+Create in lib/integrations/email-helpers.ts:
+- buildOutboundEmailPayload()
+- normalizeEmailSyncStatus()
+- providerSupportsDraftSync()
+
+15) AI USE
+Use Claude only for smart action suggestions in this milestone.
+Do not use Claude for ordinary reminder CRUD.
+
+Cost control:
+- only generate smart suggestions on demand or when major application state changes
+- save generated suggestions
+- do not regenerate repeatedly without reason
+
+16) NOTIFICATION / SUGGESTION UX
+Notification center should feel useful, not noisy.
+
+Priority guidance:
+- urgent = interview within 6 hours or missed action
+- high = interview tomorrow, follow-up due, thank-you overdue
+- medium = prep recommended soon
+- low = general suggestion
+
+Smart actions section should show:
+- title
+- why now
+- suggested date/time
+- accept
+- dismiss
+
+17) SECURITY + VALIDATION
+- backend only for AI/sync routes
+- validate all timestamps and enums
+- restrict all data access to user-owned rows
+- do not claim real provider connection when not connected
+- rate limit smart-action generation routes
+- keep integration tokens out of frontend
+- treat sync layers as provider adapters
+
+18) QUALITY REQUIREMENTS
+- keep API routes thin
+- isolate provider code
+- isolate notification logic
+- reuse timeline event helpers
+- add loading states
+- add empty states:
+  - no notifications
+  - no smart suggestions
+  - no integrations connected
+
+19) SUCCESS CRITERIA
+This milestone is complete when:
+- user can manage notification preferences
+- user can create and view notification items
+- user can snooze/dismiss/complete notifications
+- smart action suggestions can be generated and stored
+- accepting a suggestion creates the right reminder/notification outcome
+- interview sync records can be created
+- outbound email records can be created
+- integrations page reflects connection state honestly
+- notification center works cleanly
+- everything persists in Supabase
+
+20) FUTURE-READY NOTES
+Keep architecture ready for:
+- real Google OAuth calendar sync
+- real Gmail draft creation and send flows
+- Outlook integration
+- push notifications
+- daily digest emails
+- automated reminder jobs
+- background cron processing
+- calendar conflict detection
+- follow-up autopilot suggestions
+
+NOW DO THE FOLLOWING
+- Generate all required code files
+- Show code file by file
+- Do not skip important implementation pieces
+- Keep naming consistent with Resuone
+- Keep architecture aligned with previous milestones
+- Do not only explain — actually output the implementation
