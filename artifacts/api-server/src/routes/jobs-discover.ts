@@ -132,6 +132,8 @@ router.post("/jobs/discover", async (req, res) => {
   // ── AI Ranking (optional, requires auth + candidate profile) ──────────────
   let aiRankedJobs: typeof storedJobs = [];
   let aiRanked = false;
+  // matchData: jobId → { matchScore, fitReasons, missingRequirements, recommendationSummary }
+  let matchData: Record<string, { matchScore: number; fitReasons: string[]; missingRequirements: string[]; recommendationSummary: string }> = {};
 
   if (aiRanking && userId) {
     try {
@@ -169,6 +171,19 @@ router.post("/jobs/discover", async (req, res) => {
           jobIdByCanonicalKey: jobIdByKey,
         });
 
+        // Build matchData map (jobId → match details) to include in response
+        for (const rec of recommendations) {
+          const jobId = jobIdByKey.get(rec.jobCanonicalKey);
+          if (jobId) {
+            matchData[jobId] = {
+              matchScore: rec.matchScore,
+              fitReasons: rec.fitReasons,
+              missingRequirements: rec.missingRequirements,
+              recommendationSummary: rec.recommendationSummary,
+            };
+          }
+        }
+
         // Re-order storedJobs by AI match score
         const scoreByKey = new Map(
           recommendations.map((r) => [r.jobCanonicalKey, r.matchScore]),
@@ -205,6 +220,7 @@ router.post("/jobs/discover", async (req, res) => {
     total: deduped.length,
     cached: false,
     aiRanked,
+    matchData,
     sourceBreakdown: discovery.sourceBreakdown,
     errors: discovery.errors.length > 0 ? discovery.errors : undefined,
   });

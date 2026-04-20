@@ -1,14 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import { COUNTRY_OPTIONS } from "@/lib/countries";
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { authedFetch } from "@/lib/authed-fetch";
-import { COUNTRY_OPTIONS } from "@/lib/countries";
 import { TailorCvModal } from "@/components/application/tailor-cv-modal";
 import {
   MapPin,
@@ -16,9 +15,7 @@ import {
   ExternalLink,
   Loader2,
   Globe,
-  Search,
   Sparkles,
-  RefreshCcw,
   ChevronDown,
   ChevronUp,
   AlertCircle,
@@ -26,6 +23,7 @@ import {
   BookmarkCheck,
   FileText,
   MailOpen,
+  RefreshCcw,
 } from "lucide-react";
 import { saveJob } from "@/lib/tracker-api";
 
@@ -55,11 +53,19 @@ interface DiscoveredJob {
   metadata: Record<string, unknown>;
 }
 
+interface MatchInfo {
+  matchScore: number;
+  fitReasons: string[];
+  missingRequirements: string[];
+  recommendationSummary: string;
+}
+
 interface DiscoverResponse {
   jobs: DiscoveredJob[];
   total: number;
   cached: boolean;
   aiRanked: boolean;
+  matchData: Record<string, MatchInfo>;
   sourceBreakdown: Record<string, number>;
   errors?: string[];
 }
@@ -70,16 +76,25 @@ interface Application {
   company: string;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-function formatRelative(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const d = Math.floor(ms / 86_400_000);
-  if (d === 0) return "Today";
-  if (d === 1) return "Yesterday";
-  if (d < 7) return `${d} days ago`;
-  if (d < 30) return `${Math.floor(d / 7)}w ago`;
-  return `${Math.floor(d / 30)}mo ago`;
+function MatchScoreBar({ score }: { score: number }) {
+  const color =
+    score >= 70 ? "bg-green-500" : score >= 45 ? "bg-yellow-500" : "bg-red-400";
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${score}%` }} />
+      </div>
+      <span className="text-sm font-semibold w-10 text-right">{score}%</span>
+    </div>
+  );
+}
+
+function ScoreBadge({ score }: { score: number }) {
+  if (score >= 70) return <Badge className="bg-green-100 text-green-800 border-green-200">Strong Match</Badge>;
+  if (score >= 45) return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Partial Match</Badge>;
+  return <Badge className="bg-red-100 text-red-700 border-red-200">Weak Match</Badge>;
 }
 
 function sourceLabel(source: string) {
@@ -91,10 +106,21 @@ function sourceLabel(source: string) {
   return map[source] ?? source;
 }
 
+function formatRelative(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const d = Math.floor(ms / 86_400_000);
+  if (d === 0) return "Today";
+  if (d === 1) return "Yesterday";
+  if (d < 7) return `${d} days ago`;
+  if (d < 30) return `${Math.floor(d / 7)}w ago`;
+  return `${Math.floor(d / 30)}mo ago`;
+}
+
 // ─── Job Card ─────────────────────────────────────────────────────────────────
 
 function JobCard({
   job,
+  match,
   applications,
   onTailor,
   saved,
@@ -102,6 +128,7 @@ function JobCard({
   onSave,
 }: {
   job: DiscoveredJob;
+  match: MatchInfo | null;
   applications: Application[];
   onTailor: (job: DiscoveredJob, mode: "tailor" | "cover-letter") => void;
   saved: boolean;
@@ -109,6 +136,7 @@ function JobCard({
   onSave: (job: DiscoveredJob) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const { toast } = useToast();
 
   const salaryText =
     job.salaryMin && job.salaryMax
@@ -124,7 +152,7 @@ function JobCard({
   return (
     <Card className="border border-border hover:shadow-md transition-shadow">
       <CardContent className="p-5">
-        {/* Title + meta row */}
+        {/* Title + badge row */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-base text-foreground leading-tight line-clamp-2">
@@ -153,19 +181,33 @@ function JobCard({
                   {job.employmentType}
                 </Badge>
               )}
-              {job.seniority && (
-                <Badge variant="outline" className="text-xs capitalize">
-                  {job.seniority}
-                </Badge>
-              )}
               {salaryText && (
                 <span className="text-xs font-medium text-foreground/80">{salaryText}</span>
               )}
             </div>
           </div>
+          {match && (
+            <div className="shrink-0">
+              <ScoreBadge score={match.matchScore} />
+            </div>
+          )}
         </div>
 
-        {/* Expandable details */}
+        {/* Match score bar */}
+        {match && (
+          <div className="mb-3">
+            <MatchScoreBar score={match.matchScore} />
+          </div>
+        )}
+
+        {/* AI summary */}
+        {match?.recommendationSummary && (
+          <p className="text-sm text-muted-foreground mb-3 leading-relaxed italic">
+            {match.recommendationSummary}
+          </p>
+        )}
+
+        {/* Expand toggle */}
         <button
           onClick={() => setExpanded(!expanded)}
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mb-2"
@@ -176,7 +218,33 @@ function JobCard({
 
         {expanded && (
           <div className="space-y-3 mt-2">
-            {job.skills && job.skills.length > 0 && (
+            {match && (match.fitReasons ?? []).length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-green-700 mb-1.5">Why it fits</p>
+                <ul className="space-y-1">
+                  {match.fitReasons.map((r, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-xs text-foreground/80">
+                      <span className="text-green-500 mt-0.5">✓</span>
+                      {r}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {match && (match.missingRequirements ?? []).length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-amber-700 mb-1.5">Gaps to bridge</p>
+                <ul className="space-y-1">
+                  {match.missingRequirements.map((r, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-xs text-foreground/80">
+                      <span className="text-amber-500 mt-0.5">△</span>
+                      {r}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {!match && job.skills && job.skills.length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-1.5">Skills</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -191,7 +259,7 @@ function JobCard({
             {cleanDesc && (
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-1">About the role</p>
-                <p className="text-xs text-foreground/70 leading-relaxed line-clamp-6">
+                <p className="text-xs text-foreground/70 leading-relaxed line-clamp-4">
                   {cleanDesc}
                 </p>
               </div>
@@ -224,7 +292,6 @@ function JobCard({
             )}
           </div>
 
-          {/* Action buttons */}
           <div className="flex gap-2">
             <Button
               size="sm"
@@ -276,24 +343,22 @@ function JobCard({
 export default function GlobalJobDiscover() {
   const { toast } = useToast();
 
-  const [query, setQuery] = useState("");
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [selectedApp, setSelectedApp] = useState<string>("");
+  const [preferredLocation, setPreferredLocation] = useState("");
   const [country, setCountry] = useState("");
-  const [location, setLocation] = useState("");
-  const [remoteOnly, setRemoteOnly] = useState(false);
-  const [aiRanking, setAiRanking] = useState(false);
+  const [remotePreference, setRemotePreference] = useState("any");
+  const [roleOverride, setRoleOverride] = useState("");
+  const [minScore, setMinScore] = useState(0);
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DiscoverResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
   const [savingJobId, setSavingJobId] = useState<string | null>(null);
-
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [selectedAppId, setSelectedAppId] = useState<string>("");
   const [modalJob, setModalJob] = useState<DiscoveredJob | null>(null);
-  const [modalMode, setModalMode] = useState<"tailor" | "cover-letter">("tailor"); // captured for future use
 
-  // Fetch user applications for Tailor CV / Cover Letter modal
   useEffect(() => {
     authedFetch(`${BASE}/applications`)
       .then((r) => (r.ok ? r.json() : {}))
@@ -304,93 +369,97 @@ export default function GlobalJobDiscover() {
           ? data
           : [];
         setApplications(apps);
-        if (apps.length > 0) setSelectedAppId(apps[0].id);
+        if (apps.length > 0) setSelectedApp(apps[0].id);
       })
       .catch(() => {});
   }, []);
 
-  const handleSearch = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!query.trim()) {
-        toast({ title: "Enter a search query", variant: "destructive" });
-        return;
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    const app = applications.find((a) => a.id === selectedApp);
+    const query = roleOverride.trim() || (app ? app.jobTitle : "");
+    if (!query) {
+      toast({ title: "Select a CV or enter a job title", variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const res = await authedFetch(`${BASE}/jobs/discover`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query,
+          country,
+          location: preferredLocation.trim() || "",
+          remoteOnly: remotePreference === "remote",
+          aiRanking: true,
+          applicationId: selectedApp || undefined,
+          skipCache: false,
+          limit: 50,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(err.error ?? `HTTP ${res.status}`);
       }
 
-      setLoading(true);
-      setResult(null);
+      const data: DiscoverResponse = await res.json();
+      setResult(data);
 
-      try {
-        const res = await authedFetch(`${BASE}/jobs/discover`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query: query.trim(),
-            country,
-            location,
-            remoteOnly,
-            aiRanking,
-            limit: 50,
-          }),
-        });
+      toast({
+        title: `${data.jobs.length} jobs found`,
+        description: data.aiRanked ? "AI-ranked by match with your CV" : "Sorted by relevance",
+      });
+    } catch (err: any) {
+      const msg = err?.message ?? "Something went wrong";
+      setError(msg);
+      toast({ title: "Search failed", description: msg, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
 
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: "Unknown error" }));
-          throw new Error(err.error ?? `HTTP ${res.status}`);
-        }
-
-        const data: DiscoverResponse = await res.json();
-        setResult(data);
-
-        if (data.errors?.length) {
-          toast({
-            title: "Some sources had issues",
-            description: data.errors.join(" | "),
-            variant: "destructive",
-          });
-        }
-      } catch (err: any) {
-        toast({ title: "Search failed", description: err.message, variant: "destructive" });
-      } finally {
-        setLoading(false);
-      }
-    },
-    [query, country, location, remoteOnly, aiRanking, toast],
-  );
-
-  const handleSave = useCallback(
-    async (job: DiscoveredJob) => {
-      if (savedJobIds.has(job.id) || savingJobId === job.id) return;
-      setSavingJobId(job.id);
-      try {
-        const { alreadySaved } = await saveJob({
-          externalJobCacheId: job.id,
-          jobTitle: job.title,
-          company: job.company ?? null,
-          location: job.location ?? null,
-          employmentType: job.employmentType ?? null,
-          remoteType: job.remote ? "remote" : null,
-          salaryMin: job.salaryMin ? Number(job.salaryMin) : null,
-          salaryMax: job.salaryMax ? Number(job.salaryMax) : null,
-          currency: job.currency ?? null,
-          applyUrl: job.applyUrl ?? job.companyCareersUrl ?? null,
-          jobSnapshot: job as unknown as Record<string, unknown>,
-        });
-        setSavedJobIds((prev) => new Set([...prev, job.id]));
-        toast({ title: alreadySaved ? "Already saved" : "Job saved to tracker", description: "View it in Saved Jobs." });
-      } catch (err: any) {
-        toast({ title: "Could not save job", description: err.message, variant: "destructive" });
-      } finally {
-        setSavingJobId(null);
-      }
-    },
-    [savedJobIds, savingJobId, toast],
-  );
+  async function handleSave(job: DiscoveredJob) {
+    if (savedJobIds.has(job.id) || savingJobId === job.id) return;
+    setSavingJobId(job.id);
+    try {
+      const { alreadySaved } = await saveJob({
+        externalJobCacheId: job.id,
+        jobTitle: job.title,
+        company: job.company ?? null,
+        location: job.location ?? null,
+        employmentType: job.employmentType ?? null,
+        remoteType: job.remote ? "remote" : null,
+        salaryMin: job.salaryMin ? Number(job.salaryMin) : null,
+        salaryMax: job.salaryMax ? Number(job.salaryMax) : null,
+        currency: job.currency ?? null,
+        applyUrl: job.applyUrl ?? job.companyCareersUrl ?? null,
+        jobSnapshot: job as unknown as Record<string, unknown>,
+      });
+      setSavedJobIds((prev) => new Set([...prev, job.id]));
+      toast({ title: alreadySaved ? "Already saved" : "Job saved to tracker", description: "View it in Saved Jobs." });
+    } catch (err: any) {
+      toast({ title: "Could not save job", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingJobId(null);
+    }
+  }
 
   function handleTailor(job: DiscoveredJob, mode: "tailor" | "cover-letter") {
     setModalJob(job);
-    setModalMode(mode);
   }
+
+  const scored = result
+    ? result.jobs
+        .map((j) => ({ job: j, match: result.matchData?.[j.id] ?? null }))
+        .filter(({ match }) => !match || match.matchScore >= minScore)
+    : [];
 
   return (
     <AppLayout>
@@ -400,202 +469,231 @@ export default function GlobalJobDiscover() {
           jobTitle={modalJob.title}
           jobCompany={modalJob.company ?? undefined}
           externalJobCacheId={modalJob.id}
-          defaultApplicationId={selectedAppId || undefined}
+          defaultApplicationId={selectedApp || undefined}
           onClose={() => setModalJob(null)}
         />
       )}
 
-      <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+      <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
+        <div className="flex items-start justify-between mb-8">
+          <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Globe className="h-6 w-6 text-primary" />
+              <Globe className="w-6 h-6 text-primary" />
               Global Job Discovery
             </h1>
-            <p className="text-muted-foreground text-sm">
-              Search across Google Jobs, Greenhouse, and Lever in one unified engine.
+            <p className="text-muted-foreground mt-1 text-sm">
+              AI-powered matching across Google Jobs, Greenhouse, and Lever — driven by your CV.
             </p>
           </div>
         </div>
 
-        {/* Search form */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Search className="w-4 h-4 text-muted-foreground" />
-              Search Jobs
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-0">
-            <form onSubmit={handleSearch} className="space-y-4">
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Input
-                    placeholder='e.g. "software engineer", "product manager react"'
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    disabled={loading}
-                    className="w-full"
-                  />
-                </div>
-                <Button type="submit" disabled={loading || !query.trim()}>
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <><Search className="h-4 w-4 mr-1.5" />Search</>
-                  )}
-                </Button>
-              </div>
+        {/* No CVs warning */}
+        {applications.length === 0 && (
+          <div className="mb-6 flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+            <FileText className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+            <p className="text-blue-800">
+              Analyse a CV first — your CV is used to find and rank matching jobs across the globe.
+            </p>
+          </div>
+        )}
 
-              {applications.length > 0 && (
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">CV to tailor with</Label>
-                  <select
-                    value={selectedAppId}
-                    onChange={(e) => setSelectedAppId(e.target.value)}
-                    disabled={loading}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
+        <form onSubmit={handleSubmit}>
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                Choose a CV &amp; Set Preferences
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* CV selector */}
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium mb-1.5">CV to use</label>
+                <Select value={selectedApp} onValueChange={setSelectedApp}>
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        applications.length === 0
+                          ? "No CVs found — analyse one first"
+                          : "Select a CV…"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
                     {applications.slice(0, 20).map((a) => (
-                      <option key={a.id} value={a.id}>
+                      <SelectItem key={a.id} value={a.id}>
                         {a.jobTitle} @ {a.company}
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Country</Label>
-                  <select
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    disabled={loading}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    {COUNTRY_OPTIONS.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">City / region</Label>
-                  <Input
-                    placeholder="e.g. Stockholm, London"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    disabled={loading}
-                  />
-                </div>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="remote-toggle"
-                    checked={remoteOnly}
-                    onCheckedChange={setRemoteOnly}
-                    disabled={loading}
-                  />
-                  <Label htmlFor="remote-toggle" className="text-sm cursor-pointer">
-                    Remote only
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="ai-toggle"
-                    checked={aiRanking}
-                    onCheckedChange={setAiRanking}
-                    disabled={loading}
-                  />
-                  <Label htmlFor="ai-toggle" className="text-sm cursor-pointer flex items-center gap-1">
-                    <Sparkles className="h-3.5 w-3.5 text-primary" />
-                    AI ranking
-                  </Label>
-                </div>
+              {/* Preferred location */}
+              <div>
+                <label className="block text-sm font-medium mb-1.5">
+                  Preferred location <span className="text-muted-foreground font-normal">(optional)</span>
+                </label>
+                <Input
+                  placeholder="e.g. London, New York"
+                  value={preferredLocation}
+                  onChange={(e) => setPreferredLocation(e.target.value)}
+                />
               </div>
-            </form>
-          </CardContent>
-        </Card>
 
-        {/* Loading */}
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm">Searching Google Jobs, Greenhouse &amp; Lever…</p>
+              {/* Country */}
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Country</label>
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  {COUNTRY_OPTIONS.map((c) => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Work arrangement */}
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Work arrangement</label>
+                <select
+                  value={remotePreference}
+                  onChange={(e) => setRemotePreference(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="any">Any</option>
+                  <option value="remote">Remote only</option>
+                  <option value="hybrid">Hybrid</option>
+                  <option value="onsite">On-site</option>
+                </select>
+              </div>
+
+              {/* Job title override */}
+              <div>
+                <label className="block text-sm font-medium mb-1.5">
+                  Job title <span className="text-muted-foreground font-normal">(optional override)</span>
+                </label>
+                <Input
+                  placeholder="e.g. Senior Product Manager"
+                  value={roleOverride}
+                  onChange={(e) => setRoleOverride(e.target.value)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Button
+            type="submit"
+            disabled={loading || applications.length === 0}
+            className="w-full sm:w-auto"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Searching & analysing…
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Find My Jobs
+              </>
+            )}
+          </Button>
+        </form>
+
+        {/* Error */}
+        {error && (
+          <div className="mt-6 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-sm">
+            <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+            <p className="text-red-700">{error}</p>
           </div>
         )}
 
         {/* Results */}
         {result && !loading && (
-          <div className="space-y-4">
-            {/* Result summary bar */}
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium">
-                  {result.jobs.length} results
-                  {result.total > result.jobs.length && (
-                    <span className="text-muted-foreground"> (of {result.total} found)</span>
+          <div className="mt-8">
+            <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+              <div>
+                <h2 className="text-lg font-semibold">
+                  {result.jobs.length} Jobs Found
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                  {result.aiRanked && (
+                    <span className="inline-flex items-center gap-1 text-primary font-medium">
+                      <Sparkles className="w-3 h-3" /> AI-ranked by CV match
+                    </span>
                   )}
-                </span>
-                {result.cached && (
-                  <Badge variant="secondary" className="text-xs">
-                    <RefreshCcw className="h-3 w-3 mr-1" />Cached
-                  </Badge>
-                )}
-                {result.aiRanked && (
-                  <Badge className="text-xs bg-primary/10 text-primary border border-primary/20">
-                    <Sparkles className="h-3 w-3 mr-1" />AI Ranked
-                  </Badge>
-                )}
+                  {result.cached && (
+                    <span className="inline-flex items-center gap-1">
+                      <RefreshCcw className="w-3 h-3" /> Cached results
+                    </span>
+                  )}
+                  <span>
+                    {Object.entries(result.sourceBreakdown)
+                      .filter(([, n]) => n > 0)
+                      .map(([src, n]) => {
+                        const labels: Record<string, string> = { google_jobs: "Google", greenhouse: "Greenhouse", lever: "Lever" };
+                        return `${labels[src] ?? src}: ${n}`;
+                      })
+                      .join(" · ")}
+                  </span>
+                </p>
               </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                {Object.entries(result.sourceBreakdown).map(([src, count]) => {
-                  const labels: Record<string, string> = {
-                    google_jobs: "Google",
-                    greenhouse: "Greenhouse",
-                    lever: "Lever",
-                  };
-                  if (!count) return null;
-                  return <span key={src}>{labels[src] ?? src}: {count}</span>;
-                })}
-              </div>
+
+              {result.aiRanked && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-muted-foreground">Min score</label>
+                  <Select value={String(minScore)} onValueChange={(v) => setMinScore(Number(v))}>
+                    <SelectTrigger className="w-24 h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">All</SelectItem>
+                      <SelectItem value="30">30%+</SelectItem>
+                      <SelectItem value="50">50%+</SelectItem>
+                      <SelectItem value="70">70%+</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
-            {/* No results */}
-            {result.jobs.length === 0 && (
+            {scored.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground space-y-2">
                 <AlertCircle className="h-8 w-8 mx-auto opacity-50" />
-                <p className="text-sm">No jobs found. Try a different query or remove filters.</p>
+                <p className="text-sm">
+                  {result.aiRanked
+                    ? `No jobs above ${minScore}% match. Try lowering the filter.`
+                    : "No jobs found. Try adjusting your preferences."}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {scored.map(({ job, match }) => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    match={match}
+                    applications={applications}
+                    onTailor={handleTailor}
+                    saved={savedJobIds.has(job.id)}
+                    saving={savingJobId === job.id}
+                    onSave={handleSave}
+                  />
+                ))}
               </div>
             )}
-
-            {/* Job cards */}
-            <div className="space-y-3">
-              {result.jobs.map((job) => (
-                <JobCard
-                  key={job.id}
-                  job={job}
-                  applications={applications}
-                  onTailor={handleTailor}
-                  saved={savedJobIds.has(job.id)}
-                  saving={savingJobId === job.id}
-                  onSave={handleSave}
-                />
-              ))}
-            </div>
           </div>
         )}
 
         {/* Empty state */}
         {!result && !loading && (
-          <div className="text-center py-20 text-muted-foreground space-y-3">
+          <div className="text-center py-20 text-muted-foreground space-y-3 mt-8">
             <Globe className="h-12 w-12 mx-auto opacity-20" />
-            <p className="text-sm">Search across multiple job boards in one place.</p>
+            <p className="text-sm">Select a CV and click Find My Jobs to discover matching roles globally.</p>
             <p className="text-xs opacity-70">Powered by Google Jobs, Greenhouse ATS &amp; Lever ATS</p>
           </div>
         )}
