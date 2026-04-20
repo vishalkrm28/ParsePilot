@@ -14,6 +14,7 @@ import {
   exportAssets,
   type TailoredCvDetail,
 } from "@/lib/application-api";
+import { buildCvPrintHtml, openPrintWindow } from "@/lib/pdf-export";
 import {
   FileText,
   User,
@@ -153,6 +154,13 @@ export default function TailoredCvDetailPage() {
     }
   }
 
+  function handleExportPdf() {
+    if (!cv) return;
+    const html = buildCvPrintHtml(cv.tailoredCvJson, cv.versionName);
+    const safeName = (cv.versionName ?? "tailored-cv").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    openPrintWindow(html, `${safeName}.pdf`);
+  }
+
   if (loading) {
     return (
       <AppLayout>
@@ -235,6 +243,14 @@ export default function TailoredCvDetailPage() {
                 <Download className="w-3.5 h-3.5 mr-1.5" />
               )}
               Export .txt
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPdf}
+            >
+              <FileText className="w-3.5 h-3.5 mr-1.5" />
+              Export PDF
             </Button>
             <Button
               size="sm"

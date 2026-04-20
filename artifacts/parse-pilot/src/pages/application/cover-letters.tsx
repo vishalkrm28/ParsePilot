@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { listCoverLetters, type CoverLetterSummary } from "@/lib/application-api";
+import { buildCoverLetterPrintHtml, openPrintWindow } from "@/lib/pdf-export";
 import {
   MailOpen,
   Sparkles,
@@ -69,16 +70,27 @@ function ExpandedLetter({ letter }: { letter: CoverLetterSummary }) {
     URL.revokeObjectURL(url);
   }
 
+  function handleExportPdf() {
+    const html = buildCoverLetterPrintHtml(letter.coverLetterText, letter.jobTitle, letter.jobCompany);
+    const label = [letter.jobTitle, letter.jobCompany].filter(Boolean).join("_") || "cover-letter";
+    const safeName = label.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+    openPrintWindow(html, `${safeName}.pdf`);
+  }
+
   return (
     <div className="mt-4 pt-4 border-t border-border">
       <div className="bg-muted/50 rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap mb-3 max-h-72 overflow-y-auto">
         {letter.coverLetterText}
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <CopyButton text={letter.coverLetterText} />
         <Button variant="outline" size="sm" onClick={handleExport}>
           <Download className="w-3.5 h-3.5 mr-1.5" />
           Export .txt
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleExportPdf}>
+          <FileText className="w-3.5 h-3.5 mr-1.5" />
+          Export PDF
         </Button>
         {letter.tailoredCvId && (
           <Link href={`/application/tailored-cvs/${letter.tailoredCvId}?action=cover-letter`}>
