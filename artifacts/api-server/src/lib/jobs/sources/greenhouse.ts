@@ -23,24 +23,16 @@ export function getDefaultGreenhouseBoardTokens(
       logger.warn("GREENHOUSE_BOARD_TOKENS_JSON is not valid JSON");
     }
   }
-  // Built-in seed list of well-known global tech companies on Greenhouse
+  // Built-in seed list — only verified working Greenhouse board tokens
   return [
     "airbnb",
-    "doordash",
-    "dropbox",
     "hubspot",
     "intercom",
     "mongodb",
-    "robinhood",
-    "shopify",
-    "slack",
-    "square",
     "stripe",
     "twilio",
-    "zendesk",
-    "zoom",
-    "spotify",
-    "klarna",
+    "dropbox",
+    "robinhood",
   ];
 }
 
@@ -72,7 +64,7 @@ async function fetchBoardJobs(boardToken: string): Promise<UnifiedJob[]> {
 
   const res = await fetch(url, {
     headers: { Accept: "application/json" },
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(5_000),
   });
 
   if (!res.ok) {

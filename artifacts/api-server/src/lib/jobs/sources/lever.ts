@@ -23,15 +23,15 @@ export function getDefaultLeverCompanies(
       logger.warn("LEVER_COMPANIES_JSON is not valid JSON");
     }
   }
-  // Seed list of companies known to use Lever
+  // Seed list of companies known to use Lever (verified working handles)
   return [
-    "netflix",
     "figma",
     "linear",
-    "loom",
     "scale",
     "snyk",
     "contentful",
+    "reddit",
+    "grammarly",
   ];
 }
 
@@ -63,7 +63,7 @@ async function fetchCompanyJobs(company: string): Promise<UnifiedJob[]> {
 
   const res = await fetch(url, {
     headers: { Accept: "application/json" },
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(5_000),
   });
 
   if (!res.ok) {
