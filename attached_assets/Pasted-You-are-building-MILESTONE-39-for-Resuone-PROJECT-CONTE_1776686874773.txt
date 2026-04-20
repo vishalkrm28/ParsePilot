@@ -1,0 +1,642 @@
+You are building MILESTONE 39 for Resuone.
+
+PROJECT CONTEXT
+Resuone already has or is implementing:
+- Next.js App Router
+- Supabase
+- Anthropic Claude integration
+- CV parsing
+- CV vs job analysis
+- recruiter workflows
+- open job recommendations
+- tailored CV generation
+- cover letter generation
+- application tracker
+- saved jobs
+- interview prep
+- follow-up email drafts
+- interview scheduling
+- mock interview sessions
+- notifications
+- smart reminders
+- billing / credits / workspaces / admin analytics
+
+Now build the public growth and conversion layer so Resuone can attract traffic, convert visitors into users, capture leads, and support SEO landing pages for both candidate and recruiter audiences.
+
+PRIMARY GOAL
+Turn Resuone into a growth-ready SaaS with:
+1. upgraded public homepage
+2. strong conversion funnel
+3. pricing page
+4. candidate landing pages
+5. recruiter landing pages
+6. SEO content pages
+7. waitlist / lead capture
+8. basic product marketing analytics
+
+USER / BUSINESS OUTCOMES
+This milestone should help Resuone:
+- convert anonymous visitors into signups
+- capture leads even before signup
+- improve SEO indexability
+- support separate messaging for candidates vs recruiters
+- support product-led growth
+- collect funnel data for iteration
+- prepare the site for paid ads and organic traffic
+
+IMPORTANT RULES
+- Keep public pages fast and clean
+- Separate candidate messaging and recruiter messaging clearly
+- Build forms so submissions persist in Supabase
+- Do not overcomplicate analytics at first
+- Track meaningful funnel steps only
+- Keep SEO pages indexable and structured
+- Keep design premium, modern, and conversion-focused
+- Do not make the homepage too generic
+- Write code and page structure so copy can be edited later easily
+- Keep components reusable for future landing pages
+
+TECH STACK
+- Next.js App Router
+- TypeScript
+- Supabase
+- Existing Resuone design system if present
+- Optional chart-free analytics tables/cards for internal viewing
+- Static and dynamic SEO-friendly pages
+
+BUILD THE FOLLOWING
+
+1) DATABASE TABLES
+Create and use these Supabase tables:
+
+marketing_leads
+- id uuid primary key default gen_random_uuid()
+- email text not null
+- full_name text
+- company text
+- role text
+- lead_type text not null
+- source text
+- page_path text
+- utm_source text
+- utm_medium text
+- utm_campaign text
+- notes text
+- metadata jsonb default '{}'::jsonb
+- created_at timestamptz default now()
+
+waitlist_signups
+- id uuid primary key default gen_random_uuid()
+- email text not null unique
+- full_name text
+- company text
+- user_type text not null
+- interest_area text
+- source text
+- page_path text
+- utm_source text
+- utm_medium text
+- utm_campaign text
+- metadata jsonb default '{}'::jsonb
+- created_at timestamptz default now()
+
+contact_requests
+- id uuid primary key default gen_random_uuid()
+- full_name text not null
+- email text not null
+- company text
+- role text
+- message text not null
+- inquiry_type text not null
+- source text
+- page_path text
+- metadata jsonb default '{}'::jsonb
+- created_at timestamptz default now()
+
+funnel_events
+- id uuid primary key default gen_random_uuid()
+- anonymous_id text
+- user_id uuid
+- event_name text not null
+- page_path text
+- referrer text
+- utm_source text
+- utm_medium text
+- utm_campaign text
+- metadata jsonb default '{}'::jsonb
+- created_at timestamptz default now()
+
+seo_pages
+- id uuid primary key default gen_random_uuid()
+- slug text not null unique
+- title text not null
+- description text not null
+- page_type text not null
+- hero_title text
+- hero_subtitle text
+- body_json jsonb not null default '{}'::jsonb
+- cta_label text
+- cta_href text
+- is_published boolean default false
+- created_at timestamptz default now()
+- updated_at timestamptz default now()
+
+Add indexes where appropriate on:
+- email
+- lead_type
+- user_type
+- inquiry_type
+- event_name
+- created_at
+- slug
+- is_published
+
+2) ENUM / VALUE MODELS
+
+Allowed lead_type values:
+- candidate
+- recruiter
+- institution
+- partner
+- general
+
+Allowed inquiry_type values:
+- demo
+- sales
+- support
+- partnership
+- general
+
+Allowed user_type values:
+- candidate
+- recruiter
+- institution
+
+Allowed page_type values:
+- candidate_landing
+- recruiter_landing
+- feature_page
+- seo_article
+- template_page
+- use_case_page
+
+Create Zod enums for all of these.
+
+3) NEW FILES AND FOLDERS
+Create:
+
+lib/marketing/marketing-schemas.ts
+lib/marketing/marketing-helpers.ts
+lib/marketing/funnel.ts
+lib/marketing/seo.ts
+lib/marketing/default-copy.ts
+
+app/api/marketing/lead-capture/route.ts
+app/api/marketing/waitlist/route.ts
+app/api/marketing/contact/route.ts
+app/api/marketing/funnel-event/route.ts
+app/api/marketing/seo-pages/route.ts
+app/api/marketing/seo-pages/[slug]/route.ts
+
+app/(marketing)/layout.tsx
+app/(marketing)/page.tsx
+app/(marketing)/pricing/page.tsx
+app/(marketing)/for-candidates/page.tsx
+app/(marketing)/for-recruiters/page.tsx
+app/(marketing)/contact/page.tsx
+app/(marketing)/waitlist/page.tsx
+app/(marketing)/features/page.tsx
+app/(marketing)/features/[slug]/page.tsx
+app/(marketing)/use-cases/[slug]/page.tsx
+app/(marketing)/seo/[slug]/page.tsx
+
+app/admin/marketing/page.tsx
+
+components/marketing/
+- hero.tsx
+- social-proof.tsx
+- feature-grid.tsx
+- pricing-cards.tsx
+- cta-band.tsx
+- lead-form.tsx
+- waitlist-form.tsx
+- contact-form.tsx
+- faq.tsx
+- comparison-table.tsx
+- testimonial-cards.tsx
+- section-shell.tsx
+
+4) HOMEPAGE STRUCTURE
+Create a premium conversion-focused homepage:
+app/(marketing)/page.tsx
+
+Required sections:
+A) Hero
+- strong headline
+- clear subheadline
+- two CTAs:
+  - Get started
+  - See how it works
+
+B) Audience split
+- for candidates
+- for recruiters
+
+C) Core feature highlights
+- CV analysis
+- job recommendations
+- tailored CVs
+- cover letters
+- application tracker
+- recruiter ranking
+
+D) How it works
+- 3 or 4-step flow
+
+E) Proof / trust section
+- use placeholders if needed
+- “Built for modern job seekers and recruiting teams”
+
+F) Pricing teaser
+- link to pricing page
+
+G) FAQ
+
+H) Final CTA
+
+Keep it clean, premium, and product-focused.
+
+5) SEPARATE LANDING PAGES
+Create:
+
+app/(marketing)/for-candidates/page.tsx
+This page should focus on:
+- CV analysis
+- open job recommendations
+- tailored CVs
+- cover letters
+- application tracker
+- interview prep
+
+app/(marketing)/for-recruiters/page.tsx
+This page should focus on:
+- CV ranking
+- recruiter job matching
+- candidate comparison
+- team workflow
+- recruiter dashboard
+- shared workspace
+
+Each page should have:
+- specific hero copy
+- benefits
+- workflow
+- CTA
+- FAQ
+- lead capture or contact CTA
+
+6) PRICING PAGE
+Create:
+app/(marketing)/pricing/page.tsx
+
+Show:
+- Free
+- Pro
+- Recruiter Solo
+- Recruiter Team
+
+Each pricing card should show:
+- monthly/yearly indication
+- included credits
+- feature highlights
+- CTA
+- workspace/team note where relevant
+
+Also include:
+- comparison table
+- FAQ
+- enterprise/contact CTA
+
+7) LEAD CAPTURE + WAITLIST
+Create:
+app/api/marketing/lead-capture/route.ts
+app/api/marketing/waitlist/route.ts
+components/marketing/lead-form.tsx
+components/marketing/waitlist-form.tsx
+app/(marketing)/waitlist/page.tsx
+
+Lead capture input:
+{
+  "email": "...",
+  "fullName": "...",
+  "company": "...",
+  "role": "...",
+  "leadType": "recruiter",
+  "source": "homepage_cta",
+  "pagePath": "/",
+  "utmSource": "...",
+  "utmMedium": "...",
+  "utmCampaign": "..."
+}
+
+Waitlist input:
+{
+  "email": "...",
+  "fullName": "...",
+  "company": "...",
+  "userType": "candidate",
+  "interestArea": "Tailored CVs",
+  "source": "waitlist_page",
+  "pagePath": "/waitlist"
+}
+
+Rules:
+- validate inputs
+- store submissions
+- prevent duplicate waitlist email insert failure from crashing UX
+- return clear success states
+
+8) CONTACT / DEMO FORM
+Create:
+app/(marketing)/contact/page.tsx
+app/api/marketing/contact/route.ts
+components/marketing/contact-form.tsx
+
+Input:
+{
+  "fullName": "...",
+  "email": "...",
+  "company": "...",
+  "role": "...",
+  "message": "...",
+  "inquiryType": "demo",
+  "source": "contact_page",
+  "pagePath": "/contact"
+}
+
+Use this for:
+- recruiter demo requests
+- partnership interest
+- general inquiries
+
+9) FUNNEL EVENT TRACKING
+Create:
+app/api/marketing/funnel-event/route.ts
+lib/marketing/funnel.ts
+
+Track simple events such as:
+- landing_page_view
+- pricing_page_view
+- candidate_page_view
+- recruiter_page_view
+- lead_form_started
+- lead_form_submitted
+- waitlist_joined
+- contact_submitted
+- signup_clicked
+- pricing_cta_clicked
+- recruiter_demo_clicked
+
+Create helper:
+trackFunnelEvent({
+  anonymousId,
+  userId,
+  eventName,
+  pagePath,
+  referrer,
+  utmSource,
+  utmMedium,
+  utmCampaign,
+  metadata
+})
+
+Do not overengineer frontend analytics.
+Use lightweight POST calls from key actions/pages.
+
+10) SEO PAGE SYSTEM
+Create:
+app/api/marketing/seo-pages/route.ts
+app/api/marketing/seo-pages/[slug]/route.ts
+app/(marketing)/seo/[slug]/page.tsx
+lib/marketing/seo.ts
+
+Build a database-backed SEO page system.
+Each published seo_pages row should render a public page.
+
+SEO page rendering should support:
+- title
+- description
+- hero title
+- hero subtitle
+- simple section blocks from body_json
+- CTA band
+
+Use metadata generation so title/description render properly.
+
+11) DEFAULT SEO / LANDING CONTENT SEED
+Seed or support content entries for pages like:
+- ai-cv-analyzer
+- resume-job-match
+- tailored-resume-for-job
+- cover-letter-generator
+- recruiter-cv-ranking
+- candidate-screening-software
+- interview-prep-assistant
+- application-tracker
+- resume-keyword-optimization
+- job-recommendation-tool
+
+Each should be structured as:
+- hero
+- benefits
+- feature bullets
+- CTA
+
+12) FEATURE PAGES
+Create:
+app/(marketing)/features/page.tsx
+app/(marketing)/features/[slug]/page.tsx
+
+Feature pages can be static or backed by data helper.
+Include pages for:
+- cv-analysis
+- job-recommendations
+- tailored-cvs
+- cover-letters
+- application-tracker
+- interview-prep
+- recruiter-ranking
+
+Each page should include:
+- what it does
+- who it is for
+- workflow
+- benefit bullets
+- CTA
+
+13) USE CASE PAGE SUPPORT
+Create:
+app/(marketing)/use-cases/[slug]/page.tsx
+
+Use case examples:
+- for-students
+- for-career-switchers
+- for-recruiters
+- for-placement-teams
+- for-operations-roles
+- for-tech-roles
+
+Structure:
+- audience-specific problem
+- how Resuone helps
+- recommended workflow
+- CTA
+
+14) MARKETING COPY CONFIG
+Create:
+lib/marketing/default-copy.ts
+
+Store editable default copy blocks for:
+- homepage
+- candidate page
+- recruiter page
+- pricing FAQ
+- feature intros
+- CTA labels
+
+This should make future copy updates easier.
+
+15) MARKETING HELPERS
+Create:
+lib/marketing/marketing-helpers.ts
+
+Add helpers:
+- getUtmParamsFromSearchParams()
+- buildLeadSource()
+- normalizePagePath()
+- buildSeoMetadata()
+- canonicalUrlForPath()
+- formatPricingDisplay()
+
+Create in lib/marketing/seo.ts:
+- getPublishedSeoPageBySlug()
+- getAllPublishedSeoSlugs()
+- seoPageToSections()
+- buildPageMetadata()
+
+16) MARKETING LAYOUT
+Create:
+app/(marketing)/layout.tsx
+
+Requirements:
+- public navbar
+- footer
+- clean page shell
+- links to:
+  - Features
+  - For Candidates
+  - For Recruiters
+  - Pricing
+  - Contact
+  - Login / Get started
+
+Use a premium SaaS-style layout.
+
+17) ADMIN MARKETING PAGE
+Create:
+app/admin/marketing/page.tsx
+
+Show:
+- total leads
+- total waitlist signups
+- contact requests
+- funnel event counts
+- top traffic pages
+- top lead sources
+- top UTM campaigns
+- recent leads table
+- recent waitlist signups table
+- recent contact requests
+
+This is an internal page for marketing visibility.
+
+18) PAGE METADATA + SEO REQUIREMENTS
+Each public page should have:
+- proper title
+- proper description
+- canonical URL helper
+- noindex only where appropriate
+- structured clean headings
+- strong internal linking
+
+For dynamic SEO pages:
+- generateMetadata
+- handle not found if unpublished
+
+19) UI REQUIREMENTS
+The marketing site should feel premium and conversion-focused.
+
+Use:
+- generous spacing
+- strong headings
+- focused CTAs
+- clear audience positioning
+- minimal clutter
+
+Forms should have:
+- loading state
+- success state
+- error state
+
+Add empty states where relevant in admin marketing view.
+
+20) SECURITY + VALIDATION
+- validate all public form inputs with Zod
+- rate limit lead/contact/waitlist routes
+- sanitize stored optional metadata
+- do not expose admin marketing page to ordinary users
+- reject malformed funnel events gracefully
+- do not trust client-provided UTM blindly
+
+21) QUALITY REQUIREMENTS
+- keep marketing components reusable
+- keep page data separated from page rendering where practical
+- keep route handlers thin
+- use helper functions for metadata and forms
+- keep code aligned with existing Resuone architecture
+- use file-by-file implementation output
+
+22) SUCCESS CRITERIA
+This milestone is complete when:
+- homepage is upgraded
+- pricing page exists
+- candidate and recruiter landing pages exist
+- lead capture works
+- waitlist works
+- contact page works
+- funnel events can be tracked
+- SEO pages can be stored and rendered
+- feature pages exist
+- admin marketing page shows useful funnel data
+- public site feels ready for traffic and conversion
+
+23) FUTURE-READY NOTES
+Keep architecture ready for:
+- blog engine
+- comparison pages
+- programmatic SEO scaling
+- lead scoring
+- CRM sync
+- A/B testing
+- advanced attribution
+- ads landing pages
+- newsletter capture
+- case study pages
+
+NOW DO THE FOLLOWING
+- Generate all required code files
+- Show code file by file
+- Do not skip important implementation pieces
+- Keep naming consistent with Resuone
+- Keep architecture aligned with previous milestones
+- Do not only explain — actually output the implementation
