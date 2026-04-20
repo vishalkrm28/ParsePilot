@@ -13,6 +13,7 @@ export const CREDIT_COSTS = {
   cv_optimization: 1,
   cover_letter: 1,
   tailored_cv: 1,
+  interview_prep: 1,
   docx_export: 0,
   pdf_export: 0,
   // Charged when a CV for a different person is detected on the same account.

@@ -46,12 +46,22 @@ router.post("/interview-prep/generate", authMiddleware, async (req, res) => {
   });
   if (!app) return;
 
-  // ── Credit check ──────────────────────────────────────────────────────────
+  // ── Credit gate: atomic check-and-deduct before any AI call ──────────────
   const affordable = await canSpendCredits(userId, 1);
   if (!affordable) {
     res.status(402).json({
       error: "Not enough credits to generate interview prep. Upgrade to Pro or unlock a CV.",
       code: "INSUFFICIENT_CREDITS",
+    });
+    return;
+  }
+  try {
+    await spendCredits(userId, 1, "interview_prep", { source: "interview_prep_generate" });
+  } catch (spendErr) {
+    logger.error({ spendErr, userId }, "Credit spend failed before interview prep AI call");
+    res.status(402).json({
+      error: "Failed to deduct credits. Please try again.",
+      code: "CREDIT_DEDUCTION_FAILED",
     });
     return;
   }
@@ -167,13 +177,6 @@ router.post("/interview-prep/generate", authMiddleware, async (req, res) => {
     logger.error({ aiErr }, "Interview prep AI call failed");
     res.status(500).json({ error: "AI generation failed. Please try again." });
     return;
-  }
-
-  // ── Spend credit ──────────────────────────────────────────────────────────
-  try {
-    await spendCredits(userId, 1, "cover_letter", { source: "interview_prep" });
-  } catch (_) {
-    logger.warn({ userId }, "Credit spend failed after AI — continuing anyway");
   }
 
   // ── Save to DB ────────────────────────────────────────────────────────────
