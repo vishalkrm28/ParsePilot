@@ -23,17 +23,24 @@ export function getDefaultGreenhouseBoardTokens(
       logger.warn("GREENHOUSE_BOARD_TOKENS_JSON is not valid JSON");
     }
   }
-  // Built-in seed list of well-known tech companies on Greenhouse
+  // Built-in seed list of well-known global tech companies on Greenhouse
   return [
+    "airbnb",
+    "doordash",
+    "dropbox",
+    "hubspot",
+    "intercom",
+    "mongodb",
+    "robinhood",
+    "shopify",
+    "slack",
+    "square",
+    "stripe",
+    "twilio",
+    "zendesk",
+    "zoom",
     "spotify",
     "klarna",
-    "king",
-    "mojang",
-    "truecaller",
-    "einride",
-    "northvolt",
-    "voi",
-    "anyfin",
   ];
 }
 

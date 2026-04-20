@@ -61,7 +61,7 @@ router.post("/jobs/discover", async (req, res) => {
   }
 
   const defaultCountry =
-    country || process.env.JOB_DISCOVERY_DEFAULT_COUNTRY || "se";
+    country || process.env.JOB_DISCOVERY_DEFAULT_COUNTRY || "";
 
   // ── Cache lookup ──────────────────────────────────────────────────────────
   const cacheKey = buildSearchCacheKey({

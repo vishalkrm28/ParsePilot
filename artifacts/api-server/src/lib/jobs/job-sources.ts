@@ -10,6 +10,24 @@ import {
 import type { UnifiedJob } from "./job-schema.js";
 import { logger } from "../logger.js";
 
+/**
+ * Filter jobs from ATS sources (Greenhouse, Lever) by query keywords.
+ * These sources return ALL jobs from a company board — we need to narrow
+ * down to roles that actually match what the user searched for.
+ */
+function filterByQuery(jobs: UnifiedJob[], query: string): UnifiedJob[] {
+  if (!query.trim()) return jobs;
+  const keywords = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+  if (!keywords.length) return jobs;
+  return jobs.filter((job) => {
+    const haystack = `${job.title} ${job.description ?? ""}`.toLowerCase();
+    return keywords.some((kw) => haystack.includes(kw));
+  });
+}
+
 export interface DiscoveryInput {
   query: string;
   country?: string;
@@ -73,21 +91,23 @@ export async function discoverJobsFromSources(
     errors.push(`google_jobs: ${msg}`);
   }
 
-  const greenhouseJobs: UnifiedJob[] =
+  const greenhouseRaw: UnifiedJob[] =
     greenhouseResult.status === "fulfilled" ? greenhouseResult.value : [];
   if (greenhouseResult.status === "rejected") {
     const msg = String(greenhouseResult.reason?.message ?? greenhouseResult.reason);
     logger.warn({ err: greenhouseResult.reason }, "Greenhouse source failed");
     errors.push(`greenhouse: ${msg}`);
   }
+  const greenhouseJobs = filterByQuery(greenhouseRaw, query);
 
-  const leverJobs: UnifiedJob[] =
+  const leverRaw: UnifiedJob[] =
     leverResult.status === "fulfilled" ? leverResult.value : [];
   if (leverResult.status === "rejected") {
     const msg = String(leverResult.reason?.message ?? leverResult.reason);
     logger.warn({ err: leverResult.reason }, "Lever source failed");
     errors.push(`lever: ${msg}`);
   }
+  const leverJobs = filterByQuery(leverRaw, query);
 
   const jobs = [...googleJobs, ...greenhouseJobs, ...leverJobs];
 
