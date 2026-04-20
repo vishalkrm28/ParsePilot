@@ -276,18 +276,29 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
     ? topRoles
     : [normalizedProfile.keywords.slice(0, 2).join(" ") || "software engineer"];
 
+  // Adzuna only supports a fixed set of country codes.
+  const ADZUNA_SUPPORTED = new Set([
+    "at", "au", "be", "br", "ca", "ch", "de", "es", "fr",
+    "gb", "in", "it", "mx", "nl", "nz", "pl", "sg", "us", "za",
+  ]);
+  const adzunaCountry = ADZUNA_SUPPORTED.has(country) ? country : "gb";
+  if (adzunaCountry !== country) {
+    logger.info({ requestedCountry: country, fallbackCountry: adzunaCountry }, "Country not supported by Adzuna — falling back to gb");
+  }
+
   const rawJobs: ReturnType<typeof normalizeAdzunaJob>[] = [];
 
   for (const term of searchTerms) {
     try {
-      const results = await fetchAdzunaJobs({ what: term, where: preferredLocation, country, resultsPerPage: 20 });
+      const results = await fetchAdzunaJobs({ what: term, where: preferredLocation, country: adzunaCountry, resultsPerPage: 20 });
       rawJobs.push(...results.map(normalizeAdzunaJob));
     } catch (err) {
       logger.warn({ err, term }, "Adzuna fetch failed for term — skipping");
     }
   }
 
-  if (rawJobs.length < 20 && topRoles.length > 0) {
+  // Always try The Muse as a supplementary source (it's country-agnostic)
+  if (rawJobs.length < 30 && topRoles.length > 0) {
     try {
       const museResults = await fetchMuseJobs({ category: topRoles[0], page: 1 });
       rawJobs.push(...museResults.map(normalizeMuseJob));
@@ -298,7 +309,7 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
 
   if (rawJobs.length === 0) {
     res.status(502).json({
-      error: "Could not fetch any jobs from external providers. Please check API credentials.",
+      error: "Could not fetch any jobs from the job boards. Try a different country or location.",
       code: "NO_JOBS_FETCHED",
     });
     return;

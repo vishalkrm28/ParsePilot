@@ -595,12 +595,18 @@ export default function JobRecommendations() {
                   <option value="de">Germany</option>
                   <option value="fr">France</option>
                   <option value="nl">Netherlands</option>
-                  <option value="se">Sweden</option>
+                  <option value="be">Belgium</option>
+                  <option value="at">Austria</option>
+                  <option value="ch">Switzerland</option>
+                  <option value="es">Spain</option>
+                  <option value="it">Italy</option>
+                  <option value="pl">Poland</option>
                   <option value="sg">Singapore</option>
                   <option value="in">India</option>
                   <option value="nz">New Zealand</option>
                   <option value="za">South Africa</option>
                   <option value="br">Brazil</option>
+                  <option value="mx">Mexico</option>
                 </select>
               </div>
 
