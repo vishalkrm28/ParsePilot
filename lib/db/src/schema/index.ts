@@ -7,3 +7,4 @@ export * from "./unlock";
 export * from "./usage";
 export * from "./recruiter";
 export * from "./jobs";
+export * from "./tailoring";

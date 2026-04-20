@@ -14,6 +14,7 @@ import {
   type CreditsResponse,
 } from "@/lib/jobs-api";
 import { authedFetch } from "@/lib/authed-fetch";
+import { TailorCvModal } from "@/components/application/tailor-cv-modal";
 import {
   MapPin,
   Building2,
@@ -26,6 +27,7 @@ import {
   ChevronUp,
   FileText,
   RefreshCcw,
+  MailOpen,
 } from "lucide-react";
 
 const BASE = import.meta.env.VITE_API_URL ?? "/api";
@@ -58,7 +60,13 @@ function ScoreBadge({ score }: { score: number }) {
   return <Badge className="bg-red-100 text-red-700 border-red-200">Weak Match</Badge>;
 }
 
-function JobCard({ rec }: { rec: JobResult }) {
+function JobCard({
+  rec,
+  onTailor,
+}: {
+  rec: JobResult;
+  onTailor: (rec: JobResult, mode: "tailor" | "cover-letter") => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const { job } = rec;
 
@@ -162,21 +170,43 @@ function JobCard({ rec }: { rec: JobResult }) {
           </div>
         )}
 
-        <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
-          <span className="text-xs text-muted-foreground capitalize">
-            via {job.source === "adzuna" ? "Adzuna" : "The Muse"}
-          </span>
-          {job.apply_url && (
-            <a
-              href={job.apply_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+        <div className="mt-3 pt-3 border-t border-border">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground capitalize">
+              via {job.source === "adzuna" ? "Adzuna" : "The Muse"}
+            </span>
+            {job.apply_url && (
+              <a
+                href={job.apply_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+              >
+                Apply now
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+          </div>
+          <div className="flex gap-2 mt-2.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 text-xs h-8"
+              onClick={() => onTailor(rec, "tailor")}
             >
-              Apply now
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          )}
+              <FileText className="w-3.5 h-3.5 mr-1.5" />
+              Tailor CV
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 text-xs h-8"
+              onClick={() => onTailor(rec, "cover-letter")}
+            >
+              <MailOpen className="w-3.5 h-3.5 mr-1.5" />
+              Cover Letter
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -204,6 +234,15 @@ export default function JobRecommendations() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RecommendResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Tailor CV / Cover Letter modal
+  const [modalJob, setModalJob] = useState<JobResult | null>(null);
+  const [modalMode, setModalMode] = useState<"tailor" | "cover-letter">("tailor");
+
+  function handleTailor(rec: JobResult, mode: "tailor" | "cover-letter") {
+    setModalJob(rec);
+    setModalMode(mode);
+  }
 
   // ── Fetch credit info (re-runs when selected CV changes) ──────────────────
   const refreshCredits = useCallback(async (appId?: string | null) => {
@@ -371,6 +410,15 @@ export default function JobRecommendations() {
 
   return (
     <AppLayout>
+      {modalJob && (
+        <TailorCvModal
+          applications={applications}
+          jobTitle={modalJob.job.title}
+          jobCompany={modalJob.job.company}
+          externalJobCacheId={modalJob.cacheId}
+          onClose={() => setModalJob(null)}
+        />
+      )}
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
@@ -603,7 +651,7 @@ export default function JobRecommendations() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filtered.map((rec) => (
-                  <JobCard key={rec.id} rec={rec} />
+                  <JobCard key={rec.id} rec={rec} onTailor={handleTailor} />
                 ))}
               </div>
             )}

@@ -35,6 +35,9 @@ import RecruiterJobs from "@/pages/recruiter/jobs";
 import RecruiterJobDetail from "@/pages/recruiter/job-detail";
 import RecruiterJobRanking from "@/pages/recruiter/job-ranking";
 import JobRecommendations from "@/pages/jobs/recommendations";
+import TailoredCvsPage from "@/pages/application/tailored-cvs";
+import TailoredCvDetailPage from "@/pages/application/tailored-cv-detail";
+import CoverLettersPage from "@/pages/application/cover-letters";
 import InviteResponse from "@/pages/invite-response";
 import CvMatchScore from "@/pages/seo/cv-match-score";
 import AtsResumeChecker from "@/pages/seo/ats-resume-checker";
@@ -98,6 +101,9 @@ function AppRouter() {
       <Route path="/billing/unlock-success" component={UnlockSuccess} />
       <Route path="/settings" component={Settings} />
       <Route path="/jobs/recommendations" component={JobRecommendations} />
+      <Route path="/application/tailored-cvs/:id" component={TailoredCvDetailPage} />
+      <Route path="/application/tailored-cvs" component={TailoredCvsPage} />
+      <Route path="/application/cover-letters" component={CoverLettersPage} />
       <Route path="/bulk" component={BulkPricing} />
       <Route path="/bulk/success" component={BulkSuccess} />
       <Route path="/bulk/session" component={BulkSession} />
