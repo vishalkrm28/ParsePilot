@@ -82,7 +82,7 @@ const recruiterExclusiveChildren = [
   { href: "/recruiter/exclusive-interviews", label: "Schedule", icon: Video },
 ];
 const recruiterTailItems = [
-  { href: "/recruiter/pricing", label: "Plans & Billing", icon: CreditCard },
+  { href: "/recruiter/pricing", label: "Recruiter Plan", icon: CreditCard },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
