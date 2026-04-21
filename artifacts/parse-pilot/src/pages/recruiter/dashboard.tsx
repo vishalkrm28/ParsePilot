@@ -7,6 +7,7 @@ import {
 } from "@/lib/recruiter-api";
 import { Loader2, Users, Mail, CheckCircle2, XCircle, Search,
   Trash2, LayoutGrid, BarChart3, Plus, ArrowRight, FileText, Download, UserCog } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { InviteModal } from "./invite-modal";
 import { StatusBadge } from "./status-badge";
@@ -47,7 +48,7 @@ export default function RecruiterDashboard() {
       const matchScore = filterScore === "all" ||
         (filterScore === "70+" && (c.score ?? 0) >= 70) ||
         (filterScore === "50-70" && (c.score ?? 0) >= 50 && (c.score ?? 0) < 70) ||
-        (filterScore === "<50" && (c.score ?? 0) < 50);
+        (filterScore === "lt50" && (c.score ?? 0) < 50);
       return matchSearch && matchStatus && matchScore;
     });
   }, [candidates, search, filterStatus, filterScore]);
@@ -185,21 +186,29 @@ export default function RecruiterDashboard() {
               className="w-full pl-9 pr-4 h-9 rounded-lg border border-border/60 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
           </div>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-            className="h-9 rounded-lg border border-border/60 bg-background text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary/30">
-            <option value="all">All Status</option>
-            <option value="new">New</option>
-            <option value="invited">Invited</option>
-            <option value="accepted">Accepted</option>
-            <option value="rejected">Rejected</option>
-          </select>
-          <select value={filterScore} onChange={e => setFilterScore(e.target.value)}
-            className="h-9 rounded-lg border border-border/60 bg-background text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary/30">
-            <option value="all">All Scores</option>
-            <option value="70+">70%+</option>
-            <option value="50-70">50–70%</option>
-            <option value="<50">Below 50%</option>
-          </select>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="h-9 w-36">
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="new">New</SelectItem>
+              <SelectItem value="invited">Invited</SelectItem>
+              <SelectItem value="accepted">Accepted</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterScore} onValueChange={setFilterScore}>
+            <SelectTrigger className="h-9 w-36">
+              <SelectValue placeholder="All Scores" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Scores</SelectItem>
+              <SelectItem value="70+">70%+</SelectItem>
+              <SelectItem value="50-70">50–70%</SelectItem>
+              <SelectItem value="lt50">Below 50%</SelectItem>
+            </SelectContent>
+          </Select>
           {selected.size > 0 && (
             <button onClick={() => setBulkInviteOpen(true)}
               className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-semibold px-3 h-9 rounded-lg hover:bg-primary/90 transition-colors">

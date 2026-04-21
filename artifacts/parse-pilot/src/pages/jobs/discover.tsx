@@ -545,30 +545,37 @@ export default function GlobalJobDiscover() {
               {/* Country */}
               <div>
                 <label className="block text-sm font-medium mb-1.5">Country</label>
-                <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                <Select
+                  value={country === "" ? "all" : country}
+                  onValueChange={(v) => setCountry(v === "all" ? "" : v)}
                 >
-                  {COUNTRY_OPTIONS.map((c) => (
-                    <option key={c.code} value={c.code}>{c.label}</option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {COUNTRY_OPTIONS.map((c) => (
+                      <SelectItem key={c.code === "" ? "all" : c.code} value={c.code === "" ? "all" : c.code}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Work arrangement */}
               <div>
                 <label className="block text-sm font-medium mb-1.5">Work arrangement</label>
-                <select
-                  value={remotePreference}
-                  onChange={(e) => setRemotePreference(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  <option value="any">Any</option>
-                  <option value="remote">Remote only</option>
-                  <option value="hybrid">Hybrid</option>
-                  <option value="onsite">On-site</option>
-                </select>
+                <Select value={remotePreference} onValueChange={setRemotePreference}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select arrangement" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Any</SelectItem>
+                    <SelectItem value="remote">Remote only</SelectItem>
+                    <SelectItem value="hybrid">Hybrid</SelectItem>
+                    <SelectItem value="onsite">On-site</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Job title override */}
