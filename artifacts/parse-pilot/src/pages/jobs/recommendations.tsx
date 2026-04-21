@@ -567,13 +567,14 @@ export default function JobRecommendations() {
                   )}
                 </label>
                 <Select
-                  value={selectedApp}
-                  onValueChange={setSelectedApp}
+                  value={selectedApp || "__none__"}
+                  onValueChange={(v) => setSelectedApp(v === "__none__" ? "" : v)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={applications.length === 0 ? "No CVs found — analyse one first" : "Select a CV…"} />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none__">— No CV selected —</SelectItem>
                     {!isProUser && (
                       <SelectItem value="__latest__">Most recent CV (auto)</SelectItem>
                     )}

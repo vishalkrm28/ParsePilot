@@ -36,7 +36,7 @@ export function Footer() {
           <Link href="/privacy" className="hover:text-muted-foreground transition-colors">Privacy Policy</Link>
           <Link href="/help" className="hover:text-muted-foreground transition-colors">Help Centre</Link>
           <a href="mailto:help@resuone.com" className="hover:text-muted-foreground transition-colors">help@resuone.com</a>
-          <span>© {new Date().getFullYear()} ResuOne</span>
+          <span>© {new Date().getFullYear()} ResuOne Ltd. All rights reserved.</span>
         </div>
 
       </div>

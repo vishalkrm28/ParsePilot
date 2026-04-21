@@ -56,7 +56,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Link href="/contact" className="hover:text-muted-foreground transition-colors">
             Contact
           </Link>
-          <span>© {new Date().getFullYear()} ResuOne</span>
+          <span>© {new Date().getFullYear()} ResuOne Ltd. All rights reserved.</span>
         </div>
       </div>
     </div>

@@ -527,7 +527,10 @@ export default function GlobalJobDiscover() {
               {/* CV selector */}
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium mb-1.5">CV to use</label>
-                <Select value={selectedApp} onValueChange={setSelectedApp}>
+                <Select
+                  value={selectedApp || "__none__"}
+                  onValueChange={(v) => setSelectedApp(v === "__none__" ? "" : v)}
+                >
                   <SelectTrigger>
                     <SelectValue
                       placeholder={
@@ -538,6 +541,7 @@ export default function GlobalJobDiscover() {
                     />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none__">— No CV selected —</SelectItem>
                     {applications.slice(0, 20).map((a) => (
                       <SelectItem key={a.id} value={a.id}>
                         {a.jobTitle} @ {a.company}
