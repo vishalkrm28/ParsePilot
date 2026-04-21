@@ -6,7 +6,7 @@ function apiUrl(path: string) {
 
 export type DraftType = "follow_up" | "thank_you" | "networking" | "interview_confirmation";
 export type EmailTone = "professional" | "warm" | "concise" | "confident";
-export type DraftStatus = "draft" | "copied" | "archived";
+export type DraftStatus = "draft" | "copied" | "archived" | "gmail_draft";
 
 export interface EmailDraft {
   id: string;
@@ -64,5 +64,12 @@ export async function updateDraftStatus(draftId: string, status: DraftStatus): P
   return request("/api/emails/update-draft-status", {
     method: "PATCH",
     body: JSON.stringify({ draftId, status }),
+  });
+}
+
+export async function pushToGmail(draftId: string): Promise<{ draft: EmailDraft; gmailDraftId: string | null; message: string }> {
+  return request("/api/emails/push-to-gmail", {
+    method: "POST",
+    body: JSON.stringify({ draftId }),
   });
 }

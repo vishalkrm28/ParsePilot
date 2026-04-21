@@ -19,6 +19,7 @@ import {
   EmailDraftOutputSchema,
 } from "../lib/emails/email-schemas.js";
 import { buildEmailPrompt } from "../lib/emails/email-prompts.js";
+import { pushDraftToGmail } from "../lib/emails/gmail-helpers.js";
 
 const router: IRouter = Router();
 
@@ -163,6 +164,41 @@ router.get("/emails/list-drafts", authMiddleware, async (req, res) => {
     .limit(100);
 
   res.json({ drafts });
+});
+
+// ─── POST /api/emails/push-to-gmail ──────────────────────────────────────────
+
+router.post("/emails/push-to-gmail", authMiddleware, async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const { draftId } = req.body as { draftId?: string };
+  if (!draftId) { res.status(400).json({ error: "draftId required" }); return; }
+
+  const [draft] = await db
+    .select()
+    .from(applicationEmailDraftsTable)
+    .where(and(eq(applicationEmailDraftsTable.id, draftId), eq(applicationEmailDraftsTable.userId, userId)))
+    .limit(1);
+  if (!draft) { res.status(404).json({ error: "Draft not found" }); return; }
+
+  logger.info({ userId, draftId }, "Pushing draft to Gmail");
+
+  const { gmailDraftId, success, error } = await pushDraftToGmail(draft.subject, draft.bodyText);
+
+  if (!success) {
+    logger.warn({ userId, draftId, error }, "Gmail push failed");
+    res.status(502).json({ error: "Failed to push to Gmail", detail: error });
+    return;
+  }
+
+  const [updated] = await db
+    .update(applicationEmailDraftsTable)
+    .set({ status: "gmail_draft", updatedAt: new Date() })
+    .where(eq(applicationEmailDraftsTable.id, draftId))
+    .returning();
+
+  res.json({ draft: updated, gmailDraftId, message: "Draft saved to your Gmail drafts folder." });
 });
 
 // ─── PATCH /api/emails/update-draft-status ────────────────────────────────────

@@ -70,6 +70,7 @@ import {
   generateEmailDraft,
   listEmailDrafts,
   updateDraftStatus,
+  pushToGmail,
   type EmailDraft,
   type DraftType,
   type EmailTone,
@@ -155,6 +156,7 @@ export default function AppDetailPage() {
   const [generatingEmail, setGeneratingEmail] = useState(false);
   const [expandedDraft, setExpandedDraft] = useState<string | null>(null);
   const [copiedDraft, setCopiedDraft] = useState<string | null>(null);
+  const [pushingGmailDraft, setPushingGmailDraft] = useState<string | null>(null);
 
   // M36: Interviews
   const [interviews, setInterviews] = useState<ApplicationInterview[]>([]);
@@ -321,6 +323,19 @@ export default function AppDetailPage() {
       }
     } catch {
       toast({ variant: "destructive", title: "Failed to copy" });
+    }
+  }
+
+  async function handlePushToGmail(draft: EmailDraft) {
+    setPushingGmailDraft(draft.id);
+    try {
+      const result = await pushToGmail(draft.id);
+      setEmailDrafts(prev => prev.map(d => d.id === draft.id ? result.draft : d));
+      toast({ title: "Saved to Gmail drafts", description: "Open Gmail to review and send." });
+    } catch {
+      toast({ variant: "destructive", title: "Failed to push to Gmail" });
+    } finally {
+      setPushingGmailDraft(null);
     }
   }
 
@@ -705,6 +720,9 @@ export default function AppDetailPage() {
                         {draft.status === "sent" && (
                           <span className="text-[11px] bg-blue-50 text-blue-600 rounded px-1.5 shrink-0">sent</span>
                         )}
+                        {draft.status === "gmail_draft" && (
+                          <span className="text-[11px] bg-red-50 text-red-600 rounded px-1.5 shrink-0">in Gmail</span>
+                        )}
                       </div>
                       {expandedDraft === draft.id ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
                     </button>
@@ -712,7 +730,7 @@ export default function AppDetailPage() {
                       <div className="p-3 pt-0 border-t border-border/50 space-y-2">
                         <p className="text-xs font-medium text-muted-foreground">Subject: <span className="text-foreground">{draft.subject}</span></p>
                         <pre className="text-xs text-foreground whitespace-pre-wrap font-sans leading-relaxed max-h-48 overflow-y-auto">{draft.bodyText}</pre>
-                        <div className="flex gap-2 pt-1">
+                        <div className="flex flex-wrap gap-2 pt-1">
                           <Button
                             size="sm"
                             variant="outline"
@@ -722,6 +740,20 @@ export default function AppDetailPage() {
                             {copiedDraft === draft.id ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
                             {copiedDraft === draft.id ? "Copied!" : "Copy"}
                           </Button>
+                          {draft.status !== "gmail_draft" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-7 gap-1.5 text-red-600 border-red-200 hover:bg-red-50"
+                              onClick={() => handlePushToGmail(draft)}
+                              disabled={pushingGmailDraft === draft.id}
+                            >
+                              {pushingGmailDraft === draft.id
+                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                : <Mail className="w-3.5 h-3.5" />}
+                              {pushingGmailDraft === draft.id ? "Saving…" : "Save to Gmail"}
+                            </Button>
+                          )}
                           {draft.status === "draft" && (
                             <Button
                               size="sm"

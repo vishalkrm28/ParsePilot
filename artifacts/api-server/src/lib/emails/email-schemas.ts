@@ -16,7 +16,7 @@ export const EmailToneEnum = z.enum([
 ]);
 export type EmailTone = z.infer<typeof EmailToneEnum>;
 
-export const DraftStatusEnum = z.enum(["draft", "copied", "archived"]);
+export const DraftStatusEnum = z.enum(["draft", "copied", "archived", "gmail_draft"]);
 export type DraftStatus = z.infer<typeof DraftStatusEnum>;
 
 export const GenerateEmailDraftBody = z.object({

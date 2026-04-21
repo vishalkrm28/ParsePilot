@@ -29,23 +29,29 @@ router.get("/email-sync/connect-status", authMiddleware, async (req, res) => {
   const userId = req.user?.id;
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const connections = await db
+  // Ensure a "connected" row exists for gmail (connected via Replit connectors SDK)
+  const [existingGmail] = await db
     .select()
     .from(emailSyncConnectionsTable)
-    .where(eq(emailSyncConnectionsTable.userId, userId));
+    .where(and(eq(emailSyncConnectionsTable.userId, userId), eq(emailSyncConnectionsTable.provider, "gmail")))
+    .limit(1);
 
-  const providers = ["gmail", "outlook"];
-  const statusMap: Record<string, { status: string; providerEmail: string | null }> = {};
-
-  for (const provider of providers) {
-    const existing = connections.find((c) => c.provider === provider);
-    statusMap[provider] = {
-      status: existing?.status ?? "not_connected",
-      providerEmail: existing?.providerEmail ?? null,
-    };
+  if (!existingGmail) {
+    await db.insert(emailSyncConnectionsTable)
+      .values({ userId, provider: "gmail", status: "connected", providerEmail: null })
+      .onConflictDoNothing();
+  } else if (existingGmail.status !== "connected") {
+    await db.update(emailSyncConnectionsTable)
+      .set({ status: "connected" })
+      .where(eq(emailSyncConnectionsTable.id, existingGmail.id));
   }
 
-  res.json({ connections: statusMap, message: "OAuth not yet implemented. Architecture is sync-ready." });
+  res.json({
+    connections: {
+      gmail: { status: "connected", providerEmail: existingGmail?.providerEmail ?? null },
+      outlook: { status: "not_connected", providerEmail: null },
+    },
+  });
 });
 
 // ─── POST /api/email-sync/outbound ───────────────────────────────────────────
