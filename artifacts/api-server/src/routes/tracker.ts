@@ -140,6 +140,31 @@ router.post("/tracker/apps", authMiddleware, async (req, res) => {
   const body = parsedOrFail(CreateTrackedAppBody, req.body, res) as import("../lib/tracker/tracker-schemas.js").CreateTrackedAppBody | null;
   if (!body) return;
 
+  // ── Deduplication: return existing app if already tracked from same source ──
+  if (body.savedJobId) {
+    const [existing] = await db
+      .select()
+      .from(trackedApplicationsTable)
+      .where(and(eq(trackedApplicationsTable.userId, userId), eq(trackedApplicationsTable.savedJobId, body.savedJobId)))
+      .limit(1);
+    if (existing) {
+      res.status(200).json({ app: existing, alreadyExists: true });
+      return;
+    }
+  }
+
+  if (body.externalJobCacheId) {
+    const [existing] = await db
+      .select()
+      .from(trackedApplicationsTable)
+      .where(and(eq(trackedApplicationsTable.userId, userId), eq(trackedApplicationsTable.externalJobCacheId, body.externalJobCacheId)))
+      .limit(1);
+    if (existing) {
+      res.status(200).json({ app: existing, alreadyExists: true });
+      return;
+    }
+  }
+
   // Derive initial stage: if assets already linked → preparing, else saved
   const initialStage = body.tailoredCvId || body.coverLetterId ? "preparing" : "saved";
 
