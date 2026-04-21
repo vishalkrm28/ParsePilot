@@ -21,9 +21,16 @@ import {
   Building2,
   MapPin,
   ChevronRight,
+  ChevronDown,
   Plus,
   LayoutGrid,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 const STAGE_COLORS: Record<ApplicationStage, string> = {
@@ -96,22 +103,29 @@ function AppCard({
         </span>
       </div>
       <div
-        className="mt-2.5 pt-2 border-t border-border flex items-center gap-1"
+        className="mt-2.5 pt-2 border-t border-border"
         onClick={(e) => e.stopPropagation()}
       >
-        <span className="text-[10px] text-muted-foreground mr-0.5">Move:</span>
-        {nextStages.slice(0, 3).map((s) => (
-          <button
-            key={s}
-            onClick={() => onMoveStage(app, s)}
-            className="text-[10px] px-1.5 py-0.5 rounded border border-border hover:bg-accent transition-colors"
-          >
-            {STAGE_LABELS[s]}
-          </button>
-        ))}
-        {nextStages.length > 3 && (
-          <span className="text-[10px] text-muted-foreground">+{nextStages.length - 3}</span>
-        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="w-full flex items-center justify-between gap-1.5 text-[11px] px-2 py-1 rounded border border-border hover:bg-accent transition-colors text-muted-foreground">
+              <span className="font-medium">Move to stage</span>
+              <ChevronDown className="w-3 h-3 flex-shrink-0" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-[160px]">
+            {nextStages.map((s) => (
+              <DropdownMenuItem
+                key={s}
+                onClick={() => onMoveStage(app, s)}
+                className="text-xs cursor-pointer"
+              >
+                <span className={cn("w-2 h-2 rounded-full mr-2 flex-shrink-0 border", STAGE_COLORS[s])} />
+                {STAGE_LABELS[s]}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

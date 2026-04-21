@@ -26,6 +26,7 @@ import {
   MessageSquare,
   Video,
   ChevronDown,
+  Receipt,
 } from "lucide-react";
 import { LogoBrand } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
@@ -83,6 +84,7 @@ const recruiterExclusiveChildren = [
 ];
 const recruiterTailItems = [
   { href: "/recruiter/pricing", label: "Recruiter Plans", icon: CreditCard },
+  { href: "/billing", label: "Manage Billing", icon: Receipt },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

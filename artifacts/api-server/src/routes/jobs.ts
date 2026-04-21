@@ -301,17 +301,42 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
     logger.info({ requestedCountry: country, fallbackCountry: adzunaCountry }, "Country not supported by Adzuna — falling back to gb");
   }
 
+  // Map country codes to the country name strings Adzuna returns in location.area[0].
+  const ADZUNA_COUNTRY_NAMES: Record<string, string[]> = {
+    at: ["austria"],
+    au: ["australia"],
+    be: ["belgium", "belgique", "belgië"],
+    br: ["brazil", "brasil"],
+    ca: ["canada"],
+    ch: ["switzerland", "schweiz", "suisse"],
+    de: ["germany", "deutschland"],
+    es: ["spain", "españa"],
+    fr: ["france"],
+    gb: ["uk", "united kingdom", "great britain", "england", "scotland", "wales"],
+    in: ["india"],
+    it: ["italy", "italia"],
+    mx: ["mexico", "méxico"],
+    nl: ["netherlands", "nederland"],
+    nz: ["new zealand"],
+    pl: ["poland", "polska"],
+    sg: ["singapore"],
+    us: ["us", "usa", "united states"],
+    za: ["south africa"],
+  };
+  const validCountryNames = ADZUNA_COUNTRY_NAMES[adzunaCountry] ?? [];
+
   const rawJobs: ReturnType<typeof normalizeAdzunaJob>[] = [];
 
   for (const term of searchTerms) {
     try {
       const results = await fetchAdzunaJobs({ what: term, where: preferredLocation, country: adzunaCountry, resultsPerPage: 20 });
-      // Post-filter by country code from location.area[0] — Adzuna sometimes
-      // returns multinational listings with a different country's location even
-      // when querying a specific country endpoint.
+      // Post-filter: Adzuna sometimes returns multinational listings even when
+      // querying a country-specific endpoint. location.area[0] is the country
+      // NAME (e.g. "Belgium") — compare against mapped names, not the code.
       const countryFiltered = results.filter((job) => {
         const areaCountry = (job.location?.area?.[0] ?? "").toLowerCase();
-        return !areaCountry || areaCountry === adzunaCountry;
+        if (!areaCountry) return true;
+        return validCountryNames.some((name) => areaCountry.includes(name) || name.includes(areaCountry));
       });
       rawJobs.push(...countryFiltered.map(normalizeAdzunaJob));
     } catch (err) {
