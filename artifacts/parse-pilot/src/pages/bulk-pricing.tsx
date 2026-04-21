@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { authedFetch } from "@/lib/authed-fetch";
 import { AppLayout } from "@/components/layout/app-layout";
 import {
-  Sparkles, Crown, CheckCircle2, ArrowRight, Zap, Users,
-  Star, Info, X, Loader2, ChevronRight, TrendingUp,
+  Sparkles, Crown, CheckCircle2, ArrowRight, Users,
+  Star, Info, Loader2, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
@@ -33,96 +33,7 @@ interface BulkStatus {
   showProUpsell: boolean;
 }
 
-// ─── Tier upsell config ───────────────────────────────────────────────────────
 
-const UPSELL_FROM: Record<string, { targetId: string; savingDollars: number; message: string }> = {
-  "10": {
-    targetId: "25",
-    savingDollars: 10,
-    message: "You're analyzing multiple candidates. For just $10 more, you can analyze 25 CVs instead of 10.",
-  },
-  "25": {
-    targetId: "50",
-    savingDollars: 10,
-    message: "Planning to analyze more profiles? Upgrade to 50 CVs for full flexibility.",
-  },
-};
-
-// ─── UpsellModal ─────────────────────────────────────────────────────────────
-
-function UpsellModal({
-  fromTier,
-  toTier,
-  onUpgrade,
-  onContinue,
-  onClose,
-  loading,
-}: {
-  fromTier: BulkTier;
-  toTier: BulkTier;
-  onUpgrade: () => void;
-  onContinue: () => void;
-  onClose: () => void;
-  loading: boolean;
-}) {
-  const upsell = UPSELL_FROM[fromTier.id];
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-card rounded-2xl border border-border shadow-2xl max-w-md w-full p-6 relative">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
-
-        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-          <TrendingUp className="w-5 h-5 text-primary" />
-        </div>
-
-        <h3 className="text-lg font-bold mb-2">One small upgrade, much more capacity</h3>
-        <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-          {upsell?.message}
-        </p>
-
-        {/* Comparison */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          <div className="rounded-xl border border-border bg-muted/30 p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">You selected</p>
-            <p className="text-xl font-bold">{fromTier.cvLimit} CVs</p>
-            <p className="text-sm font-semibold text-primary">${fromTier.amountDollars}</p>
-          </div>
-          <div className="rounded-xl border-2 border-primary bg-primary/5 p-4 text-center relative">
-            <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap">
-              Recommended
-            </span>
-            <p className="text-xs text-muted-foreground mb-1">Upgrade to</p>
-            <p className="text-xl font-bold">{toTier.cvLimit} CVs</p>
-            <p className="text-sm font-semibold text-primary">${toTier.amountDollars}</p>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={onUpgrade}
-            disabled={loading}
-            className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-60"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-            Upgrade to {toTier.cvLimit} CVs — ${toTier.amountDollars}
-          </button>
-          <button
-            onClick={onContinue}
-            disabled={loading}
-            className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl border border-border text-sm font-medium hover:bg-muted/40 transition-colors disabled:opacity-60"
-          >
-            Continue with {fromTier.cvLimit} CVs
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── ProUpsellBanner ─────────────────────────────────────────────────────────
 
@@ -216,9 +127,6 @@ export default function BulkPricing() {
   const [status, setStatus] = useState<BulkStatus | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
 
-  const [selectedTier, setSelectedTier] = useState<BulkTier | null>(null);
-  const [upsellTier, setUpsellTier] = useState<BulkTier | null>(null);
-  const [showUpsell, setShowUpsell] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -303,20 +211,8 @@ export default function BulkPricing() {
   };
 
   const handleSelectTier = (tier: BulkTier) => {
-    const upsell = UPSELL_FROM[tier.id];
-    if (upsell) {
-      const upgradeTier = tiers.find((t) => t.id === upsell.targetId);
-      if (upgradeTier) {
-        setSelectedTier(tier);
-        setUpsellTier(upgradeTier);
-        setShowUpsell(true);
-        return;
-      }
-    }
     startCheckout(tier);
   };
-
-  const tierById = (id: string) => tiers.find((t) => t.id === id);
 
   return (
     <AppLayout>
@@ -552,23 +448,6 @@ export default function BulkPricing() {
         )}
       </div>
 
-      {/* Upsell modal */}
-      {showUpsell && selectedTier && upsellTier && (
-        <UpsellModal
-          fromTier={selectedTier}
-          toTier={upsellTier}
-          loading={checkoutLoading}
-          onUpgrade={() => {
-            setShowUpsell(false);
-            startCheckout(upsellTier);
-          }}
-          onContinue={() => {
-            setShowUpsell(false);
-            startCheckout(selectedTier);
-          }}
-          onClose={() => setShowUpsell(false)}
-        />
-      )}
     </AppLayout>
   );
 }
