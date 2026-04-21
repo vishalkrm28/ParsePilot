@@ -138,6 +138,7 @@ async function apiRequest<T>(url: string, opts?: RequestInit): Promise<T> {
 
 export async function saveJob(params: {
   externalJobCacheId?: string | null;
+  discoveredJobId?: string | null;
   sourceApplicationId?: string | null;
   jobTitle: string;
   company?: string | null;

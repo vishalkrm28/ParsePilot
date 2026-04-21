@@ -61,9 +61,23 @@ router.post("/tracker/saved-jobs", authMiddleware, async (req, res) => {
     }
   }
 
+  // Deduplicate: same user + same discoveredJobId (Global Jobs)
+  if (body.discoveredJobId) {
+    const [existing] = await db
+      .select({ id: savedJobsTable.id })
+      .from(savedJobsTable)
+      .where(and(eq(savedJobsTable.userId, userId), eq(savedJobsTable.discoveredJobId, body.discoveredJobId)))
+      .limit(1);
+    if (existing) {
+      res.status(200).json({ savedJob: existing, alreadySaved: true });
+      return;
+    }
+  }
+
   const [savedJob] = await db.insert(savedJobsTable).values({
     userId,
     externalJobCacheId: body.externalJobCacheId ?? null,
+    discoveredJobId: body.discoveredJobId ?? null,
     sourceApplicationId: body.sourceApplicationId ?? null,
     jobTitle: body.jobTitle,
     company: body.company ?? null,

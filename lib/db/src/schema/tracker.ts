@@ -9,7 +9,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { externalJobsCacheTable } from "./jobs";
+import { externalJobsCacheTable, discoveredJobsTable } from "./jobs";
 import { tailoredCvsTable, coverLettersTable } from "./tailoring";
 
 // ─── Saved Jobs ───────────────────────────────────────────────────────────────
@@ -20,9 +20,15 @@ export const savedJobsTable = pgTable("saved_jobs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: text("user_id").notNull(),
 
-  // Optional link back to the cached external job (from Find Jobs)
+  // Optional link back to the cached external job (from Find Jobs / Adzuna / Muse)
   externalJobCacheId: varchar("external_job_cache_id").references(
     () => externalJobsCacheTable.id,
+    { onDelete: "set null" },
+  ),
+
+  // Optional link to a globally discovered job (from Global Jobs / jobs table)
+  discoveredJobId: varchar("discovered_job_id").references(
+    () => discoveredJobsTable.id,
     { onDelete: "set null" },
   ),
 

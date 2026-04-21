@@ -430,7 +430,7 @@ export default function GlobalJobDiscover() {
     setSavingJobId(job.id);
     try {
       const { alreadySaved } = await saveJob({
-        externalJobCacheId: job.id,
+        discoveredJobId: job.id,
         jobTitle: job.title,
         company: job.company ?? null,
         location: job.location ?? null,

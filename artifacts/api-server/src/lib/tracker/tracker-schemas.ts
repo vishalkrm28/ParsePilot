@@ -54,6 +54,7 @@ export type AnswerType = z.infer<typeof AnswerTypeEnum>;
 
 export const SaveJobBody = z.object({
   externalJobCacheId: z.string().optional().nullable(),
+  discoveredJobId: z.string().optional().nullable(),
   sourceApplicationId: z.string().optional().nullable(),
   jobTitle: z.string().min(1),
   company: z.string().optional().nullable(),
