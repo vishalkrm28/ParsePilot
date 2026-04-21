@@ -14,6 +14,7 @@ import {
   updateNotes,
   linkAssets,
   updateAppStatus,
+  deleteTrackedApp,
   createReminder,
   completeReminder,
   type TrackedApp,
@@ -39,6 +40,7 @@ import {
   Sparkles,
   Save,
   Archive,
+  Trash2,
   Building2,
   MapPin,
   Mail,
@@ -51,6 +53,17 @@ import {
   ChevronUp,
   X,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
 import {
@@ -261,6 +274,17 @@ export default function AppDetailPage() {
       navigate("/tracker");
     } catch {
       toast({ variant: "destructive", title: "Failed to archive" });
+    }
+  }
+
+  async function handleDelete() {
+    if (!app) return;
+    try {
+      await deleteTrackedApp(app.id);
+      toast({ title: "Application deleted" });
+      navigate("/tracker");
+    } catch {
+      toast({ variant: "destructive", title: "Failed to delete" });
     }
   }
 
@@ -1129,6 +1153,35 @@ export default function AppDetailPage() {
                   <Archive className="w-3.5 h-3.5 mr-2" />
                   Archive Application
                 </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="w-full text-xs h-8 justify-start text-red-500 hover:text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 mr-2" />
+                      Delete Application
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this application?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete the application and all its history, notes, and reminders. This cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                        onClick={handleDelete}
+                      >
+                        Delete permanently
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </CardContent>
             </Card>
 

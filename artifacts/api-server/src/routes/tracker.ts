@@ -390,6 +390,22 @@ router.patch("/tracker/apps/:id/status", authMiddleware, async (req, res) => {
   res.json({ ok: true, status });
 });
 
+// ─── DELETE /api/tracker/apps/:id ────────────────────────────────────────────
+
+router.delete("/tracker/apps/:id", authMiddleware, async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const app = await assertAppOwnership(req.params.id, userId).catch((e) => {
+    res.status(e.status ?? 500).json({ error: e.message ?? "Error" });
+    return null;
+  });
+  if (!app) return;
+
+  await db.delete(trackedApplicationsTable).where(eq(trackedApplicationsTable.id, app.id));
+  res.json({ ok: true });
+});
+
 // ─── POST /api/tracker/apps/:id/timeline ─────────────────────────────────────
 
 router.post("/tracker/apps/:id/timeline", authMiddleware, async (req, res) => {

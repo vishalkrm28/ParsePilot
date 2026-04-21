@@ -238,6 +238,10 @@ export async function updateAppStatus(appId: string, status: ApplicationStatus):
   });
 }
 
+export async function deleteTrackedApp(appId: string): Promise<void> {
+  await authedFetch(`${BASE}/tracker/apps/${appId}`, { method: "DELETE" });
+}
+
 // ── Reminders ─────────────────────────────────────────────────────────────────
 
 export async function createReminder(appId: string, params: {
