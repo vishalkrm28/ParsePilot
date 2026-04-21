@@ -170,6 +170,13 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Mode was just set (race: navigate fired before status refreshed) —
+    // drive them to the correct destination now that status has caught up.
+    if (mode !== null && location === "/onboarding") {
+      navigate(mode === "recruiter" ? "/recruiter/pricing" : "/dashboard");
+      return;
+    }
+
     // Recruiter mode: block job-seeker-only routes
     if (mode === "recruiter") {
       const blocked = JOB_SEEKER_ONLY_PATHS.some((p) => location === p || location.startsWith(p));
