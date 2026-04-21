@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
-import { db, candidateProfilesTable, discoveredJobsTable, jobDiscoveryRunsTable } from "@workspace/db";
+import { db, candidateProfilesTable, discoveredJobsTable, jobDiscoveryRunsTable, usersTable } from "@workspace/db";
 import { and, count, eq, desc, gte, inArray } from "drizzle-orm";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { logger } from "../lib/logger.js";
@@ -10,15 +10,28 @@ import { upsertDiscoveredJobs, saveDiscoveryRun } from "../lib/jobs/job-store.js
 import { buildSearchCacheKey, getCachedSearchResult, saveCachedSearchResult } from "../lib/jobs/job-cache.js";
 import { getJobsByIds } from "../lib/jobs/job-store.js";
 import { matchDiscoveredJobsWithAI, saveJobMatchResults } from "../lib/jobs/job-matching.js";
+import { getJobRecCredits, spendJobRecCredit } from "../lib/credits.js";
+import { subscriptionIsActive } from "../lib/billing.js";
+
 const router: IRouter = Router();
 
-const DAILY_LIMIT_PER_CV = 10;
+const PRO_DAILY_LIMIT_PER_CV = 10;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function todayUtcStart(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
+/** True if the user has an active Pro subscription. */
+async function checkIsPro(userId: string): Promise<boolean> {
+  const [user] = await db
+    .select({ subscriptionStatus: usersTable.subscriptionStatus })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .limit(1);
+  return subscriptionIsActive(user?.subscriptionStatus);
 }
 
 /** Count how many Global Job searches this user has done today for a given CV. */
@@ -77,23 +90,35 @@ router.post("/jobs/discover", authMiddleware, async (req, res) => {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  // ── Per-CV daily limit (applies to all users, Pro and non-Pro alike) ────────
-  // Global Jobs does NOT consume job_rec_credits — that pool is reserved for
-  // Find Jobs. Instead, every user gets the same 10-searches-per-CV-per-day cap.
-  if (!applicationId) {
-    return res.status(422).json({
-      error: "Please select a CV to search for jobs.",
-      code: "NO_CV_SELECTED",
-    });
-  }
-  const runsToday = await countDiscoveryRunsToday(userId, applicationId);
-  if (runsToday >= DAILY_LIMIT_PER_CV) {
-    return res.status(429).json({
-      error: `You've used all ${DAILY_LIMIT_PER_CV} searches for this CV today. Try again tomorrow or select a different CV.`,
-      code: "CV_DAILY_LIMIT_REACHED",
-      remainingForCv: 0,
-      runsUsedTodayForCv: runsToday,
-    });
+  // ── Quota enforcement — identical rules to Find Jobs ─────────────────────
+  //   Pro users   → 10 searches per CV per day (requires CV selection)
+  //   Non-Pro     → deducts 1 from shared job_rec_credits pool
+  const isPro = await checkIsPro(userId);
+
+  if (isPro) {
+    if (!applicationId) {
+      return res.status(422).json({
+        error: "Please select a CV to search for jobs.",
+        code: "NO_CV_SELECTED",
+      });
+    }
+    const runsToday = await countDiscoveryRunsToday(userId, applicationId);
+    if (runsToday >= PRO_DAILY_LIMIT_PER_CV) {
+      return res.status(429).json({
+        error: `You've used all ${PRO_DAILY_LIMIT_PER_CV} searches for this CV today. Try again tomorrow or select a different CV.`,
+        code: "CV_DAILY_LIMIT_REACHED",
+        remainingForCv: 0,
+        runsUsedTodayForCv: runsToday,
+      });
+    }
+  } else {
+    const credits = await getJobRecCredits(userId);
+    if (credits < 1) {
+      return res.status(402).json({
+        error: "No job search credits. Unlock a CV analysis ($6.99) to receive 10 searches.",
+        code: "NO_JOB_REC_CREDITS",
+      });
+    }
   }
 
   const defaultCountry =
@@ -129,6 +154,7 @@ router.post("/jobs/discover", authMiddleware, async (req, res) => {
           dedupedCount: cachedJobs.length,
           cached: true,
         });
+        if (!isPro) await spendJobRecCredit(userId);
         return res.json({
           jobs: cachedJobs.slice(0, limit),
           total: cachedJobs.length,
@@ -280,6 +306,8 @@ router.post("/jobs/discover", authMiddleware, async (req, res) => {
     dedupedCount: deduped.length,
     cached: false,
   });
+
+  if (!isPro) await spendJobRecCredit(userId);
 
   return res.json({
     jobs: (aiRanked ? aiRankedJobs : storedJobs).slice(0, limit),
