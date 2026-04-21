@@ -148,8 +148,8 @@ const JOB_SEEKER_ONLY_PATHS = [
   "/tracker",
   "/emails",
   "/mock-interview",
-  "/bulk",
   "/application/",
+  // NOTE: /bulk is intentionally omitted — bulk purchasing is available to all user types
 ];
 
 function OnboardingGate({ children }: { children: React.ReactNode }) {

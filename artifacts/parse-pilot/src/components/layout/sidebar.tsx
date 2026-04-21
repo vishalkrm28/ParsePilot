@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils";
 const coreItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, proOnly: false },
   { href: "/new", label: "New Application", icon: FilePlus2, proOnly: false },
-  { href: "/bulk/history", label: "Bulk Mode", icon: Users, proOnly: true },
+  { href: "/bulk/history", label: "Bulk Mode", icon: Users, proOnly: false },
 ];
 
 const jobsItems = [
