@@ -823,16 +823,57 @@ function UserRow({
                 <InfoBox label="Interview Preps" value={trackerData?.counts.interviewPreps?.toString() ?? "0"} />
               </div>
 
+              {/* Credit allocation panel */}
+              <div className="bg-zinc-800/50 border border-zinc-700/60 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium text-white">Credit Balance</span>
+                  </div>
+                  <span className="text-xs text-zinc-400">
+                    Current: <span className={`font-semibold ${(detail?.balance?.availableCredits ?? 0) > 0 ? "text-green-400" : "text-red-400"}`}>
+                      {detail?.balance?.availableCredits ?? 0}
+                    </span>
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {[10, 50, 100, 250, 500].map(preset => (
+                    <button
+                      key={preset}
+                      onClick={() => setCredits(String(preset))}
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                        credits === String(preset)
+                          ? "bg-primary text-white"
+                          : "bg-zinc-700 hover:bg-zinc-600 text-zinc-300"
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <span className="text-xs text-zinc-500 whitespace-nowrap">Set to:</span>
+                    <input
+                      type="number" min="0" max="99999" value={credits}
+                      onChange={e => setCredits(e.target.value)}
+                      className="w-24 bg-zinc-800 border border-zinc-600 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <span className="text-xs text-zinc-500">credits</span>
+                  </div>
+                  <button
+                    onClick={grantCredits}
+                    disabled={actionLoading === "credits" || !credits || Number(credits) < 0}
+                    className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                  >
+                    {actionLoading === "credits" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
+                    Set balance
+                  </button>
+                </div>
+              </div>
+
               {/* Actions row */}
               <div className="flex flex-wrap gap-2">
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="number" min="1" max="1000" value={credits}
-                    onChange={e => setCredits(e.target.value)}
-                    className="w-16 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                  <ActionBtn icon={<CreditCard className="w-3.5 h-3.5" />} label="Grant credits" loading={actionLoading === "credits"} onClick={grantCredits} />
-                </div>
                 <div className="flex items-center gap-1.5">
                   <select
                     value={bulkTier} onChange={e => setBulkTier(e.target.value)}
