@@ -3,8 +3,9 @@ import { Link, useLocation } from "wouter";
 import { LogoBrand } from "@/components/brand/logo";
 import { useMutation } from "@tanstack/react-query";
 import { startRecruiterCheckout } from "@/lib/recruiter-api";
-import { CheckCircle2, Users, Zap, Shield, ArrowRight, Loader2 } from "lucide-react";
+import { CheckCircle2, Users, Zap, Shield, ArrowRight, Loader2, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ManageBillingButton } from "@/components/billing/manage-billing-button";
 
 const SOLO_FEATURES = [
   "Unlimited candidate pipeline",
@@ -151,8 +152,22 @@ export default function RecruiterPricing() {
           <span className="flex items-center gap-1.5"><Zap className="w-4 h-4" /> Instant access after payment</span>
         </div>
 
+        {/* Manage existing subscription */}
+        <div className="mt-10 border border-border/40 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <CreditCard className="w-4 h-4 text-muted-foreground" />
+              <span className="font-semibold text-foreground text-sm">Already subscribed?</span>
+            </div>
+            <p className="text-muted-foreground text-sm">
+              Update your payment method, view invoices, or cancel your recruiter plan via the Stripe portal.
+            </p>
+          </div>
+          <ManageBillingButton label="Manage Subscription" className="shrink-0 sm:w-auto w-full" />
+        </div>
+
         {/* White-label callout */}
-        <div className="mt-14 border border-border/40 rounded-2xl p-6 text-center">
+        <div className="mt-6 border border-border/40 rounded-2xl p-6 text-center">
           <p className="font-semibold text-foreground mb-2">Running an HR agency or staffing firm?</p>
           <p className="text-muted-foreground text-sm mb-4">
             ResuOne Recruiter can be white-labelled with your branding. Invite emails, pipeline, and candidate pages — all under your name.
