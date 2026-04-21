@@ -144,8 +144,11 @@ export default function BulkPricing() {
         setTiers(tiersData.tiers ?? []);
         setStatus(statusData);
         // Recruiter plan holders already have batch analysis included —
-        // send them straight to the bulk session page, no purchase needed.
-        if (statusData?.isRecruiter) {
+        // send them straight to the session page only if they still have
+        // capacity. If their pass is exhausted they need to buy more here.
+        const hasCapacity =
+          statusData?.activePass && statusData.activePass.remaining > 0;
+        if (statusData?.isRecruiter && hasCapacity) {
           navigate("/bulk/session");
         }
       })

@@ -834,13 +834,17 @@ export default function BulkSession() {
               <div className="rounded-2xl border-2 border-dashed border-red-200 dark:border-red-900/50 bg-red-500/5 p-8 text-center">
                 <Lock className="w-8 h-8 mx-auto mb-3 text-red-400" />
                 <p className="text-sm font-semibold text-red-600 mb-1">All {limit} CV slots used</p>
-                <p className="text-xs text-muted-foreground mb-3">Your current pass is fully consumed.</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  {isRecruiter
+                    ? "You've used all your monthly CV tokens. Upgrade to a Team plan for 300 tokens/month."
+                    : "Your current pass is fully consumed."}
+                </p>
                 <button
-                  onClick={() => navigate("/bulk")}
+                  onClick={() => navigate(isRecruiter ? "/recruiter/pricing" : "/bulk")}
                   className="inline-flex items-center gap-2 text-sm font-semibold bg-primary text-primary-foreground px-4 py-2 rounded-xl hover:opacity-90 transition-opacity"
                 >
                   <Users className="w-4 h-4" />
-                  Buy more CV slots
+                  {isRecruiter ? "Upgrade to Team plan" : "Buy more CV slots"}
                 </button>
               </div>
             ) : (
