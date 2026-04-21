@@ -12,7 +12,6 @@ import {
   listPlans,
   getCreditBalance,
   getBillingStatus,
-  checkEntitlement,
   FEATURE_LABELS,
   type Plan,
   type CreditBalance,
@@ -81,21 +80,20 @@ export default function BillingPage() {
 
   const load = useCallback(async () => {
     try {
-      const [ps, bal, status, planCheck] = await Promise.all([
+      const [ps, bal, status] = await Promise.all([
         listPlans(),
         getCreditBalance().catch(() => null),
         getBillingStatus().catch(() => null),
-        checkEntitlement("cv_analysis_enabled").catch(() => null),
       ]);
       setPlans(ps);
       setBalance(bal);
       setBillingStatus(status);
 
-      // Use the entitlement resolver which knows the user's exact plan code
-      if (planCheck?.planCode) {
-        setCurrentPlanCode(planCheck.planCode);
-      } else if (status?.isPro) {
-        setCurrentPlanCode("pro");
+      // planCode from /billing/status is the single source of truth —
+      // it uses resolvePlanCodeForUser which correctly handles recruiter
+      // vs pro vs free based on live Stripe subscription status.
+      if (status?.planCode) {
+        setCurrentPlanCode(status.planCode);
       }
     } catch (err) {
       toast({ variant: "destructive", title: "Failed to load billing info" });

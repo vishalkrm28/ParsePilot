@@ -24,7 +24,7 @@ export interface EntitlementResult {
 }
 
 // Map Stripe subscription state → plan code
-async function resolvePlanCodeForUser(userId: string): Promise<string> {
+export async function resolvePlanCodeForUser(userId: string): Promise<string> {
   const [user] = await db
     .select({
       subscriptionStatus: usersTable.subscriptionStatus,

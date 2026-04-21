@@ -76,6 +76,7 @@ export async function getBillingStatus() {
   return apiFetch<{
     isPro: boolean;
     isRecruiter: boolean;
+    planCode: string;
     hasBulkAccess: boolean;
     subscriptionStatus: string | null;
     subscriptionPriceId: string | null;

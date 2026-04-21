@@ -8,7 +8,7 @@ import { logger } from "../lib/logger.js";
 import { getUserCredits, FREE_CREDIT_ALLOWANCE, PRO_CREDIT_ALLOWANCE } from "../lib/credits.js";
 import { subscriptionIsActive, recruiterStatusIsActive, hasUnlockedResult } from "../lib/billing.js";
 import { hasBulkAccess } from "../lib/bulk.js";
-import { checkEntitlementForUser, getCreditCostForFeature } from "../lib/billing/entitlements.js";
+import { checkEntitlementForUser, getCreditCostForFeature, resolvePlanCodeForUser } from "../lib/billing/entitlements.js";
 
 /**
  * Extract a structured log context from a Stripe SDK error so we get
@@ -124,12 +124,14 @@ router.get("/billing/status", async (req, res) => {
     // successful Stripe renewal would incorrectly strip Pro access.
     const isPro = subscriptionIsActive(dbUser.subscriptionStatus);
     const isRecruiter = recruiterStatusIsActive(dbUser.recruiterSubscriptionStatus);
+    const planCode = await resolvePlanCodeForUser(req.user.id);
 
     const bulkAccess = await hasBulkAccess(req.user.id);
 
     res.json({
       isPro,
       isRecruiter,
+      planCode,
       hasBulkAccess: bulkAccess,
       subscriptionStatus: dbUser.subscriptionStatus ?? null,
       subscriptionPriceId: dbUser.subscriptionPriceId ?? null,
