@@ -167,7 +167,9 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const { status: billingStatus } = useBillingStatus();
   const isRecruiter = billingStatus?.isRecruiter ?? false;
-  const isRecruiterMode = billingStatus?.userMode === "recruiter";
+  const isPro = billingStatus?.isPro ?? false;
+  const hasBothPlans = isPro && isRecruiter;
+  const isRecruiterMode = !hasBothPlans && billingStatus?.userMode === "recruiter";
 
   const displayName =
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
@@ -311,6 +313,50 @@ export function Sidebar() {
             {accountItems.map(({ href, label, icon: Icon }) => (
               <NavItem key={href} href={href} label={label} icon={Icon} isActive={location === href} />
             ))}
+
+            {/* Recruiter section — only for users with both plans */}
+            {hasBothPlans && (
+              <>
+                <SectionLabel label="Recruiter" />
+                {recruiterCoreItems.map(({ href, label, icon: Icon }) => {
+                  const isActive =
+                    href === "/recruiter/dashboard"
+                      ? location.startsWith("/recruiter") &&
+                        !location.startsWith("/recruiter/pricing") &&
+                        !location.startsWith("/recruiter/exclusive") &&
+                        !location.startsWith("/recruiter/pipeline")
+                      : location.startsWith(href);
+                  return <NavItem key={href} href={href} label={label} icon={Icon} isActive={isActive} />;
+                })}
+                <div
+                  role="button"
+                  onClick={() => {
+                    if (inRecruiterExclusive) {
+                      setRecruiterExclusiveOpen((o) => !o);
+                    } else {
+                      navigate(recruiterExclusiveParent.href);
+                      setRecruiterExclusiveOpen(true);
+                    }
+                  }}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors group",
+                    inRecruiterExclusive
+                      ? "bg-primary/15 text-primary"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                  )}
+                >
+                  <Star className={cn("w-4 h-4 flex-shrink-0", inRecruiterExclusive ? "text-primary" : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground")} />
+                  <span className="flex-1">{recruiterExclusiveParent.label}</span>
+                  <ChevronDown className={cn("w-3.5 h-3.5 transition-transform flex-shrink-0", recruiterExclusiveOpen ? "rotate-0 text-primary/60" : "-rotate-90 text-sidebar-foreground/30")} />
+                </div>
+                {recruiterExclusiveOpen && recruiterExclusiveChildren.map(({ href, label, icon: Icon }) => (
+                  <NavItem key={href} href={href} label={label} icon={Icon} isActive={location === href} indent />
+                ))}
+                {recruiterTailItems.map(({ href, label, icon: Icon }) => (
+                  <NavItem key={href} href={href} label={label} icon={Icon} isActive={location === href} />
+                ))}
+              </>
+            )}
           </>
         )}
       </nav>

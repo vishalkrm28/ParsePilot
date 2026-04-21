@@ -161,6 +161,9 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
 
     const mode = status.userMode;
 
+    // Users with both a pro plan AND a recruiter plan can access everything — no gates
+    if (status.isPro && status.isRecruiter) return;
+
     // First-time users with no mode set → onboarding
     if (mode === null && location !== "/onboarding") {
       navigate("/onboarding");
