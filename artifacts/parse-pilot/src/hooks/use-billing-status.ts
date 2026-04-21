@@ -8,6 +8,7 @@ export interface BillingStatus {
   subscriptionStatus: string | null;
   currentPeriodEnd: string | null;
   hasCustomer: boolean;
+  userMode: "job_seeker" | "recruiter" | null;
 }
 
 interface UseBillingStatusResult {

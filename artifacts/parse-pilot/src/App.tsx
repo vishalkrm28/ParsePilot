@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,7 +7,9 @@ import { useAuth } from "@workspace/replit-auth-web";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { registerClerkTokenGetter } from "@/lib/authed-fetch";
+import { useBillingStatus } from "@/hooks/use-billing-status";
 import Landing from "@/pages/landing";
+import OnboardingPage from "@/pages/onboarding";
 import Dashboard from "@/pages/dashboard";
 import NewApplication from "@/pages/new-application";
 import ApplicationDetail from "@/pages/application-detail";
@@ -107,7 +109,7 @@ function ClerkTokenSync() {
 }
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isLoading, isAuthenticated, login } = useAuth();
+  const { isLoading, isAuthenticated } = useAuth();
 
   if (isLoading) {
     return (
@@ -124,9 +126,71 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Routes only accessible to job seekers (blocked for recruiter mode)
+const RECRUITER_ONLY_PATHS = [
+  "/recruiter/dashboard",
+  "/recruiter/pipeline",
+  "/recruiter/exclusive-jobs",
+  "/recruiter/exclusive-messages",
+  "/recruiter/exclusive-interviews",
+  "/recruiter/jobs",
+  "/candidate/",
+];
+
+// Routes only accessible to job seekers (blocked for recruiter mode)
+const JOB_SEEKER_ONLY_PATHS = [
+  "/dashboard",
+  "/new",
+  "/applications/",
+  "/jobs/recommendations",
+  "/jobs/discover",
+  "/jobs/exclusive",
+  "/tracker",
+  "/emails",
+  "/mock-interview",
+  "/bulk",
+  "/application/",
+];
+
+function OnboardingGate({ children }: { children: React.ReactNode }) {
+  const { status, loading } = useBillingStatus();
+  const [location, navigate] = useLocation();
+
+  useEffect(() => {
+    if (loading || !status) return;
+
+    const mode = status.userMode;
+
+    // First-time users with no mode set → onboarding
+    if (mode === null && location !== "/onboarding") {
+      navigate("/onboarding");
+      return;
+    }
+
+    // Recruiter mode: block job-seeker-only routes
+    if (mode === "recruiter") {
+      const blocked = JOB_SEEKER_ONLY_PATHS.some((p) => location === p || location.startsWith(p));
+      if (blocked) {
+        navigate(status.isRecruiter ? "/recruiter/dashboard" : "/recruiter/pricing");
+      }
+    }
+
+    // Job-seeker mode: block core recruiter routes (pricing stays accessible for upgrade)
+    if (mode === "job_seeker") {
+      const blocked = RECRUITER_ONLY_PATHS.some((p) => location === p || location.startsWith(p));
+      if (blocked) {
+        navigate("/dashboard");
+      }
+    }
+  }, [status, loading, location]);
+
+  return <>{children}</>;
+}
+
 function AppRouter() {
   return (
     <Switch>
+      <Route path="/onboarding" component={OnboardingPage} />
       <Route path="/" component={Dashboard} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/new" component={NewApplication} />
@@ -225,10 +289,12 @@ function App() {
               <Route path="/recruiter/team/join/:token" component={TeamJoin} />
               {/* Admin — own token-based auth */}
               <Route path="/admin" component={AdminPage} />
-              {/* Everything else goes through the auth gate */}
+              {/* Everything else goes through the auth gate + onboarding gate */}
               <Route>
                 <AuthGate>
-                  <AppRouter />
+                  <OnboardingGate>
+                    <AppRouter />
+                  </OnboardingGate>
                 </AuthGate>
               </Route>
             </Switch>

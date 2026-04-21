@@ -108,6 +108,7 @@ router.get("/billing/status", async (req, res) => {
         subscriptionPriceId: usersTable.subscriptionPriceId,
         currentPeriodEnd: usersTable.currentPeriodEnd,
         recruiterSubscriptionStatus: usersTable.recruiterSubscriptionStatus,
+        userMode: usersTable.userMode,
       })
       .from(usersTable)
       .where(eq(usersTable.id, req.user.id))
@@ -128,6 +129,9 @@ router.get("/billing/status", async (req, res) => {
 
     const bulkAccess = await hasBulkAccess(req.user.id);
 
+    // Derive effective mode: active recruiter subscribers always get recruiter mode
+    const effectiveMode = isRecruiter ? "recruiter" : (dbUser.userMode ?? null);
+
     res.json({
       isPro,
       isRecruiter,
@@ -137,6 +141,7 @@ router.get("/billing/status", async (req, res) => {
       subscriptionPriceId: dbUser.subscriptionPriceId ?? null,
       currentPeriodEnd: dbUser.currentPeriodEnd?.toISOString() ?? null,
       hasCustomer: !!dbUser.stripeCustomerId,
+      userMode: effectiveMode,
     });
   } catch (err) {
     logger.error({ err }, "Failed to fetch billing status");
@@ -588,6 +593,31 @@ router.post("/billing/check-entitlement", async (req, res) => {
   } catch (err) {
     logger.error({ err }, "Entitlement check failed");
     res.status(500).json({ error: "Could not check entitlement" });
+  }
+});
+
+// ─── POST /user/mode ─────────────────────────────────────────────────────────
+// Sets the user's chosen mode ("job_seeker" | "recruiter"). Called from the
+// onboarding page. Active recruiter subscribers are always in recruiter mode
+// regardless of this field (enforced in /billing/status).
+
+const SetUserModeBody = z.object({
+  mode: z.enum(["job_seeker", "recruiter"]),
+});
+
+router.post("/user/mode", async (req, res) => {
+  if (!req.user) { res.status(401).json({ error: "Authentication required", code: "UNAUTHENTICATED" }); return; }
+  const parsed = SetUserModeBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "mode must be 'job_seeker' or 'recruiter'" }); return; }
+
+  try {
+    await db.update(usersTable)
+      .set({ userMode: parsed.data.mode })
+      .where(eq(usersTable.id, req.user.id));
+    res.json({ success: true, mode: parsed.data.mode });
+  } catch (err) {
+    logger.error({ err }, "Failed to set user mode");
+    res.status(500).json({ error: "Could not save your choice. Please try again.", code: "DB_ERROR" });
   }
 });
 

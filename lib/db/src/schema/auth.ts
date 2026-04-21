@@ -35,6 +35,10 @@ export const usersTable = pgTable("users", {
 
   // Recruiter Team plan — set for members who joined an owner's team
   recruiterTeamId: varchar("recruiter_team_id"),
+
+  // User's chosen mode — set during onboarding
+  // "job_seeker" | "recruiter" | null (null = not yet set → show onboarding)
+  userMode: varchar("user_mode"),
 });
 
 export type UpsertUser = typeof usersTable.$inferInsert;
