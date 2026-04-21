@@ -1,0 +1,342 @@
+You are building MILESTONE 41 for Resuone.
+
+PROJECT CONTEXT
+Resuone already has:
+- global job discovery (Milestone 40)
+- CV parsing and matching
+- recruiter workflows
+- application tracker
+- notifications system
+- billing + plans (Pro, Recruiter, etc.)
+- smart reminders
+
+NEW FEATURE GOAL
+Build an INTERNAL JOB MARKETPLACE where:
+1. recruiters can post jobs directly on Resuone
+2. jobs are visible to Pro users (and above)
+3. candidates receive notifications for relevant jobs
+4. jobs are also included in job matching engine
+5. Resuone builds its own job supply over time
+
+This is critical for:
+- platform growth
+- exclusivity
+- monetization
+
+--------------------------------------------------
+
+1) DATABASE TABLES
+
+Create:
+
+internal_jobs
+- id uuid primary key default gen_random_uuid()
+- workspace_id uuid references workspaces(id)
+- created_by_user_id uuid not null
+- title text not null
+- company text not null
+- location text
+- country text
+- remote boolean default false
+- job_type text
+- seniority text
+- description text not null
+- requirements jsonb default '[]'::jsonb
+- salary_min numeric
+- salary_max numeric
+- currency text
+- status text default 'active'
+- visibility text default 'pro_only'
+- expires_at timestamptz
+- created_at timestamptz default now()
+- updated_at timestamptz default now()
+
+internal_job_applications
+- id uuid primary key default gen_random_uuid()
+- job_id uuid references internal_jobs(id) on delete cascade
+- user_id uuid not null
+- candidate_profile_id uuid
+- status text default 'applied'
+- cover_letter text
+- notes text
+- created_at timestamptz default now()
+
+internal_job_notifications
+- id uuid primary key default gen_random_uuid()
+- job_id uuid references internal_jobs(id)
+- user_id uuid not null
+- notified boolean default false
+- created_at timestamptz default now()
+
+Add indexes:
+- workspace_id
+- created_by_user_id
+- status
+- visibility
+- country
+- remote
+
+--------------------------------------------------
+
+2) ENUM VALUES
+
+status:
+- draft
+- active
+- paused
+- closed
+
+visibility:
+- pro_only
+- public
+
+application status:
+- applied
+- shortlisted
+- rejected
+- hired
+
+--------------------------------------------------
+
+3) JOB POSTING API
+
+Create:
+app/api/internal-jobs/create/route.ts
+
+Input:
+{
+  "workspaceId": "...",
+  "title": "...",
+  "company": "...",
+  "location": "...",
+  "country": "...",
+  "remote": true,
+  "jobType": "...",
+  "seniority": "...",
+  "description": "...",
+  "requirements": [],
+  "salaryMin": 3000,
+  "salaryMax": 5000,
+  "currency": "EUR",
+  "visibility": "pro_only"
+}
+
+Flow:
+1. validate recruiter permissions
+2. require recruiter plan or workspace role
+3. create job
+4. trigger notification pipeline
+5. return job
+
+--------------------------------------------------
+
+4) LIST INTERNAL JOBS API
+
+Create:
+app/api/internal-jobs/list/route.ts
+
+Input:
+{
+  "userId": "...",
+  "plan": "pro"
+}
+
+Rules:
+- free users → only public jobs
+- pro users → all jobs
+- recruiter → their own jobs + visible jobs
+
+--------------------------------------------------
+
+5) APPLY TO JOB API
+
+Create:
+app/api/internal-jobs/apply/route.ts
+
+Input:
+{
+  "jobId": "...",
+  "userId": "...",
+  "candidateProfileId": "...",
+  "coverLetter": "..."
+}
+
+Flow:
+1. validate access
+2. create application
+3. notify recruiter (future extension)
+4. return success
+
+--------------------------------------------------
+
+6) NOTIFICATION ENGINE (CORE)
+
+When a job is created:
+
+Flow:
+1. find relevant users:
+   - Pro users
+   - matching country OR remote
+2. optionally filter using:
+   - candidate profile
+   - job title similarity
+
+Create:
+lib/internal-jobs/notification.ts
+
+Function:
+notifyUsersForNewJob(job)
+
+Steps:
+- fetch eligible users
+- create notification_items
+- mark in internal_job_notifications
+
+--------------------------------------------------
+
+7) SMART MATCH FILTER (IMPORTANT)
+
+Before notifying ALL users, filter:
+
+Match rules:
+- job title vs user CV title
+- skills overlap
+- country match OR remote
+
+👉 Only notify relevant users
+
+--------------------------------------------------
+
+8) INTEGRATION WITH GLOBAL JOB ENGINE
+
+IMPORTANT:
+
+Internal jobs should also appear in:
+- /jobs/discover
+- /jobs/match
+
+So:
+
+Add source:
+"internal"
+
+When aggregating jobs:
+- include internal_jobs
+
+--------------------------------------------------
+
+9) UI — RECRUITER JOB POSTING
+
+Create:
+app/recruiter/jobs/create/page.tsx
+
+Fields:
+- title
+- description
+- requirements
+- location
+- remote toggle
+- salary
+- visibility
+
+Add:
+- preview mode
+- publish button
+
+--------------------------------------------------
+
+10) UI — JOB LISTING
+
+Update:
+app/jobs/discover/page.tsx
+
+Add:
+- "Resuone Exclusive" badge
+- highlight internal jobs
+
+--------------------------------------------------
+
+11) UI — APPLY FLOW
+
+Add button:
+"Apply Now"
+
+Flow:
+- select CV
+- optional cover letter
+- submit
+
+--------------------------------------------------
+
+12) UI — RECRUITER DASHBOARD
+
+Create:
+app/recruiter/jobs/page.tsx
+
+Show:
+- posted jobs
+- number of applicants
+- status
+- actions:
+  - edit
+  - pause
+  - close
+
+--------------------------------------------------
+
+13) UI — APPLICATION MANAGEMENT
+
+Create:
+app/recruiter/jobs/[id]/applications/page.tsx
+
+Show:
+- list of applicants
+- CV summary
+- match score
+- actions:
+  - shortlist
+  - reject
+
+--------------------------------------------------
+
+14) CREDIT / BILLING
+
+Optionally:
+- posting job = free for recruiter plan
+- OR charge credits
+
+Future-ready:
+- featured job = premium
+
+--------------------------------------------------
+
+15) SUCCESS CRITERIA
+
+Milestone complete when:
+- recruiter can post job
+- job visible to Pro users
+- notifications triggered
+- candidates can apply
+- recruiter can view applicants
+- internal jobs appear in job search
+- matching works
+
+--------------------------------------------------
+
+16) FUTURE EXTENSIONS
+
+Keep ready for:
+- featured jobs
+- promoted listings
+- recruiter messaging
+- interview scheduling directly
+- employer branding pages
+- company profiles
+
+--------------------------------------------------
+
+NOW DO THE FOLLOWING
+- Generate all files
+- Show code file by file
+- Do not skip implementation
+- Keep modular architecture
