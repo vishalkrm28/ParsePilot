@@ -140,6 +140,40 @@ router.patch("/internal-jobs/:id", async (req, res) => {
   }
 });
 
+// ─── GET /internal-jobs/posted — recruiter's own listings ────────────────────
+// MUST be declared before /:id to avoid "posted" being treated as an ID param
+
+router.get("/internal-jobs/posted", async (req, res) => {
+  if (!req.user) { res.status(401).json({ error: "Authentication required" }); return; }
+  try {
+    const { status } = req.query as Record<string, string>;
+
+    const conditions: any[] = [eq(internalJobsTable.postedByUserId, req.user.id)];
+    if (status) conditions.push(eq(internalJobsTable.status, status));
+
+    const jobs = await db
+      .select()
+      .from(internalJobsTable)
+      .where(and(...conditions))
+      .orderBy(desc(internalJobsTable.createdAt));
+
+    if (!jobs.length) { res.json({ jobs: [] }); return; }
+
+    const jobIds = jobs.map((j) => j.id);
+    const appCounts = await db
+      .select({ jobId: internalJobApplicationsTable.jobId, cnt: count() })
+      .from(internalJobApplicationsTable)
+      .where(sql`${internalJobApplicationsTable.jobId} = ANY(${jobIds})`)
+      .groupBy(internalJobApplicationsTable.jobId);
+
+    const cntMap = Object.fromEntries(appCounts.map((a) => [a.jobId, Number(a.cnt)]));
+    res.json({ jobs: jobs.map((j) => ({ ...j, applicationCount: cntMap[j.id] ?? 0 })) });
+  } catch (err) {
+    logger.error({ err }, "Failed to load posted jobs");
+    res.status(500).json({ error: "Failed to load jobs" });
+  }
+});
+
 // ─── GET /internal-jobs — list with filters ───────────────────────────────────
 
 router.get("/internal-jobs", async (req, res) => {
@@ -302,39 +336,6 @@ router.get("/internal-jobs/:id", async (req, res) => {
   } catch (err) {
     logger.error({ err }, "Failed to load job detail");
     res.status(500).json({ error: "Failed to load job" });
-  }
-});
-
-// ─── GET /internal-jobs/posted — recruiter's own listings ────────────────────
-
-router.get("/internal-jobs/posted", async (req, res) => {
-  if (!req.user) { res.status(401).json({ error: "Authentication required" }); return; }
-  try {
-    const { status } = req.query as Record<string, string>;
-
-    const conditions: any[] = [eq(internalJobsTable.postedByUserId, req.user.id)];
-    if (status) conditions.push(eq(internalJobsTable.status, status));
-
-    const jobs = await db
-      .select()
-      .from(internalJobsTable)
-      .where(and(...conditions))
-      .orderBy(desc(internalJobsTable.createdAt));
-
-    if (!jobs.length) { res.json({ jobs: [] }); return; }
-
-    const jobIds = jobs.map((j) => j.id);
-    const appCounts = await db
-      .select({ jobId: internalJobApplicationsTable.jobId, cnt: count() })
-      .from(internalJobApplicationsTable)
-      .where(sql`${internalJobApplicationsTable.jobId} = ANY(${jobIds})`)
-      .groupBy(internalJobApplicationsTable.jobId);
-
-    const cntMap = Object.fromEntries(appCounts.map((a) => [a.jobId, Number(a.cnt)]));
-    res.json({ jobs: jobs.map((j) => ({ ...j, applicationCount: cntMap[j.id] ?? 0 })) });
-  } catch (err) {
-    logger.error({ err }, "Failed to load posted jobs");
-    res.status(500).json({ error: "Failed to load jobs" });
   }
 });
 

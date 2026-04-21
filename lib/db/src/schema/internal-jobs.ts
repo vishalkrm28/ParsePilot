@@ -10,8 +10,8 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { candidateProfilesTable } from "./jobs-core.js";
-import { tailoredCvsTable, coverLettersTable } from "./tailoring.js";
+import { candidateProfilesTable } from "./jobs-core";
+import { tailoredCvsTable, coverLettersTable } from "./tailoring";
 
 // ─── Enums (value models) ─────────────────────────────────────────────────────
 

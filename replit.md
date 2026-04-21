@@ -52,6 +52,17 @@ The ParsePilot AI project is structured as a monorepo using pnpm workspaces. It 
 *   `lib/db`: Drizzle ORM schema and connection.
 *   `lib/integrations-openai-ai-server`: Replit AI Integration client.
 
+## Internal Job Marketplace (M41)
+
+Seven tables live in `lib/db/src/schema/internal-jobs.ts` and are fully pushed to the live database:
+`internal_jobs`, `internal_job_applications`, `internal_job_candidate_analyses`,
+`internal_job_application_events`, `internal_job_notifications`, `internal_job_messages`,
+`internal_job_interview_invites`.
+
+Schema files that reference other schema files in the same package must use extension-less imports
+(e.g., `from "./jobs-core"` not `from "./jobs-core.js"`) so drizzle-kit can resolve them at
+push time.
+
 ## External Dependencies
 
 *   **AI Service**: OpenAI via Replit AI Integrations proxy (specifically gpt-5.2).

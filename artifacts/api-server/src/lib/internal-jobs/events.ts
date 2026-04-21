@@ -1,5 +1,6 @@
 import { db, internalJobApplicationEventsTable } from "@workspace/db";
 import type { INTERNAL_JOB_EVENT_TYPE, INTERNAL_JOB_ACTOR_TYPE } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { logger } from "../logger.js";
 
 type EventType = (typeof INTERNAL_JOB_EVENT_TYPE)[number];
@@ -35,11 +36,6 @@ export async function getApplicationEvents(applicationId: string) {
   return db
     .select()
     .from(internalJobApplicationEventsTable)
-    .where(
-      (await import("drizzle-orm")).eq(
-        internalJobApplicationEventsTable.applicationId,
-        applicationId,
-      ),
-    )
+    .where(eq(internalJobApplicationEventsTable.applicationId, applicationId))
     .orderBy(internalJobApplicationEventsTable.createdAt);
 }
