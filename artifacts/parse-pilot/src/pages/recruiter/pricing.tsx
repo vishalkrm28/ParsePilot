@@ -60,12 +60,19 @@ export default function RecruiterPricing() {
     if (!isActiveRecruiter) return;
     authedFetch("/api/billing/recruiter-detail")
       .then(async (r) => {
-        if (!r.ok) return;
         const data: RecruiterDetail = await r.json();
+        // always set — even { active: false } so we know the fetch is done
         setRecruiterDetail(data);
       })
-      .catch(() => {});
+      .catch(() => {
+        // on failure treat as loaded-but-unknown
+        setRecruiterDetail({ active: false });
+      });
   }, [isActiveRecruiter]);
+
+  // true only once the detail fetch has settled
+  const detailLoaded = recruiterDetail !== null;
+  const currentPlan = recruiterDetail?.active ? recruiterDetail.plan : null;
 
   const checkoutMutation = useMutation({
     mutationFn: (plan: "solo" | "team") => {
@@ -137,11 +144,13 @@ export default function RecruiterPricing() {
                 {recruiterDetail?.plan === "team" ? "Team Recruiter" : "Solo Recruiter"} — Active
               </p>
               <p className="text-sm text-green-700 mt-0.5">
-                {recruiterDetail
-                  ? recruiterDetail.cancelAtPeriodEnd
-                    ? `Cancels ${recruiterDetail.periodEnd ? new Date(recruiterDetail.periodEnd).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "at end of period"} — access continues until then`
-                    : `Renews ${recruiterDetail.periodEnd ? new Date(recruiterDetail.periodEnd).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "—"}`
-                  : "Loading plan details…"}
+                {!detailLoaded
+                  ? "Loading plan details…"
+                  : recruiterDetail?.active && recruiterDetail.periodEnd
+                    ? recruiterDetail.cancelAtPeriodEnd
+                      ? `Cancels ${new Date(recruiterDetail.periodEnd).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} — access continues until then`
+                      : `Renews ${new Date(recruiterDetail.periodEnd).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`
+                    : "Managed via Stripe"}
               </p>
             </div>
           </div>
@@ -172,13 +181,13 @@ export default function RecruiterPricing() {
               ))}
             </ul>
 
-            {isActiveRecruiter && recruiterDetail?.plan !== "team" ? (
+            {currentPlan === "solo" ? (
               <div className="w-full flex items-center justify-center gap-2 bg-green-100 text-green-700 font-semibold py-3 rounded-xl text-sm cursor-default border border-green-200">
                 <CheckCircle2 className="w-4 h-4" /> Current Plan
               </div>
             ) : (
               <button onClick={() => handleStart("solo")}
-                disabled={checkoutMutation.isPending || isActiveRecruiter}
+                disabled={checkoutMutation.isPending || currentPlan === "team"}
                 className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-semibold py-3 rounded-xl hover:bg-primary/90 transition-all text-sm disabled:opacity-50">
                 {checkoutMutation.isPending && selectedPlan === "solo"
                   ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -214,18 +223,18 @@ export default function RecruiterPricing() {
               ))}
             </ul>
 
-            {isActiveRecruiter && recruiterDetail?.plan === "team" ? (
+            {currentPlan === "team" ? (
               <div className="w-full flex items-center justify-center gap-2 bg-green-100 text-green-700 font-semibold py-3 rounded-xl text-sm cursor-default border border-green-200">
                 <CheckCircle2 className="w-4 h-4" /> Current Plan
               </div>
             ) : (
               <button onClick={() => handleStart("team")}
-                disabled={checkoutMutation.isPending || isActiveRecruiter}
+                disabled={checkoutMutation.isPending}
                 className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground font-semibold py-3 rounded-xl hover:bg-primary/90 transition-all text-sm disabled:opacity-50">
                 {checkoutMutation.isPending && selectedPlan === "team"
                   ? <Loader2 className="w-4 h-4 animate-spin" />
                   : <ArrowRight className="w-4 h-4" />}
-                Start Team Plan
+                {currentPlan === "solo" ? "Upgrade to Team" : "Start Team Plan"}
               </button>
             )}
           </div>

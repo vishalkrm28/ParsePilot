@@ -389,8 +389,14 @@ router.get("/billing/recruiter-detail", async (req, res) => {
       .where(eq(usersTable.id, req.user.id))
       .limit(1);
 
-    if (!dbUser?.recruiterSubscriptionId || !dbUser.recruiterSubscriptionStatus) {
+    if (!dbUser?.recruiterSubscriptionStatus) {
       res.json({ active: false });
+      return;
+    }
+
+    // If there's no Stripe subscription ID we can still return the plan name
+    if (!dbUser.recruiterSubscriptionId) {
+      res.json({ active: true, plan: dbUser.recruiterSubscriptionStatus as string, periodEnd: null, cancelAtPeriodEnd: false });
       return;
     }
 
