@@ -118,6 +118,7 @@ export const jobMatchResultsTable = pgTable(
 export const jobDiscoveryRunsTable = pgTable("job_discovery_runs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: text("user_id"),
+  sourceApplicationId: varchar("source_application_id"),
   query: text("query").notNull(),
   country: text("country"),
   remoteOnly: boolean("remote_only").default(false),

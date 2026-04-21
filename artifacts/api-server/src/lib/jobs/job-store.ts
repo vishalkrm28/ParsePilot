@@ -102,6 +102,7 @@ export async function getJobsByIds(ids: string[]) {
 
 export async function saveDiscoveryRun({
   userId,
+  applicationId,
   query,
   country,
   remoteOnly,
@@ -111,6 +112,7 @@ export async function saveDiscoveryRun({
   cached,
 }: {
   userId?: string;
+  applicationId?: string | null;
   query: string;
   country?: string;
   remoteOnly?: boolean;
@@ -122,6 +124,7 @@ export async function saveDiscoveryRun({
   try {
     await db.insert(jobDiscoveryRunsTable).values({
       userId: userId ?? null,
+      sourceApplicationId: applicationId ?? null,
       query,
       country: country ?? null,
       remoteOnly: remoteOnly ?? false,
