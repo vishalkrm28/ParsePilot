@@ -96,6 +96,11 @@
   }
 }
 
+/* Ensure all Radix popper overlays (Select, Tooltip, etc.) always render above page content */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
 /* Custom Scrollbar for a premium feel */
 ::-webkit-scrollbar {
   width: 8px;
