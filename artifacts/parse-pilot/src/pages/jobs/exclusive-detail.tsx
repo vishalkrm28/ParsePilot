@@ -356,7 +356,7 @@ export default function ExclusiveJobDetail() {
         <div className="max-w-3xl mx-auto px-4 py-12 text-center">
           <AlertCircle className="w-10 h-10 text-destructive mx-auto mb-3" />
           <p className="text-sm text-destructive">{(error as Error)?.message ?? "Job not found"}</p>
-          <Button variant="outline" className="mt-4" onClick={() => navigate("/jobs/exclusive")}>
+          <Button variant="ghost" size="sm" className="mt-4 text-muted-foreground" onClick={() => navigate("/jobs/exclusive")}>
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Jobs
           </Button>
         </div>

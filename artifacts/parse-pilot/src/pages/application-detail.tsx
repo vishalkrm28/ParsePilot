@@ -30,7 +30,6 @@ import {
   Lock,
   BarChart2,
   ArrowLeft,
-  Users,
   Info,
   Brain,
   TrendingUp,
@@ -395,20 +394,6 @@ export default function ApplicationDetail() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const [fromBulk, setFromBulk] = useState(false);
-
-  // Detect if user arrived here from a bulk session (check stored results)
-  useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem("bulk_completed_results");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) setFromBulk(true);
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
 
   const [activeTab, setActiveTab] = useState<TabId>("cv");
   const [missingAnswers, setMissingAnswers] = useState<Record<string, string>>({});
@@ -438,7 +423,6 @@ export default function ApplicationDetail() {
 
   const { status: billingStatus } = useBillingStatus();
   const isPro = billingStatus?.isPro ?? false;
-  const hasBulkAccess = billingStatus?.hasBulkAccess ?? false;
 
   const { data: app, isLoading, refetch } = useGetApplication(id);
 
@@ -598,18 +582,6 @@ export default function ApplicationDetail() {
 
   return (
     <AppLayout>
-      {/* ── Back to bulk results ─────────────────────────────────────────── */}
-      {fromBulk && (
-        <button
-          onClick={() => navigate("/bulk/session")}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6 group"
-        >
-          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-          <Users className="w-3.5 h-3.5" />
-          Back to batch results
-        </button>
-      )}
-
       {/* ── Page Header ─────────────────────────────────────────────────── */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-8">
         <div>
@@ -698,25 +670,17 @@ export default function ApplicationDetail() {
                   This looks like a different person's CV
                 </p>
                 <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 leading-relaxed">
-                  Pro is for optimising your own CV across multiple roles — not for analysing more than 1 person's CV. Results are hidden. Switch to Bulk Mode for multiple candidates.
+                  Pro is for optimising your own CV across multiple roles. Results are hidden when a different person's CV is detected.
                 </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                <a
-                  href="/bulk"
-                  className="text-xs font-semibold text-amber-800 dark:text-amber-200 underline underline-offset-2 hover:no-underline whitespace-nowrap"
+                <button
+                  onClick={() => setIdentityWarning(null)}
+                  className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 font-medium"
+                  aria-label="Dismiss identity warning"
                 >
-                  Go to Bulk Mode
-                </a>
-                {hasBulkAccess && (
-                  <button
-                    onClick={() => setIdentityWarning(null)}
-                    className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 font-medium"
-                    aria-label="Dismiss identity warning"
-                  >
-                    Dismiss
-                  </button>
-                )}
+                  Dismiss
+                </button>
               </div>
             </div>
           </motion.div>
@@ -734,24 +698,16 @@ export default function ApplicationDetail() {
               <div className="max-w-sm">
                 <h3 className="font-bold text-base mb-1.5">Results hidden</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Pro is for your own career only. This CV appears to belong to a different person, so the results are not shown. Use Bulk Mode to analyse multiple candidates.
+                  Pro is for your own career only. This CV appears to belong to a different person, so the results are not shown.
                 </p>
               </div>
               <div className="flex items-center gap-3 flex-wrap justify-center">
-                <a
-                  href="/bulk"
-                  className="px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+                <button
+                  onClick={() => setIdentityWarning(null)}
+                  className="px-5 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
                 >
-                  Switch to Bulk Mode
-                </a>
-                {hasBulkAccess && (
-                  <button
-                    onClick={() => setIdentityWarning(null)}
-                    className="px-5 py-2 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
-                  >
-                    Dismiss anyway
-                  </button>
-                )}
+                  Dismiss
+                </button>
               </div>
             </div>
           </div>

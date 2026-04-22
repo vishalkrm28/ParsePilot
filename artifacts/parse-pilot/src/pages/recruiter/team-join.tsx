@@ -54,7 +54,7 @@ export default function TeamJoin() {
           <p className="text-muted-foreground text-sm mb-6">
             This invite link may have expired, already been used, or cancelled by the team owner.
           </p>
-          <Link href="/" className="text-primary hover:underline text-sm">← Back to ResuOne</Link>
+          <Link href="/recruiter/dashboard" className="text-primary hover:underline text-sm">← Go to Dashboard</Link>
         </div>
       </div>
     );
