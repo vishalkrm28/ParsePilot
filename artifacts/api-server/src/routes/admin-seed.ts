@@ -5,8 +5,9 @@ import {
   savedJobsTable, trackedApplicationsTable, interviewPrepsTable,
   featureUsageEventsTable, workspacesTable,
   applicationEmailDraftsTable, candidatesTable, recruiterJobsTable,
+  internalJobsTable, internalJobApplicationsTable, internalJobInterviewInvitesTable,
 } from "@workspace/db";
-import { eq, sql, ilike, or, desc, count, gte } from "drizzle-orm";
+import { eq, sql, ilike, or, and, desc, count, gte, inArray } from "drizzle-orm";
 import Stripe from "stripe";
 import { logger } from "../lib/logger.js";
 import {
@@ -683,6 +684,190 @@ router.get("/_admin/user/:userId/recruiter-stats", async (req, res) => {
       recruiterJobs: Number(jobCount?.count ?? 0),
       candidates: Number(candidateCount?.count ?? 0),
     });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Internal Jobs (Exclusive Jobs) admin routes ─────────────────────────────
+
+// GET /_admin/internal-jobs — list all exclusive job postings
+router.get("/_admin/internal-jobs", async (req, res) => {
+  if (!authAdmin(req, res)) return;
+  try {
+    const search = (req.query.search as string | undefined)?.trim() ?? "";
+    const status = req.query.status as string | undefined;
+    const limit = Math.min(Number(req.query.limit ?? 100), 200);
+    const offset = Number(req.query.offset ?? 0);
+
+    const searchCond = search
+      ? or(ilike(internalJobsTable.jobTitle, `%${search}%`), ilike(internalJobsTable.company, `%${search}%`))
+      : undefined;
+    const statusCond = status ? eq(internalJobsTable.status, status) : undefined;
+    const whereCond = searchCond && statusCond ? and(searchCond, statusCond) : (searchCond ?? statusCond);
+
+    const jobs = await db
+      .select({
+        id: internalJobsTable.id,
+        jobTitle: internalJobsTable.jobTitle,
+        company: internalJobsTable.company,
+        location: internalJobsTable.location,
+        status: internalJobsTable.status,
+        postedByUserId: internalJobsTable.postedByUserId,
+        createdAt: internalJobsTable.createdAt,
+        updatedAt: internalJobsTable.updatedAt,
+      })
+      .from(internalJobsTable)
+      .where(whereCond)
+      .orderBy(desc(internalJobsTable.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const jobIds = jobs.map((j) => j.id);
+    let appCounts: { jobId: string; cnt: number }[] = [];
+    if (jobIds.length > 0) {
+      const raw = await db
+        .select({ jobId: internalJobApplicationsTable.jobId, cnt: count() })
+        .from(internalJobApplicationsTable)
+        .where(inArray(internalJobApplicationsTable.jobId, jobIds))
+        .groupBy(internalJobApplicationsTable.jobId);
+      appCounts = raw.map((r) => ({ jobId: r.jobId, cnt: Number(r.cnt) }));
+    }
+    const appMap = Object.fromEntries(appCounts.map((r) => [r.jobId, r.cnt]));
+
+    // Fetch poster emails
+    const posterIds = [...new Set(jobs.map((j) => j.postedByUserId))];
+    let posterEmails: { id: string; email: string | null }[] = [];
+    if (posterIds.length > 0) {
+      posterEmails = await db
+        .select({ id: usersTable.id, email: usersTable.email })
+        .from(usersTable)
+        .where(inArray(usersTable.id, posterIds));
+    }
+    const emailMap = Object.fromEntries(posterEmails.map((u) => [u.id, u.email]));
+
+    res.json({
+      jobs: jobs.map((j) => ({
+        ...j,
+        applicationCount: appMap[j.id] ?? 0,
+        posterEmail: emailMap[j.postedByUserId] ?? null,
+      })),
+      total: jobs.length,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /_admin/internal-job/:jobId — delete an exclusive job posting
+router.delete("/_admin/internal-job/:jobId", async (req, res) => {
+  if (!authAdmin(req, res)) return;
+  const { jobId } = req.params;
+  try {
+    await db.delete(internalJobsTable).where(eq(internalJobsTable.id, jobId));
+    logger.info({ jobId }, "Admin deleted internal job");
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /_admin/interviews — list all interview invites system-wide
+router.get("/_admin/interviews", async (req, res) => {
+  if (!authAdmin(req, res)) return;
+  try {
+    const status = req.query.status as string | undefined;
+    const limit = Math.min(Number(req.query.limit ?? 100), 200);
+    const offset = Number(req.query.offset ?? 0);
+
+    const invites = await db
+      .select({
+        id: internalJobInterviewInvitesTable.id,
+        inviteTitle: internalJobInterviewInvitesTable.inviteTitle,
+        interviewType: internalJobInterviewInvitesTable.interviewType,
+        scheduledAt: internalJobInterviewInvitesTable.scheduledAt,
+        timezone: internalJobInterviewInvitesTable.timezone,
+        location: internalJobInterviewInvitesTable.location,
+        meetingUrl: internalJobInterviewInvitesTable.meetingUrl,
+        status: internalJobInterviewInvitesTable.status,
+        recruiterUserId: internalJobInterviewInvitesTable.recruiterUserId,
+        candidateUserId: internalJobInterviewInvitesTable.candidateUserId,
+        jobId: internalJobInterviewInvitesTable.jobId,
+        applicationId: internalJobInterviewInvitesTable.applicationId,
+        candidateResponseNote: internalJobInterviewInvitesTable.candidateResponseNote,
+        createdAt: internalJobInterviewInvitesTable.createdAt,
+      })
+      .from(internalJobInterviewInvitesTable)
+      .where(status ? eq(internalJobInterviewInvitesTable.status, status) : undefined)
+      .orderBy(desc(internalJobInterviewInvitesTable.scheduledAt))
+      .limit(limit)
+      .offset(offset);
+
+    // Enrich with job titles and user emails
+    const jobIds = [...new Set(invites.map((i) => i.jobId))];
+    const userIds = [...new Set([...invites.map((i) => i.recruiterUserId), ...invites.map((i) => i.candidateUserId)])];
+
+    const [jobs, users] = await Promise.all([
+      jobIds.length > 0
+        ? db.select({ id: internalJobsTable.id, jobTitle: internalJobsTable.jobTitle, company: internalJobsTable.company })
+            .from(internalJobsTable).where(inArray(internalJobsTable.id, jobIds))
+        : [],
+      userIds.length > 0
+        ? db.select({ id: usersTable.id, email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName })
+            .from(usersTable).where(inArray(usersTable.id, userIds))
+        : [],
+    ]);
+
+    const jobMap = Object.fromEntries(jobs.map((j) => [j.id, j]));
+    const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
+
+    res.json({
+      interviews: invites.map((inv) => ({
+        ...inv,
+        job: jobMap[inv.jobId] ?? null,
+        recruiter: userMap[inv.recruiterUserId] ?? null,
+        candidate: userMap[inv.candidateUserId] ?? null,
+      })),
+      total: invites.length,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /_admin/user/:userId/mode — set user mode (job_seeker | recruiter)
+router.patch("/_admin/user/:userId/mode", async (req, res) => {
+  if (!authAdmin(req, res)) return;
+  const { userId } = req.params;
+  const { mode } = req.body as { mode: string };
+  if (!["job_seeker", "recruiter"].includes(mode)) {
+    return res.status(400).json({ error: "mode must be job_seeker or recruiter" });
+  }
+  try {
+    await db.update(usersTable).set({ userMode: mode }).where(eq(usersTable.id, userId));
+    logger.info({ userId, mode }, "Admin changed user mode");
+    res.json({ success: true, message: `User mode set to ${mode}` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /_admin/user/:userId/recruiter-tokens — set recruiter CV token balance (alias for availableCredits)
+router.post("/_admin/user/:userId/recruiter-tokens", async (req, res) => {
+  if (!authAdmin(req, res)) return;
+  const { userId } = req.params;
+  const { tokens } = req.body as { tokens: number };
+  if (typeof tokens !== "number" || tokens < 0 || tokens > 9999) {
+    return res.status(400).json({ error: "tokens must be 0–9999" });
+  }
+  try {
+    const [existing] = await db.select().from(usageBalancesTable).where(eq(usageBalancesTable.userId, userId)).limit(1);
+    if (!existing) return res.status(404).json({ error: "User balance record not found" });
+    await db.update(usageBalancesTable)
+      .set({ availableCredits: tokens })
+      .where(eq(usageBalancesTable.userId, userId));
+    logger.info({ userId, tokens }, "Admin set recruiter CV tokens (via availableCredits)");
+    res.json({ success: true, message: `Recruiter tokens set to ${tokens}` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -4,7 +4,7 @@ import {
   CheckCircle, XCircle, Loader2, Trash2, ChevronRight,
   ChevronDown, Users, BarChart3, AlertTriangle, X, FileText, Star,
   Mail, DollarSign, Briefcase, Bookmark, LayoutGrid, Sparkles, Building2, Zap,
-  Clock, ArrowUpDown, Wrench,
+  Clock, ArrowUpDown, Wrench, Globe, Calendar, UserCog, Coins,
 } from "lucide-react";
 
 const STORAGE_KEY = "pp_admin_token";
@@ -118,7 +118,7 @@ export default function AdminPage() {
   const [token, setToken] = useState(() => localStorage.getItem(STORAGE_KEY) ?? "");
   const [tokenInput, setTokenInput] = useState("");
   const [authed, setAuthed] = useState(() => !!localStorage.getItem(STORAGE_KEY));
-  const [tab, setTab] = useState<"users" | "stats" | "messages" | "metrics" | "marketing">("users");
+  const [tab, setTab] = useState<"users" | "stats" | "messages" | "metrics" | "marketing" | "jobs" | "interviews">("users");
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [confirm, setConfirm] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -218,12 +218,14 @@ export default function AdminPage() {
             </div>
             <span className="font-semibold text-sm">Admin Panel</span>
           </div>
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
             {([
               { key: "users", icon: <Users className="w-3.5 h-3.5" />, label: "Users" },
               { key: "stats", icon: <BarChart3 className="w-3.5 h-3.5" />, label: "Stats" },
               { key: "metrics", icon: <DollarSign className="w-3.5 h-3.5" />, label: "Metrics" },
               { key: "messages", icon: <Mail className="w-3.5 h-3.5" />, label: "Messages" },
+              { key: "jobs", icon: <Globe className="w-3.5 h-3.5" />, label: "Jobs" },
+              { key: "interviews", icon: <Calendar className="w-3.5 h-3.5" />, label: "Interviews" },
               { key: "marketing", icon: <Zap className="w-3.5 h-3.5" />, label: "Marketing" },
             ] as const).map(({ key, icon, label }) => (
               <button
@@ -259,6 +261,12 @@ export default function AdminPage() {
         )}
         {tab === "metrics" && (
           <MetricsTab call={call} />
+        )}
+        {tab === "jobs" && (
+          <JobsTab call={call} addToast={addToast} confirmAction={confirmAction} />
+        )}
+        {tab === "interviews" && (
+          <InterviewsTab call={call} />
         )}
         {tab === "marketing" && (
           <MarketingTab call={call} />
@@ -752,6 +760,7 @@ function UserRow({
   const [credits, setCredits] = useState("10");
   const [bulkTier, setBulkTier] = useState("25");
   const [proDays, setProDays] = useState("365");
+  const [recruiterTokens, setRecruiterTokens] = useState("50");
 
   useEffect(() => {
     if (!expanded) return;
@@ -835,6 +844,34 @@ function UserRow({
       addToast(data.message ?? "Stripe synced", "success");
       await refreshDetail();
     });
+  }
+
+  async function grantRecruiterTokens() {
+    await doAction("recruiter_tokens", async () => {
+      const data = await call(`/_admin/user/${user.id}/recruiter-tokens`, {
+        method: "POST",
+        body: JSON.stringify({ tokens: Number(recruiterTokens) }),
+      });
+      addToast(data.message ?? `Recruiter tokens set to ${recruiterTokens}`, "success");
+      await refreshDetail();
+    });
+  }
+
+  async function switchUserMode(mode: "job_seeker" | "recruiter") {
+    confirmAction(
+      `Set user mode to ${mode}?`,
+      `This will change ${user.email ?? user.id}'s mode to ${mode.replace("_", " ")}.`,
+      async () => {
+        await doAction("user_mode", async () => {
+          const data = await call(`/_admin/user/${user.id}/mode`, {
+            method: "PATCH",
+            body: JSON.stringify({ mode }),
+          });
+          addToast(data.message ?? "Mode updated", "success");
+          await refreshDetail();
+        });
+      },
+    );
   }
 
   const isPro = detail?.user?.subscriptionStatus === "active";
@@ -954,6 +991,7 @@ function UserRow({
                 <InfoBox label="Lifetime Used" value={detail?.balance?.lifetimeCreditsUsed?.toString() ?? "0"} />
                 <InfoBox label="Subscription" value={detail?.user?.subscriptionStatus ?? "none"} highlight={detail?.user?.subscriptionStatus === "active" ? "green" : undefined} />
                 <InfoBox label="Recruiter" value={recruiterPlan ?? "none"} highlight={recruiterPlan ? "green" : undefined} />
+                <InfoBox label="User Mode" value={detail?.user?.userMode ?? "—"} highlight={detail?.user?.userMode === "recruiter" ? "green" : undefined} />
                 <InfoBox label="CV analyses" value={apps.length.toString()} />
                 <InfoBox label="Bulk passes" value={detail?.bulkPasses?.length?.toString() ?? "0"} />
                 <InfoBox label="Email drafts" value={emailDrafts.length.toString()} />
@@ -964,9 +1002,89 @@ function UserRow({
                   <>
                     <InfoBox label="Recruiter Jobs" value={recruiterStats.recruiterJobs.toString()} highlight={recruiterStats.recruiterJobs > 0 ? "green" : undefined} />
                     <InfoBox label="Candidates" value={recruiterStats.candidates.toString()} highlight={recruiterStats.candidates > 0 ? "green" : undefined} />
+                    <InfoBox label="CV tokens (=credits)" value={detail?.balance?.availableCredits?.toString() ?? "0"} highlight={detail?.balance?.availableCredits > 0 ? "green" : undefined} />
                   </>
                 )}
               </div>
+
+              {/* User mode toggle */}
+              <div className="bg-zinc-800/50 border border-zinc-700/60 rounded-xl p-4 space-y-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <UserCog className="w-4 h-4 text-amber-400" />
+                  <span className="text-sm font-medium text-white">User Mode</span>
+                  <span className="ml-auto text-xs text-zinc-400">
+                    Current: <span className={`font-semibold ${detail?.user?.userMode === "recruiter" ? "text-sky-400" : "text-zinc-300"}`}>
+                      {detail?.user?.userMode ?? "—"}
+                    </span>
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  {(["job_seeker", "recruiter"] as const).map(mode => (
+                    <button
+                      key={mode}
+                      onClick={() => switchUserMode(mode)}
+                      disabled={actionLoading === "user_mode" || detail?.user?.userMode === mode}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors disabled:opacity-40 ${
+                        detail?.user?.userMode === mode
+                          ? "bg-zinc-700 text-zinc-400 cursor-default"
+                          : "bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-700/50"
+                      }`}
+                    >
+                      {actionLoading === "user_mode" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCog className="w-3.5 h-3.5" />}
+                      {mode.replace("_", " ")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recruiter token panel (only if recruiter) */}
+              {recruiterPlan && (
+                <div className="bg-zinc-800/50 border border-zinc-700/60 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Coins className="w-4 h-4 text-sky-400" />
+                      <span className="text-sm font-medium text-white">Recruiter CV Tokens</span>
+                    </div>
+                    <span className="text-xs text-zinc-400">
+                      Current: <span className="font-semibold text-sky-400">{detail?.balance?.availableCredits ?? "—"}</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[10, 50, 100, 250].map(preset => (
+                      <button
+                        key={preset}
+                        onClick={() => setRecruiterTokens(String(preset))}
+                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                          recruiterTokens === String(preset)
+                            ? "bg-sky-600 text-white"
+                            : "bg-zinc-700 hover:bg-zinc-600 text-zinc-300"
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 flex-1">
+                      <span className="text-xs text-zinc-500 whitespace-nowrap">Set to:</span>
+                      <input
+                        type="number" min="0" max="9999" value={recruiterTokens}
+                        onChange={e => setRecruiterTokens(e.target.value)}
+                        className="w-24 bg-zinc-800 border border-zinc-600 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <span className="text-xs text-zinc-500">tokens</span>
+                    </div>
+                    <button
+                      onClick={grantRecruiterTokens}
+                      disabled={actionLoading === "recruiter_tokens" || !recruiterTokens}
+                      className="flex items-center gap-1.5 bg-sky-700 hover:bg-sky-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      {actionLoading === "recruiter_tokens" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Coins className="w-3.5 h-3.5" />}
+                      Set tokens
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Credit allocation panel */}
               <div className="bg-zinc-800/50 border border-zinc-700/60 rounded-xl p-4 space-y-3">
@@ -1456,6 +1574,310 @@ function MetricsTab({ call }: { call: any }) {
           <BarChart3 className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
           <p className="text-zinc-500 text-sm">No feature usage events logged yet.</p>
           <p className="text-zinc-600 text-xs mt-1">Events are recorded as users interact with AI features.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Jobs Tab ─────────────────────────────────────────────────────────────────
+
+interface AdminJob {
+  id: string; jobTitle: string; company: string; location: string | null;
+  status: string; postedByUserId: string; posterEmail: string | null;
+  applicationCount: number; createdAt: string;
+}
+
+function JobsTab({
+  call, addToast, confirmAction,
+}: {
+  call: any;
+  addToast: (m: string, t: "success" | "error") => void;
+  confirmAction: (title: string, message: string, onConfirm: () => void) => void;
+}) {
+  const [jobs, setJobs] = useState<AdminJob[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+
+  async function fetchJobs(q = search, st = statusFilter) {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (q) params.set("search", q);
+      if (st) params.set("status", st);
+      const data = await call(`/_admin/internal-jobs?${params}`);
+      setJobs(data.jobs ?? []);
+    } catch (e: any) {
+      addToast(e.message, "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { fetchJobs("", ""); }, []);
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    fetchJobs();
+  }
+
+  function deleteJob(job: AdminJob) {
+    confirmAction(
+      "Delete this job posting?",
+      `"${job.jobTitle}" at ${job.company} will be permanently deleted along with all applications.`,
+      async () => {
+        try {
+          await call(`/_admin/internal-job/${job.id}`, { method: "DELETE" });
+          addToast("Job deleted", "success");
+          setJobs(js => js.filter(j => j.id !== job.id));
+        } catch (e: any) {
+          addToast(e.message, "error");
+        }
+      },
+    );
+  }
+
+  const statusColors: Record<string, string> = {
+    active: "text-green-400", draft: "text-zinc-500", closed: "text-red-400",
+  };
+
+  return (
+    <div className="space-y-4">
+      <form onSubmit={handleSearch} className="flex gap-2">
+        <input
+          type="text" placeholder="Search job title or company..."
+          value={search} onChange={e => setSearch(e.target.value)}
+          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+        <select
+          value={statusFilter}
+          onChange={e => { setStatusFilter(e.target.value); fetchJobs(search, e.target.value); }}
+          className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none"
+        >
+          <option value="">All statuses</option>
+          <option value="active">Active</option>
+          <option value="draft">Draft</option>
+          <option value="closed">Closed</option>
+        </select>
+        <button
+          type="submit" disabled={loading}
+          className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+          Search
+        </button>
+      </form>
+
+      {loading && jobs.length === 0 ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-zinc-400" /></div>
+      ) : jobs.length === 0 ? (
+        <div className="text-center py-16">
+          <Globe className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
+          <p className="text-zinc-500 text-sm">No exclusive job postings found.</p>
+        </div>
+      ) : (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="border-b border-zinc-800">
+              <tr className="text-zinc-500 text-xs uppercase tracking-wide">
+                <th className="text-left px-4 py-3">Job</th>
+                <th className="text-left px-4 py-3">Recruiter</th>
+                <th className="text-center px-4 py-3">Apps</th>
+                <th className="text-left px-4 py-3">Status</th>
+                <th className="text-left px-4 py-3">Posted</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {jobs.map(job => (
+                <tr key={job.id} className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/30 transition-colors">
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-white truncate max-w-xs">{job.jobTitle}</p>
+                    <p className="text-xs text-zinc-500">{job.company}{job.location ? ` · ${job.location}` : ""}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-zinc-300 text-xs truncate max-w-[180px]">{job.posterEmail ?? job.postedByUserId}</p>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`font-semibold ${job.applicationCount > 0 ? "text-primary" : "text-zinc-500"}`}>
+                      {job.applicationCount}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`capitalize font-medium ${statusColors[job.status] ?? "text-zinc-400"}`}>{job.status}</span>
+                  </td>
+                  <td className="px-4 py-3 text-zinc-500 text-xs">{new Date(job.createdAt).toLocaleDateString()}</td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => deleteJob(job)}
+                      className="p-1.5 rounded-md text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      title="Delete job"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="px-4 py-3 text-xs text-zinc-500 border-t border-zinc-800">
+            {jobs.length} job{jobs.length !== 1 ? "s" : ""}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Interviews Tab ────────────────────────────────────────────────────────────
+
+interface AdminInterview {
+  id: string; inviteTitle: string; interviewType: string;
+  scheduledAt: string; timezone: string | null; location: string | null;
+  meetingUrl: string | null; status: string;
+  recruiterUserId: string; candidateUserId: string; jobId: string;
+  applicationId: string; candidateResponseNote: string | null;
+  createdAt: string;
+  job: { id: string; jobTitle: string; company: string } | null;
+  recruiter: { id: string; email: string | null; firstName: string | null; lastName: string | null } | null;
+  candidate: { id: string; email: string | null; firstName: string | null; lastName: string | null } | null;
+}
+
+function InterviewsTab({ call }: { call: any }) {
+  const [interviews, setInterviews] = useState<AdminInterview[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [error, setError] = useState("");
+
+  async function fetchInterviews(st = statusFilter) {
+    setLoading(true);
+    setError("");
+    try {
+      const params = st ? `?status=${st}` : "";
+      const data = await call(`/_admin/interviews${params}`);
+      setInterviews(data.interviews ?? []);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { fetchInterviews(""); }, []);
+
+  const statusColors: Record<string, string> = {
+    pending: "text-yellow-400 bg-yellow-400/10",
+    accepted: "text-green-400 bg-green-400/10",
+    declined: "text-red-400 bg-red-400/10",
+    completed: "text-zinc-400 bg-zinc-400/10",
+    cancelled: "text-zinc-600 bg-zinc-700/30",
+  };
+
+  if (loading && interviews.length === 0) {
+    return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-zinc-400" /></div>;
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center py-20 text-zinc-500 text-sm">
+        <AlertTriangle className="w-4 h-4 mr-2 text-red-500" /> {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <select
+          value={statusFilter}
+          onChange={e => { setStatusFilter(e.target.value); fetchInterviews(e.target.value); }}
+          className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none"
+        >
+          <option value="">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="accepted">Accepted</option>
+          <option value="declined">Declined</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <button
+          onClick={() => fetchInterviews()}
+          disabled={loading}
+          className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2.5 rounded-lg text-sm transition-colors"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          Refresh
+        </button>
+        <span className="text-xs text-zinc-500 ml-auto">{interviews.length} interviews</span>
+      </div>
+
+      {interviews.length === 0 ? (
+        <div className="text-center py-16">
+          <Calendar className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
+          <p className="text-zinc-500 text-sm">No interview invites found.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {interviews.map(inv => {
+            const scheduled = new Date(inv.scheduledAt);
+            const isPast = scheduled < new Date();
+            return (
+              <div key={inv.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-white">{inv.inviteTitle}</p>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[inv.status] ?? "text-zinc-400"}`}>
+                        {inv.status}
+                      </span>
+                      {isPast && inv.status === "accepted" && (
+                        <span className="text-xs text-zinc-500">(past)</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      {inv.job?.jobTitle ?? "Unknown job"} @ {inv.job?.company ?? "—"} · {inv.interviewType.replace(/_/g, " ")}
+                    </p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className={`text-sm font-medium ${isPast ? "text-zinc-500" : "text-white"}`}>
+                      {scheduled.toLocaleDateString()} {scheduled.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                    {inv.timezone && <p className="text-xs text-zinc-600">{inv.timezone}</p>}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-zinc-800 rounded-lg px-3 py-2">
+                    <p className="text-xs text-zinc-500 mb-0.5">Recruiter</p>
+                    <p className="text-sm text-zinc-300 truncate">
+                      {inv.recruiter?.email ?? inv.recruiterUserId}
+                    </p>
+                  </div>
+                  <div className="bg-zinc-800 rounded-lg px-3 py-2">
+                    <p className="text-xs text-zinc-500 mb-0.5">Candidate</p>
+                    <p className="text-sm text-zinc-300 truncate">
+                      {inv.candidate?.email ?? inv.candidateUserId}
+                    </p>
+                  </div>
+                </div>
+
+                {(inv.location || inv.meetingUrl || inv.candidateResponseNote) && (
+                  <div className="flex flex-wrap gap-2 text-xs text-zinc-500">
+                    {inv.location && <span>📍 {inv.location}</span>}
+                    {inv.meetingUrl && (
+                      <a href={inv.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        Meeting link
+                      </a>
+                    )}
+                    {inv.candidateResponseNote && (
+                      <span className="text-zinc-400 italic">Note: {inv.candidateResponseNote}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
