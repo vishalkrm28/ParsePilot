@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Loader2, Star, MapPin, Building2, Lock, Globe, Send, CheckCircle,
-  Clock, Briefcase, Search, Filter, Sparkles, ChevronRight, DollarSign,
+  Clock, Briefcase, Search, Filter, Sparkles, ChevronRight, Banknote,
   MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -130,7 +130,7 @@ function ExclusiveJobCard({ job, onClick }: { job: InternalJob; onClick: () => v
         </div>
         {salary && (
           <p className="text-xs font-semibold mb-2 flex items-center gap-1">
-            <DollarSign className="w-3 h-3" />{salary}
+            <Banknote className="w-3.5 h-3.5" />{salary}
           </p>
         )}
 
