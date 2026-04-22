@@ -256,8 +256,8 @@ export default function ExclusiveApplicationDetail() {
   return (
     <AppLayout>
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/jobs/exclusive")} className="mb-6 text-muted-foreground">
-          <ArrowLeft className="w-4 h-4 mr-2" /> Back to Jobs
+        <Button variant="ghost" size="sm" onClick={() => navigate(`/jobs/exclusive/${application.jobId}`)} className="mb-6 text-muted-foreground">
+          <ArrowLeft className="w-4 h-4 mr-2" /> Back to Job
         </Button>
 
         {/* Header */}

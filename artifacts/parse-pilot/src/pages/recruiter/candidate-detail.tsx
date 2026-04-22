@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getCandidate, updateCandidateStatus,
@@ -8,11 +8,12 @@ import {
 import {
   Loader2, ArrowLeft, Mail, CheckCircle2, XCircle, Star,
   BarChart3, Briefcase, MessageSquare, Trash2, Send, User,
-  Clock, Calendar, CheckCircle,
+  Calendar, CheckCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AppLayout } from "@/components/layout/app-layout";
 import { useToast } from "@/hooks/use-toast";
 import { InviteModal } from "./invite-modal";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,10 @@ function timeAgo(dateStr: string) {
 export default function CandidateDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
+  const search = useSearch();
+  const fromPipeline = new URLSearchParams(search).get("from") === "pipeline";
+  const backHref = fromPipeline ? "/recruiter/pipeline" : "/recruiter/dashboard";
+  const backLabel = fromPipeline ? "Back to Board" : "Back to Candidates";
   const { toast } = useToast();
   const qc = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -86,18 +91,24 @@ export default function CandidateDetail() {
   };
 
   if (isLoading) return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Loader2 className="w-6 h-6 animate-spin text-primary" />
-    </div>
+    <AppLayout>
+      <div className="flex items-center justify-center py-32">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    </AppLayout>
   );
 
   if (error || !data?.candidate) return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <p className="text-muted-foreground mb-4">Candidate not found.</p>
-        <button onClick={() => navigate("/recruiter/dashboard")} className="text-primary hover:underline text-sm">← Back to Dashboard</button>
+    <AppLayout>
+      <div className="flex items-center justify-center py-32">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">Candidate not found.</p>
+          <Button variant="ghost" size="sm" onClick={() => navigate(backHref)}>
+            <ArrowLeft className="w-4 h-4 mr-2" /> {backLabel}
+          </Button>
+        </div>
       </div>
-    </div>
+    </AppLayout>
   );
 
   const { candidate, invites = [] } = data;
@@ -108,24 +119,29 @@ export default function CandidateDetail() {
   const scoreBreakdown = candidate.scoringBreakdownJson as any ?? null;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Top bar — mirrors exclusive-application header */}
-      <header className="border-b border-border/40 bg-background/95 backdrop-blur sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/recruiter/dashboard")} className="text-muted-foreground gap-1.5">
-            <ArrowLeft className="w-4 h-4" /> Dashboard
-          </Button>
-          <span className="text-border/60">|</span>
-          <span className="font-semibold text-foreground text-sm truncate">{candidate.name}</span>
-          <div className="ml-auto">
-            <Badge variant="outline" className={cn("capitalize", STATUS_COLORS[candidate.status] ?? "")}>
-              {candidate.status}
-            </Badge>
-          </div>
-        </div>
-      </header>
+    <AppLayout>
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        {/* Back nav — identical to exclusive-application pattern */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(backHref)}
+          className="mb-6 text-muted-foreground"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" /> {backLabel}
+        </Button>
 
-      <main className="max-w-6xl mx-auto px-6 py-8">
+        {/* Page header row */}
+        <div className="flex items-start justify-between flex-wrap gap-4 mb-6">
+          <div>
+            <h1 className="text-xl font-bold">{candidate.name}</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">{candidate.email}</p>
+          </div>
+          <Badge variant="outline" className={cn("capitalize", STATUS_COLORS[candidate.status] ?? "")}>
+            {candidate.status}
+          </Badge>
+        </div>
+
         <div className="grid lg:grid-cols-3 gap-6">
 
           {/* ── LEFT — 2/3 main content ─────────────────────────── */}
@@ -440,7 +456,7 @@ export default function CandidateDetail() {
             </Card>
           </div>
         </div>
-      </main>
+      </div>
 
       {inviteOpen && (
         <InviteModal
@@ -454,6 +470,6 @@ export default function CandidateDetail() {
           }}
         />
       )}
-    </div>
+    </AppLayout>
   );
 }

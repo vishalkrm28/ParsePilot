@@ -135,7 +135,7 @@ export default function RecruiterPipeline() {
                       <div
                         key={c.id}
                         className="bg-background border border-border/40 rounded-xl p-4 hover:shadow-md hover:border-primary/20 transition-all cursor-pointer group"
-                        onClick={() => navigate(`/candidate/${c.id}`)}
+                        onClick={() => navigate(`/candidate/${c.id}?from=pipeline`)}
                       >
                         {/* Header row */}
                         <div className="flex items-start gap-2.5 mb-2">
