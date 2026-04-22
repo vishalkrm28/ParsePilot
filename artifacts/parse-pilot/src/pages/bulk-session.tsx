@@ -499,13 +499,21 @@ export default function BulkSession() {
   }, []);
 
   // Access: recruiter plan holders use their monthly token allowance; others need a bulk pass.
+  // Recruiters who exhausted their tokens can also access via a purchased bulk pass.
   const isRecruiter = !!(status?.isRecruiter);
   const recruiterTokens = status?.recruiterTokens ?? null;
-  const hasAccess = (isRecruiter && (recruiterTokens?.remaining ?? 0) > 0)
-    || !!(status?.activePass && status.activePass.remaining > 0);
-  // Slot counts: recruiter uses their actual token balance; others use their bulk pass.
-  const remaining = isRecruiter ? (recruiterTokens?.remaining ?? 0) : (status?.activePass?.remaining ?? 0);
-  const limit = isRecruiter ? (recruiterTokens?.total ?? 0) : (status?.activePass?.cvLimit ?? 0);
+  const recruiterTokensRemaining = recruiterTokens?.remaining ?? 0;
+  const hasActiveBulkPass = !!(status?.activePass && status.activePass.remaining > 0);
+  const hasAccess = (isRecruiter && recruiterTokensRemaining > 0)
+    || hasActiveBulkPass;
+  // Slot counts: prefer bulk pass if recruiter tokens are exhausted but pass is available.
+  const usePassSlots = hasActiveBulkPass && (!isRecruiter || recruiterTokensRemaining === 0);
+  const remaining = usePassSlots
+    ? (status?.activePass?.remaining ?? 0)
+    : isRecruiter ? recruiterTokensRemaining : (status?.activePass?.remaining ?? 0);
+  const limit = usePassSlots
+    ? (status?.activePass?.cvLimit ?? 0)
+    : isRecruiter ? (recruiterTokens?.total ?? 0) : (status?.activePass?.cvLimit ?? 0);
   const used = limit - remaining;
 
   // ── Dropzone (multiple files) ─────────────────────────────────────────────
@@ -741,9 +749,16 @@ export default function BulkSession() {
             {isRecruiter ? (
               <>
                 <h2 className="text-xl font-bold mb-2">Monthly tokens used up</h2>
-                <p className="text-muted-foreground text-sm mb-6 max-w-sm mx-auto">
-                  You've used all your CV tokens for this billing period. Your balance resets automatically at the start of your next period.
+                <p className="text-muted-foreground text-sm mb-4 max-w-sm mx-auto">
+                  You've used all your CV tokens for this billing period. Your balance resets at the start of your next period — or buy extra slots now to keep going.
                 </p>
+                <button
+                  onClick={() => navigate("/bulk")}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
+                >
+                  <Users className="w-4 h-4" />
+                  Buy more CV slots
+                </button>
               </>
             ) : (
               <>
@@ -836,15 +851,15 @@ export default function BulkSession() {
                 <p className="text-sm font-semibold text-red-600 mb-1">All {limit} CV slots used</p>
                 <p className="text-xs text-muted-foreground mb-3">
                   {isRecruiter
-                    ? "You've used all your monthly CV tokens. Upgrade to a Team plan for 300 tokens/month."
+                    ? "You've used all your monthly CV tokens. Buy extra slots to keep going — they don't expire."
                     : "Your current pass is fully consumed."}
                 </p>
                 <button
-                  onClick={() => navigate(isRecruiter ? "/recruiter/pricing" : "/bulk")}
+                  onClick={() => navigate("/bulk")}
                   className="inline-flex items-center gap-2 text-sm font-semibold bg-primary text-primary-foreground px-4 py-2 rounded-xl hover:opacity-90 transition-opacity"
                 >
                   <Users className="w-4 h-4" />
-                  {isRecruiter ? "Upgrade to Team plan" : "Buy more CV slots"}
+                  Buy more CV slots
                 </button>
               </div>
             ) : (
