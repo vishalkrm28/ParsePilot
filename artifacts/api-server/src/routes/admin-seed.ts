@@ -401,20 +401,25 @@ router.post("/_admin/sync-stripe", async (req, res) => {
 // Grant or revoke Pro subscription manually (no Stripe required)
 router.post("/_admin/grant-pro", async (req, res) => {
   if (!authAdmin(req, res)) return;
-  const { userId, revoke } = req.body as { userId?: string; revoke?: boolean };
+  const { userId, revoke, durationDays } = req.body as { userId?: string; revoke?: boolean; durationDays?: number };
   if (!userId) { res.status(400).json({ error: "userId required" }); return; }
+
+  const days = Math.max(1, Math.min(Number(durationDays ?? 365), 3650));
 
   try {
     const newStatus = revoke ? null : "active";
-    const periodEnd = revoke ? null : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year
+    const periodEnd = revoke ? null : new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
     await db.update(usersTable).set({
       subscriptionStatus: newStatus,
       currentPeriodEnd: periodEnd,
+      // When granting pro (job-seeker plan), ensure the user is in job_seeker mode
+      // so they see the full job-seeker navigation immediately.
+      ...(revoke ? {} : { userMode: "job_seeker" }),
     }).where(eq(usersTable.id, userId));
 
-    logger.info({ userId, revoke }, `Admin ${revoke ? "revoked" : "granted"} Pro subscription`);
-    res.json({ success: true, message: revoke ? "Pro revoked" : "Pro granted (1 year)", subscriptionStatus: newStatus });
+    logger.info({ userId, revoke, days }, `Admin ${revoke ? "revoked" : `granted`} Pro subscription`);
+    res.json({ success: true, message: revoke ? "Pro revoked" : `Pro granted (${days} days)`, subscriptionStatus: newStatus });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
