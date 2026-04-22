@@ -191,7 +191,9 @@ export function Sidebar() {
   const isRecruiter = billingStatus?.isRecruiter ?? false;
   const isPro = billingStatus?.isPro ?? false;
   const hasBothPlans = isPro && isRecruiter;
-  const isRecruiterMode = !hasBothPlans && billingStatus?.userMode === "recruiter";
+  // Only show recruiter-only nav when the user has no pro plan and chose recruiter mode.
+  // Pro users always get the full job-seeker nav (+ recruiter section if they also have a recruiter plan).
+  const isRecruiterMode = !isPro && !isRecruiter && billingStatus?.userMode === "recruiter";
 
   const displayName =
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||

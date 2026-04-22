@@ -177,8 +177,9 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Recruiter mode: block job-seeker-only routes
-    if (mode === "recruiter") {
+    // Recruiter mode: block job-seeker-only routes — but only for users without a pro plan.
+    // Pro users retain full job-seeker access regardless of their stored userMode.
+    if (mode === "recruiter" && !status.isPro) {
       const blocked = JOB_SEEKER_ONLY_PATHS.some((p) => location === p || location.startsWith(p));
       if (blocked) {
         navigate(status.isRecruiter ? "/recruiter/dashboard" : "/recruiter/pricing");
