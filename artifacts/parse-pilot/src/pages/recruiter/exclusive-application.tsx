@@ -457,16 +457,17 @@ export default function RecruiterExclusiveApplication() {
                         <div className="flex items-center justify-between gap-2">
                           <p className="font-medium flex-1">{invite.inviteTitle}</p>
                           <div className="flex items-center gap-1.5 flex-shrink-0">
-                            <Badge
-                              variant="outline"
-                              className={cn("text-xs capitalize", {
-                                "border-green-400 text-green-600 bg-green-50": invite.status === "completed",
-                                "border-red-400 text-red-500 bg-red-50": invite.status === "cancelled",
-                                "border-blue-400 text-blue-600 bg-blue-50": invite.status === "accepted",
-                              })}
-                            >
-                              {invite.status.replace("_", " ")}
-                            </Badge>
+                            {invite.status === "completed" ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-400">
+                                <CheckCircle className="w-3 h-3" /> Completed
+                              </span>
+                            ) : invite.status === "cancelled" ? (
+                              <Badge variant="outline" className="text-xs border-red-300 text-red-500 bg-red-50">Cancelled</Badge>
+                            ) : invite.status === "accepted" ? (
+                              <Badge variant="outline" className="text-xs border-blue-300 text-blue-600 bg-blue-50">Accepted</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs capitalize">{invite.status.replace("_", " ")}</Badge>
+                            )}
                             {!["completed", "cancelled"].includes(invite.status) && (
                               <Button
                                 size="sm"

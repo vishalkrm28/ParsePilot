@@ -5,10 +5,11 @@ import {
   internalJobsTable,
   internalJobApplicationsTable,
   internalJobApplicationEventsTable,
+  internalJobCandidateAnalysesTable,
   applicationsTable,
   candidateProfilesTable,
 } from "@workspace/db";
-import { eq, and, desc, asc } from "drizzle-orm";
+import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { resolveUserPlan, canSeeProOnlyJobs, canApplyToProOnlyJob } from "../lib/internal-jobs/plan.js";
 import { analyzeInternalJobForCandidate } from "../lib/internal-jobs/analysis.js";
@@ -327,13 +328,46 @@ router.get("/internal-jobs/:id/applications", async (req, res) => {
     if (!job) { res.status(404).json({ error: "Job not found" }); return; }
     if (job.postedByUserId !== req.user.id) { res.status(403).json({ error: "Not authorized" }); return; }
 
-    const applications = await db
-      .select()
-      .from(internalJobApplicationsTable)
-      .where(eq(internalJobApplicationsTable.jobId, req.params.id))
-      .orderBy(desc(internalJobApplicationsTable.appliedAt));
+    // Subquery: latest matchScore per applicant for this job
+    const latestScoreSq = db
+      .select({
+        userId: internalJobCandidateAnalysesTable.userId,
+        matchScore: sql<number>`max(${internalJobCandidateAnalysesTable.matchScore})`.as("match_score"),
+      })
+      .from(internalJobCandidateAnalysesTable)
+      .where(eq(internalJobCandidateAnalysesTable.internalJobId, req.params.id))
+      .groupBy(internalJobCandidateAnalysesTable.userId)
+      .as("latest_scores");
 
-    res.json({ applications, jobTitle: job.title });
+    const rows = await db
+      .select({
+        id: internalJobApplicationsTable.id,
+        jobId: internalJobApplicationsTable.jobId,
+        applicantUserId: internalJobApplicationsTable.applicantUserId,
+        candidateProfileId: internalJobApplicationsTable.candidateProfileId,
+        tailoredCvId: internalJobApplicationsTable.tailoredCvId,
+        coverLetterId: internalJobApplicationsTable.coverLetterId,
+        applicantName: internalJobApplicationsTable.applicantName,
+        applicantEmail: internalJobApplicationsTable.applicantEmail,
+        coverLetter: internalJobApplicationsTable.coverLetter,
+        status: internalJobApplicationsTable.status,
+        stage: internalJobApplicationsTable.stage,
+        candidateNotes: internalJobApplicationsTable.candidateNotes,
+        recruiterNotes: internalJobApplicationsTable.recruiterNotes,
+        autoApplyMode: internalJobApplicationsTable.autoApplyMode,
+        appliedAt: internalJobApplicationsTable.appliedAt,
+        updatedAt: internalJobApplicationsTable.updatedAt,
+        matchScore: latestScoreSq.matchScore,
+      })
+      .from(internalJobApplicationsTable)
+      .leftJoin(latestScoreSq, eq(latestScoreSq.userId, internalJobApplicationsTable.applicantUserId))
+      .where(eq(internalJobApplicationsTable.jobId, req.params.id))
+      .orderBy(
+        sql`${latestScoreSq.matchScore} desc nulls last`,
+        desc(internalJobApplicationsTable.appliedAt),
+      );
+
+    res.json({ applications: rows, jobTitle: job.title });
   } catch (err) {
     logger.error({ err }, "Failed to load applicants");
     res.status(500).json({ error: "Failed to load applicants" });

@@ -85,13 +85,19 @@ function timeAgo(dateStr: string) {
 }
 
 function InviteStatusBadge({ status }: { status: string }) {
+  if (status === "completed") {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-400">
+        <CheckCircle className="w-3 h-3" /> Completed
+      </span>
+    );
+  }
   const map: Record<string, string> = {
     pending: "bg-yellow-50 text-yellow-700 border-yellow-200",
-    accepted: "bg-green-50 text-green-700 border-green-200",
+    accepted: "bg-blue-50 text-blue-700 border-blue-200",
     declined: "bg-red-50 text-red-700 border-red-200",
     reschedule_requested: "bg-orange-50 text-orange-700 border-orange-200",
-    cancelled: "bg-gray-100 text-gray-600 border-gray-200",
-    completed: "bg-blue-50 text-blue-700 border-blue-200",
+    cancelled: "bg-gray-100 text-gray-500 border-gray-200",
   };
   return (
     <Badge variant="outline" className={cn("text-xs capitalize", map[status] ?? "")}>
@@ -286,7 +292,11 @@ export default function ExclusiveApplicationDetail() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {invites.map((invite) => (
-                    <div key={invite.id} className="p-3 rounded-lg border bg-white space-y-2">
+                    <div key={invite.id} className={cn(
+                      "p-3 rounded-lg border space-y-2",
+                      invite.status === "completed" ? "bg-green-50 border-green-300" :
+                      invite.status === "cancelled" ? "bg-gray-50 border-gray-200" : "bg-white",
+                    )}>
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="font-medium text-sm">{invite.inviteTitle}</p>

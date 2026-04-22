@@ -25,6 +25,23 @@ interface Application {
   recruiterNotes: string | null;
   appliedAt: string;
   updatedAt: string;
+  matchScore: number | null;
+}
+
+function ScoreBadge({ score, rank }: { score: number | null; rank: number }) {
+  if (score === null) return null;
+  const color =
+    score >= 80 ? "bg-green-50 text-green-700 border-green-300" :
+    score >= 60 ? "bg-yellow-50 text-yellow-700 border-yellow-300" :
+    "bg-red-50 text-red-600 border-red-200";
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-xs text-muted-foreground font-medium">#{rank}</span>
+      <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full border", color)}>
+        {score}% match
+      </span>
+    </div>
+  );
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -137,8 +154,14 @@ export default function RecruiterExclusiveJobApplicants() {
           </div>
         )}
 
+        {apps.some(a => a.matchScore !== null) && (
+          <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5">
+            <Star className="w-3.5 h-3.5 text-purple-400" />
+            Ranked by CV match score — candidates who ran an AI analysis before applying
+          </p>
+        )}
         <div className="space-y-3">
-          {apps.map((app) => (
+          {apps.map((app, idx) => (
             <Card key={app.id} className="hover:shadow-md transition-shadow cursor-pointer"
               onClick={() => navigate(`/recruiter/exclusive-jobs/${jobId}/application/${app.id}`)}>
               <CardContent className="p-4">
@@ -152,6 +175,7 @@ export default function RecruiterExclusiveJobApplicants() {
                       <Badge variant="outline" className={cn("text-xs capitalize", STATUS_COLORS[app.status])}>
                         {app.status}
                       </Badge>
+                      <ScoreBadge score={app.matchScore} rank={idx + 1} />
                     </div>
                     {app.applicantEmail && (
                       <p className="text-xs text-muted-foreground">{app.applicantEmail}</p>
