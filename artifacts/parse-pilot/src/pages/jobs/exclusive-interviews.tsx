@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { authedFetch } from "@/lib/authed-fetch";
@@ -6,7 +7,7 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Video, Building2, CheckCircle, X, ChevronRight, Calendar } from "lucide-react";
+import { Loader2, Video, Building2, CheckCircle, X, ChevronRight, Calendar, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BASE = import.meta.env.VITE_API_URL ?? "/api";
@@ -47,9 +48,22 @@ const TYPE_LABELS: Record<string, string> = {
   general: "Interview",
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  accepted: "Accepted",
+  declined: "Declined",
+  reschedule_requested: "Reschedule",
+  cancelled: "Cancelled",
+  completed: "Completed",
+};
+
+const PAST_STATUSES = ["declined", "cancelled", "completed"];
+
 export default function ExclusiveInterviews() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const { data, isLoading, refetch } = useQuery<{ invites: Invite[] }>({
     queryKey: ["candidate-invites"],
@@ -62,8 +76,41 @@ export default function ExclusiveInterviews() {
   });
 
   const invites = data?.invites ?? [];
-  const upcoming = invites.filter((i) => !["declined", "cancelled", "completed"].includes(i.status));
-  const past = invites.filter((i) => ["declined", "cancelled", "completed"].includes(i.status));
+
+  const roles = useMemo(() => {
+    const seen = new Map<string, { jobId: string; label: string; count: number }>();
+    for (const inv of invites) {
+      if (!seen.has(inv.jobId)) {
+        const label = inv.jobTitle
+          ? inv.jobCompany
+            ? `${inv.jobTitle} · ${inv.jobCompany}`
+            : inv.jobTitle
+          : "Unknown role";
+        seen.set(inv.jobId, { jobId: inv.jobId, label, count: 0 });
+      }
+      seen.get(inv.jobId)!.count++;
+    }
+    return Array.from(seen.values());
+  }, [invites]);
+
+  const statuses = useMemo(() => {
+    const seen = new Set<string>();
+    for (const inv of invites) seen.add(inv.status);
+    return Array.from(seen);
+  }, [invites]);
+
+  const filtered = useMemo(() => {
+    return invites.filter((inv) => {
+      if (roleFilter !== "all" && inv.jobId !== roleFilter) return false;
+      if (statusFilter !== "all" && inv.status !== statusFilter) return false;
+      return true;
+    });
+  }, [invites, roleFilter, statusFilter]);
+
+  const upcoming = filtered.filter((i) => !PAST_STATUSES.includes(i.status));
+  const past = filtered.filter((i) => PAST_STATUSES.includes(i.status));
+
+  const hasFilters = roleFilter !== "all" || statusFilter !== "all";
 
   async function respond(id: string, status: "accepted" | "declined" | "reschedule_requested") {
     try {
@@ -107,26 +154,140 @@ export default function ExclusiveInterviews() {
           </div>
         )}
 
-        {upcoming.length > 0 && (
-          <div className="mb-8">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Upcoming</p>
-            <div className="space-y-3">
-              {upcoming.map((invite) => (
-                <InviteCard key={invite.id} invite={invite} onRespond={respond} onNavigate={navigate} />
-              ))}
-            </div>
-          </div>
-        )}
+        {!isLoading && invites.length > 0 && (
+          <>
+            {/* ── Filter bar ── */}
+            <div className="mb-5 space-y-3">
+              {/* Role pills */}
+              {roles.length > 1 && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1">
+                    <Filter className="w-3 h-3" /> Role
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setRoleFilter("all")}
+                      className={cn(
+                        "px-3 py-1 rounded-full text-xs font-medium border transition-colors",
+                        roleFilter === "all"
+                          ? "bg-purple-600 text-white border-purple-600"
+                          : "bg-white text-muted-foreground border-border hover:border-purple-300 hover:text-purple-700"
+                      )}
+                    >
+                      All roles
+                      <span className="ml-1 opacity-60">({invites.length})</span>
+                    </button>
+                    {roles.map((r) => (
+                      <button
+                        key={r.jobId}
+                        onClick={() => setRoleFilter(r.jobId)}
+                        className={cn(
+                          "px-3 py-1 rounded-full text-xs font-medium border transition-colors max-w-[220px] truncate",
+                          roleFilter === r.jobId
+                            ? "bg-purple-600 text-white border-purple-600"
+                            : "bg-white text-muted-foreground border-border hover:border-purple-300 hover:text-purple-700"
+                        )}
+                        title={r.label}
+                      >
+                        {r.label}
+                        <span className="ml-1 opacity-60">({r.count})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-        {past.length > 0 && (
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Past</p>
-            <div className="space-y-3">
-              {past.map((invite) => (
-                <InviteCard key={invite.id} invite={invite} onRespond={respond} onNavigate={navigate} />
-              ))}
+              {/* Status pills */}
+              {statuses.length > 1 && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1">
+                    <Filter className="w-3 h-3" /> Status
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setStatusFilter("all")}
+                      className={cn(
+                        "px-3 py-1 rounded-full text-xs font-medium border transition-colors",
+                        statusFilter === "all"
+                          ? "bg-slate-700 text-white border-slate-700"
+                          : "bg-white text-muted-foreground border-border hover:border-slate-400"
+                      )}
+                    >
+                      All
+                    </button>
+                    {statuses.map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setStatusFilter(s)}
+                        className={cn(
+                          "px-3 py-1 rounded-full text-xs font-medium border transition-colors",
+                          statusFilter === s
+                            ? "bg-slate-700 text-white border-slate-700"
+                            : "bg-white text-muted-foreground border-border hover:border-slate-400"
+                        )}
+                      >
+                        {STATUS_LABELS[s] ?? s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Active filter summary */}
+              {hasFilters && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+                  <span>{filtered.length} invite{filtered.length !== 1 ? "s" : ""} shown</span>
+                  <button
+                    onClick={() => { setRoleFilter("all"); setStatusFilter("all"); }}
+                    className="text-purple-600 hover:underline"
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              )}
             </div>
-          </div>
+
+            {/* ── No results after filter ── */}
+            {filtered.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground space-y-2">
+                <p className="text-sm">No invites match the selected filters.</p>
+                <button
+                  onClick={() => { setRoleFilter("all"); setStatusFilter("all"); }}
+                  className="text-xs text-purple-600 hover:underline"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+
+            {/* ── Upcoming ── */}
+            {upcoming.length > 0 && (
+              <div className="mb-8">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  Upcoming · {upcoming.length}
+                </p>
+                <div className="space-y-3">
+                  {upcoming.map((invite) => (
+                    <InviteCard key={invite.id} invite={invite} onRespond={respond} onNavigate={navigate} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Past ── */}
+            {past.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  Past · {past.length}
+                </p>
+                <div className="space-y-3">
+                  {past.map((invite) => (
+                    <InviteCard key={invite.id} invite={invite} onRespond={respond} onNavigate={navigate} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </AppLayout>
