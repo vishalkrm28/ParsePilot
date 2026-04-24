@@ -41,6 +41,12 @@ export const discoveredJobsTable = pgTable(
     rawPayload: jsonb("raw_payload").default(sql`'{}'::jsonb`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    // Visa intelligence — computed from job description analysis
+    sponsorshipSignal: text("sponsorship_signal").default("unknown"),
+    sponsorshipConfidence: integer("sponsorship_confidence").default(0),
+    relocationSupport: boolean("relocation_support").default(false),
+    visaSponsorshipNotes: text("visa_sponsorship_notes"),
+    workAuthorizationRequirement: text("work_authorization_requirement"),
   },
   (t) => [
     uniqueIndex("jobs_canonical_key_idx").on(t.canonicalKey),

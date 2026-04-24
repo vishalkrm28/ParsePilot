@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Loader2, Plus, Briefcase, MapPin, Building2, Users, Pause, X, Check,
-  Star, Globe, Lock, PencilLine, Send, Eye, ChevronRight, Pencil,
+  Star, Globe, Lock, PencilLine, Send, Eye, ChevronRight, Pencil, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -66,6 +66,10 @@ const EMPTY_FORM = {
   employmentType: "", seniority: "", description: "", requirements: "", preferredSkills: "",
   salaryMin: "", salaryMax: "", currency: "USD", visibility: "pro_only" as "pro_only" | "public",
   publishAs: "active" as "draft" | "active",
+  visaSponsorshipAvailable: false as boolean,
+  visaSponsorshipNotes: "",
+  relocationSupport: false as boolean,
+  workAuthorizationRequirement: "",
 };
 
 function jobToForm(job: InternalJob): typeof EMPTY_FORM {
@@ -85,6 +89,10 @@ function jobToForm(job: InternalJob): typeof EMPTY_FORM {
     currency: job.currency ?? "USD",
     visibility: (job.visibility === "public" ? "public" : "pro_only") as "pro_only" | "public",
     publishAs: "active",
+    visaSponsorshipAvailable: (job as any).visaSponsorshipAvailable ?? false,
+    visaSponsorshipNotes: (job as any).visaSponsorshipNotes ?? "",
+    relocationSupport: (job as any).relocationSupport ?? false,
+    workAuthorizationRequirement: (job as any).workAuthorizationRequirement ?? "",
   };
 }
 
@@ -132,6 +140,10 @@ function PostJobDialog({
         salaryMax: form.salaryMax ? Number(form.salaryMax) : null,
         currency: form.currency,
         visibility: form.visibility,
+        visaSponsorshipAvailable: form.visaSponsorshipAvailable,
+        visaSponsorshipNotes: form.visaSponsorshipNotes || undefined,
+        relocationSupport: form.relocationSupport,
+        workAuthorizationRequirement: form.workAuthorizationRequirement || undefined,
       };
 
       if (isEdit) {
@@ -308,6 +320,59 @@ function PostJobDialog({
               placeholder={"GraphQL\nDocker\nKubernetes"}
               className="mt-1"
             />
+          </div>
+
+          {/* Visa & relocation */}
+          <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              Visa &amp; Work Authorization
+              <span className="ml-auto text-xs font-normal text-muted-foreground">Helps candidates self-select</span>
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={form.visaSponsorshipAvailable}
+                  onChange={(e) => set("visaSponsorshipAvailable", e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-sm">We can sponsor visas</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={form.relocationSupport}
+                  onChange={(e) => set("relocationSupport", e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-sm">Relocation support offered</span>
+              </label>
+            </div>
+            <div>
+              <Label className="text-xs">Work authorization requirement <span className="text-muted-foreground font-normal">(optional, e.g. "Must have UK right to work")</span></Label>
+              <Input
+                value={form.workAuthorizationRequirement}
+                onChange={(e) => set("workAuthorizationRequirement", e.target.value)}
+                placeholder="e.g. Must be authorized to work in the EU"
+                className="mt-1 text-sm"
+              />
+            </div>
+            {form.visaSponsorshipAvailable && (
+              <div>
+                <Label className="text-xs">Visa sponsorship notes <span className="text-muted-foreground font-normal">(types supported, eligibility, etc.)</span></Label>
+                <Textarea
+                  value={form.visaSponsorshipNotes}
+                  onChange={(e) => set("visaSponsorshipNotes", e.target.value)}
+                  rows={2}
+                  placeholder="e.g. We sponsor Skilled Worker visas for the UK and EU Blue Cards"
+                  className="mt-1 text-sm"
+                />
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground italic">
+              Sponsorship signals are shown as estimates only — ResuOne does not guarantee outcomes. Always confirm with your legal team.
+            </p>
           </div>
 
           {!isEdit && (

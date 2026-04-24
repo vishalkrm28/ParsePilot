@@ -76,6 +76,13 @@ export const internalJobsTable = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    // Visa / relocation — recruiter-declared
+    visaSponsorshipAvailable: boolean("visa_sponsorship_available").default(false),
+    visaSponsorshipNotes: text("visa_sponsorship_notes"),
+    relocationSupport: boolean("relocation_support").default(false),
+    workAuthorizationRequirement: text("work_authorization_requirement"),
+    sponsorshipSignal: text("sponsorship_signal").default("unknown"),
+    sponsorshipConfidence: integer("sponsorship_confidence").default(0),
   },
   (t) => [
     index("internal_jobs_posted_by_idx").on(t.postedByUserId),

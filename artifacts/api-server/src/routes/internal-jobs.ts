@@ -10,6 +10,7 @@ import { eq, and, desc, count, ilike, or, sql, inArray } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { resolveUserPlan, canSeeProOnlyJobs, canPostJobs } from "../lib/internal-jobs/plan.js";
 import { notifyUsersOfNewJob } from "../lib/internal-jobs/notifications.js";
+import { analyzeInternalJob, rescoreInternalJobFromData } from "../lib/visa/pipeline.js";
 
 const router = Router();
 
@@ -32,6 +33,10 @@ const CreateJobSchema = z.object({
   visibility: z.enum(["pro_only", "public"]).optional().default("pro_only"),
   workspaceId: z.string().optional(),
   expiresAt: z.string().datetime().optional(),
+  visaSponsorshipAvailable: z.boolean().optional().default(false),
+  visaSponsorshipNotes: z.string().optional(),
+  relocationSupport: z.boolean().optional().default(false),
+  workAuthorizationRequirement: z.string().optional(),
 });
 
 router.post("/internal-jobs", async (req, res) => {
@@ -57,6 +62,8 @@ router.post("/internal-jobs", async (req, res) => {
         expiresAt: expiresAt ? new Date(expiresAt) : null,
       })
       .returning();
+    // Async visa analysis — don't block the response
+    analyzeInternalJob(job.id).catch((err) => logger.warn({ err, jobId: job.id }, "Visa analysis failed after job create"));
     res.status(201).json({ job });
   } catch (err) {
     logger.error({ err }, "Failed to create internal job");
@@ -111,6 +118,10 @@ const UpdateJobSchema = z.object({
   visibility: z.enum(["pro_only", "public"]).optional(),
   status: z.enum(["draft", "active", "paused", "closed"]).optional(),
   expiresAt: z.string().datetime().optional(),
+  visaSponsorshipAvailable: z.boolean().optional(),
+  visaSponsorshipNotes: z.string().optional(),
+  relocationSupport: z.boolean().optional(),
+  workAuthorizationRequirement: z.string().optional(),
 });
 
 router.patch("/internal-jobs/:id", async (req, res) => {
@@ -133,6 +144,22 @@ router.patch("/internal-jobs/:id", async (req, res) => {
       .set({ ...rest, expiresAt: expiresAt ? new Date(expiresAt) : undefined, updatedAt: new Date() })
       .where(eq(internalJobsTable.id, req.params.id))
       .returning();
+    // Async visa re-score if relevant fields were updated
+    const visaFieldsTouched = rest.visaSponsorshipAvailable !== undefined || rest.relocationSupport !== undefined
+      || rest.workAuthorizationRequirement !== undefined || rest.description !== undefined;
+    if (visaFieldsTouched && updated) {
+      rescoreInternalJobFromData({
+        id: updated.id,
+        title: updated.title,
+        description: updated.description,
+        requirements: updated.requirements as string[],
+        country: updated.country,
+        company: updated.company,
+        visaSponsorshipAvailable: updated.visaSponsorshipAvailable,
+        relocationSupport: updated.relocationSupport,
+        workAuthorizationRequirement: updated.workAuthorizationRequirement,
+      }).catch((err) => logger.warn({ err, jobId: updated.id }, "Visa rescore failed after PATCH"));
+    }
     res.json({ job: updated });
   } catch (err) {
     logger.error({ err }, "Failed to update job");

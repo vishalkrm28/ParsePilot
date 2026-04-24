@@ -14,6 +14,20 @@ ResuOne is a production-ready SaaS web application designed to help users tailor
 *   Do not make changes to the file `artifacts/api-server/src/lib/env.ts`.
 *   Do not make changes to the file `artifacts/api-server/src/routes/webhook.ts`.
 
+## Visa Intelligence System (Phase 1 — complete)
+
+- **Keyword detector** (`api-server/src/lib/visa/keyword-detector.ts`): 40+ phrase library, positive / strong-negative / soft-negative / relocation / work-auth signal detection
+- **Country rules** (`country-rules.ts`): per-country sponsorship boost / penalty for 20+ countries
+- **Scoring engine** (`scoring.ts`): weighted combination of recruiter-declared fields + keyword hits + country rules → signal (high / medium / low / no / unknown) + confidence
+- **Claude AI validation** (`ai-validation.ts`): fires only on ambiguous scores (medium/low with conflicting signals); uses `claude-sonnet-4-6` via Replit-managed Anthropic integration
+- **Pipeline** (`pipeline.ts`): orchestrates all layers for internal jobs and discovered jobs; persists `sponsorship_signal` + `sponsorship_confidence` to DB after each analysis
+- **Visa route** (`routes/visa.ts`): `POST /visa/analyze-internal-job`, `POST /visa/analyze-discovered-job`, `GET /visa/preferences`, `POST /visa/preferences`
+- **VisaSignalBadge** (`components/visa/visa-signal-badge.tsx`): pill badges for high/medium/low/no/unknown signals with tooltip disclaimer
+- **Job cards**: visa badge appears on `ExclusiveJobCard` for any signal ≠ unknown
+- **Recruiter form**: "Visa & Work Authorization" section with sponsorship toggle, relocation toggle, work-auth requirement field, sponsorship notes
+- **DB**: `internal_jobs` + `jobs` tables extended with visa columns; `candidate_visa_preferences` table created
+- **Auto-analysis**: visa pipeline fires async after every job create and PATCH (if relevant fields changed)
+
 ## System Architecture
 
 The ParsePilot AI project is structured as a monorepo using pnpm workspaces. It utilizes Node.js 24 and TypeScript 5.9.
