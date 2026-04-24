@@ -161,7 +161,7 @@ function JobCard({
       const res = await authedFetch(`${BASE}/relocation/analyze-job`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ externalJobCacheId: job.id, lifestyle: "moderate" }),
+        body: JSON.stringify({ jobId: job.id, lifestyle: "moderate" }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Relocation check failed");
