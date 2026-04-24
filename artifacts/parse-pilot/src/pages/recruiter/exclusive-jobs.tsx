@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Loader2, Plus, Briefcase, MapPin, Building2, Users, Pause, X, Check,
-  Star, Globe, Lock, PencilLine, Send, Eye, ChevronRight, Pencil, ShieldCheck,
+  Star, Globe, Lock, PencilLine, Send, Eye, ChevronRight, Pencil, ShieldCheck, Languages,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -70,6 +70,10 @@ const EMPTY_FORM = {
   visaSponsorshipNotes: "",
   relocationSupport: false as boolean,
   workAuthorizationRequirement: "",
+  languageRequired: "",
+  languagePreferred: "",
+  workingLanguage: "",
+  languageNotes: "",
 };
 
 function jobToForm(job: InternalJob): typeof EMPTY_FORM {
@@ -93,6 +97,10 @@ function jobToForm(job: InternalJob): typeof EMPTY_FORM {
     visaSponsorshipNotes: (job as any).visaSponsorshipNotes ?? "",
     relocationSupport: (job as any).relocationSupport ?? false,
     workAuthorizationRequirement: (job as any).workAuthorizationRequirement ?? "",
+    languageRequired: Array.isArray((job as any).languageRequired) ? (job as any).languageRequired.join(", ") : "",
+    languagePreferred: Array.isArray((job as any).languagePreferred) ? (job as any).languagePreferred.join(", ") : "",
+    workingLanguage: (job as any).workingLanguage ?? "",
+    languageNotes: (job as any).languageNotes ?? "",
   };
 }
 
@@ -144,6 +152,10 @@ function PostJobDialog({
         visaSponsorshipNotes: form.visaSponsorshipNotes || undefined,
         relocationSupport: form.relocationSupport,
         workAuthorizationRequirement: form.workAuthorizationRequirement || undefined,
+        languageRequired: form.languageRequired ? form.languageRequired.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        languagePreferred: form.languagePreferred ? form.languagePreferred.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        workingLanguage: form.workingLanguage || undefined,
+        languageNotes: form.languageNotes || undefined,
       };
 
       if (isEdit) {
@@ -373,6 +385,53 @@ function PostJobDialog({
             <p className="text-xs text-muted-foreground italic">
               Sponsorship signals are shown as estimates only — ResuOne does not guarantee outcomes. Always confirm with your legal team.
             </p>
+          </div>
+
+          {/* Language & Working Environment */}
+          <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Languages className="w-4 h-4 text-sky-600" />
+              Language &amp; Working Environment
+              <span className="ml-auto text-xs font-normal text-muted-foreground">Helps international candidates self-select</span>
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Required languages <span className="text-muted-foreground font-normal">(comma-separated)</span></Label>
+                <Input
+                  value={form.languageRequired}
+                  onChange={(e) => set("languageRequired", e.target.value)}
+                  placeholder="e.g. English, Swedish"
+                  className="mt-1 text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Preferred languages <span className="text-muted-foreground font-normal">(comma-separated)</span></Label>
+                <Input
+                  value={form.languagePreferred}
+                  onChange={(e) => set("languagePreferred", e.target.value)}
+                  placeholder="e.g. Swedish, German"
+                  className="mt-1 text-sm"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Working language <span className="text-muted-foreground font-normal">(primary day-to-day language)</span></Label>
+              <Input
+                value={form.workingLanguage}
+                onChange={(e) => set("workingLanguage", e.target.value)}
+                placeholder="e.g. English"
+                className="mt-1 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Language notes <span className="text-muted-foreground font-normal">(optional context)</span></Label>
+              <Input
+                value={form.languageNotes}
+                onChange={(e) => set("languageNotes", e.target.value)}
+                placeholder="e.g. Swedish helpful but not mandatory — all meetings in English"
+                className="mt-1 text-sm"
+              />
+            </div>
           </div>
 
           {!isEdit && (

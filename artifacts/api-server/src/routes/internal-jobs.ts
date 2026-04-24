@@ -11,6 +11,7 @@ import { logger } from "../lib/logger.js";
 import { resolveUserPlan, canSeeProOnlyJobs, canPostJobs } from "../lib/internal-jobs/plan.js";
 import { notifyUsersOfNewJob } from "../lib/internal-jobs/notifications.js";
 import { analyzeInternalJob, rescoreInternalJobFromData } from "../lib/visa/pipeline.js";
+import { analyzeLanguageSignalForInternalJob, rescoreLanguageSignalForInternalJob } from "../lib/language/language-pipeline.js";
 
 const router = Router();
 
@@ -37,6 +38,10 @@ const CreateJobSchema = z.object({
   visaSponsorshipNotes: z.string().optional(),
   relocationSupport: z.boolean().optional().default(false),
   workAuthorizationRequirement: z.string().optional(),
+  languageRequired: z.array(z.string()).optional().default([]),
+  languagePreferred: z.array(z.string()).optional().default([]),
+  workingLanguage: z.string().optional(),
+  languageNotes: z.string().optional(),
 });
 
 router.post("/internal-jobs", async (req, res) => {
@@ -62,8 +67,9 @@ router.post("/internal-jobs", async (req, res) => {
         expiresAt: expiresAt ? new Date(expiresAt) : null,
       })
       .returning();
-    // Async visa analysis — don't block the response
+    // Async visa + language analysis — don't block the response
     analyzeInternalJob(job.id).catch((err) => logger.warn({ err, jobId: job.id }, "Visa analysis failed after job create"));
+    analyzeLanguageSignalForInternalJob(job.id).catch((err) => logger.warn({ err, jobId: job.id }, "Language analysis failed after job create"));
     res.status(201).json({ job });
   } catch (err) {
     logger.error({ err }, "Failed to create internal job");
@@ -122,6 +128,10 @@ const UpdateJobSchema = z.object({
   visaSponsorshipNotes: z.string().optional(),
   relocationSupport: z.boolean().optional(),
   workAuthorizationRequirement: z.string().optional(),
+  languageRequired: z.array(z.string()).optional(),
+  languagePreferred: z.array(z.string()).optional(),
+  workingLanguage: z.string().optional(),
+  languageNotes: z.string().optional(),
 });
 
 router.patch("/internal-jobs/:id", async (req, res) => {
@@ -147,6 +157,21 @@ router.patch("/internal-jobs/:id", async (req, res) => {
     // Async visa re-score if relevant fields were updated
     const visaFieldsTouched = rest.visaSponsorshipAvailable !== undefined || rest.relocationSupport !== undefined
       || rest.workAuthorizationRequirement !== undefined || rest.description !== undefined;
+    const languageFieldsTouched = rest.languageRequired !== undefined || rest.languagePreferred !== undefined
+      || rest.workingLanguage !== undefined || rest.description !== undefined;
+    if (languageFieldsTouched && updated) {
+      rescoreLanguageSignalForInternalJob({
+        id: updated.id,
+        title: updated.title,
+        description: updated.description,
+        requirements: updated.requirements as string[],
+        country: updated.country,
+        languageRequired: (updated as any).languageRequired as string[],
+        languagePreferred: (updated as any).languagePreferred as string[],
+        workingLanguage: (updated as any).workingLanguage,
+        languageNotes: (updated as any).languageNotes,
+      }).catch((err) => logger.warn({ err, jobId: updated.id }, "Language rescore failed after PATCH"));
+    }
     if (visaFieldsTouched && updated) {
       rescoreInternalJobFromData({
         id: updated.id,

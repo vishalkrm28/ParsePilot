@@ -83,6 +83,13 @@ export const internalJobsTable = pgTable(
     workAuthorizationRequirement: text("work_authorization_requirement"),
     sponsorshipSignal: text("sponsorship_signal").default("unknown"),
     sponsorshipConfidence: integer("sponsorship_confidence").default(0),
+    // Language / working language — recruiter-declared + computed signal
+    languageRequired: jsonb("language_required").default(sql`'[]'::jsonb`),
+    languagePreferred: jsonb("language_preferred").default(sql`'[]'::jsonb`),
+    workingLanguage: text("working_language"),
+    languageNotes: text("language_notes"),
+    languageRequirementSignal: text("language_requirement_signal").default("unknown"),
+    languageConfidence: integer("language_confidence").default(0),
   },
   (t) => [
     index("internal_jobs_posted_by_idx").on(t.postedByUserId),

@@ -14,6 +14,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { VisaSignalBadge, type VisaSignal } from "@/components/visa/visa-signal-badge";
+import { LanguageSignalBadge, type LanguageSignal } from "@/components/language/language-signal-badge";
 import { cn } from "@/lib/utils";
 
 const BASE = import.meta.env.VITE_API_URL ?? "/api";
@@ -39,6 +40,8 @@ interface InternalJob {
   applicationCount: number;
   sponsorshipSignal?: string | null;
   sponsorshipConfidence?: number | null;
+  languageRequirementSignal?: string | null;
+  languageConfidence?: number | null;
   userApplication: { id: string; status: string; stage: string } | null;
   latestAnalysis: { matchScore: number; applyRecommendation: string | null } | null;
   publishedAt: string | null;
@@ -118,6 +121,9 @@ function ExclusiveJobCard({ job, onClick }: { job: InternalJob; onClick: () => v
           )}
           {job.sponsorshipSignal && job.sponsorshipSignal !== "unknown" && (
             <VisaSignalBadge signal={job.sponsorshipSignal as VisaSignal} confidence={job.sponsorshipConfidence ?? undefined} />
+          )}
+          {job.languageRequirementSignal && job.languageRequirementSignal !== "unknown" && (
+            <LanguageSignalBadge signal={job.languageRequirementSignal as LanguageSignal} confidence={job.languageConfidence ?? undefined} />
           )}
           {job.latestAnalysis && (
             <span className={cn("text-xs font-bold ml-auto", scoreColor(job.latestAnalysis.matchScore))}>

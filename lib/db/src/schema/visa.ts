@@ -14,6 +14,9 @@ export const candidateVisaPreferencesTable = pgTable(
     hasUsWorkRights: boolean("has_us_work_rights").default(false),
     preferredRelocation: boolean("preferred_relocation").default(false),
     relocationNotes: text("relocation_notes"),
+    // Language profile — added alongside visa preferences for convenience
+    knownLanguages: jsonb("known_languages").default(sql`'[]'::jsonb`),
+    preferredWorkingLanguages: jsonb("preferred_working_languages").default(sql`'[]'::jsonb`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

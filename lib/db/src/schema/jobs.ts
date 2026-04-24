@@ -47,6 +47,12 @@ export const discoveredJobsTable = pgTable(
     relocationSupport: boolean("relocation_support").default(false),
     visaSponsorshipNotes: text("visa_sponsorship_notes"),
     workAuthorizationRequirement: text("work_authorization_requirement"),
+    // Language intelligence — computed from job description analysis
+    languageRequirementSignal: text("language_requirement_signal").default("unknown"),
+    languageRequiredLanguages: jsonb("language_required_languages").default(sql`'[]'::jsonb`),
+    languagePreferredLanguages: jsonb("language_preferred_languages").default(sql`'[]'::jsonb`),
+    languageConfidence: integer("language_confidence").default(0),
+    languageEvidenceSummary: text("language_evidence_summary"),
   },
   (t) => [
     uniqueIndex("jobs_canonical_key_idx").on(t.canonicalKey),

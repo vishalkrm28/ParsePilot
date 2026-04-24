@@ -14,6 +14,19 @@ ResuOne is a production-ready SaaS web application designed to help users tailor
 *   Do not make changes to the file `artifacts/api-server/src/lib/env.ts`.
 *   Do not make changes to the file `artifacts/api-server/src/routes/webhook.ts`.
 
+## Language Requirement Intelligence (Phase 1 — complete)
+
+- **Keyword detector** (`api-server/src/lib/language/language-keyword-detector.ts`): explicit phrase matching across English-friendly, local_required, local_preferred, multilingual categories; handles English-as-local-language correctly for US/UK/AU/CA/IE/NZ/SG
+- **Country rules** (`language-country-rules.ts`): conservative defaults for 20+ countries; never assumes local language without text evidence
+- **Scoring engine** (`language-scoring.ts`): recruiter-declared > keyword detection > country rules; strict signal hierarchy (multilingual > local_required > local_preferred > english_friendly > unknown)
+- **Pipeline** (`language-pipeline.ts`): no Claude (deterministic detection); persists `language_requirement_signal` + `language_confidence` to DB after analysis; fires async after every job create/PATCH
+- **Language fit engine** (`language-fit.ts`): pure function compares candidate known languages against job requirements → good/risky/poor/unknown; never penalises empty profiles
+- **Language route** (`routes/language.ts`): `POST /language/analyze-internal-job`, `POST /language/analyze-discovered-job`, `GET/POST /language/preferences`, `POST /language/fit`
+- **LanguageSignalBadge + LanguageFitBadge** (`components/language/language-signal-badge.tsx`): 5-state badges with tooltips
+- **Job cards**: language badge appears after visa badge for any signal ≠ unknown
+- **Recruiter form**: "Language & Working Environment" section with required, preferred, working language, and notes fields
+- **DB**: `jobs` + `internal_jobs` extended with language columns; `candidate_visa_preferences` extended with `known_languages` + `preferred_working_languages`
+
 ## Visa Intelligence System (Phase 1 — complete)
 
 - **Keyword detector** (`api-server/src/lib/visa/keyword-detector.ts`): 40+ phrase library, positive / strong-negative / soft-negative / relocation / work-auth signal detection
