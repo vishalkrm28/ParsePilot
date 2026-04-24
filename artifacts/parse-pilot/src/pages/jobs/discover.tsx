@@ -24,7 +24,9 @@ import {
   FileText,
   MailOpen,
   RefreshCcw,
+  Navigation,
 } from "lucide-react";
+import { RelocationScoreBadge, type RelocationRecommendation } from "@/components/relocation/relocation-score-badge";
 import { saveJob } from "@/lib/tracker-api";
 
 const BASE = import.meta.env.VITE_API_URL ?? "/api";
@@ -118,6 +120,13 @@ function formatRelative(iso: string): string {
 
 // ─── Job Card ─────────────────────────────────────────────────────────────────
 
+interface RelocationResult {
+  relocationScore: number;
+  relocationRecommendation: string;
+  estimatedMonthlySurplus: number | null;
+  aiSummary: { summary: string; mainUpside: string; mainRisk: string; candidateAdvice: string };
+}
+
 function JobCard({
   job,
   match,
@@ -136,7 +145,30 @@ function JobCard({
   onSave: (job: DiscoveredJob) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [relocationData, setRelocationData] = useState<RelocationResult | null>(null);
+  const [relocationLoading, setRelocationLoading] = useState(false);
+  const [relocationExpanded, setRelocationExpanded] = useState(false);
   const { toast } = useToast();
+
+  async function handleRelocationCheck() {
+    if (relocationData) { setRelocationExpanded(!relocationExpanded); return; }
+    setRelocationLoading(true);
+    try {
+      const res = await authedFetch(`${BASE}/relocation/analyze-job`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ externalJobCacheId: job.id, lifestyle: "moderate" }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? "Relocation check failed");
+      setRelocationData(d.result);
+      setRelocationExpanded(true);
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Relocation check failed", description: err.message });
+    } finally {
+      setRelocationLoading(false);
+    }
+  }
 
   const salaryText =
     job.salaryMin && job.salaryMax
@@ -331,7 +363,43 @@ function JobCard({
                 <Bookmark className="w-3.5 h-3.5" />
               )}
             </Button>
+            <Button
+              size="sm"
+              variant={relocationData ? "secondary" : "outline"}
+              className="text-xs h-8 px-3"
+              onClick={handleRelocationCheck}
+              disabled={relocationLoading}
+              title="Check relocation fit"
+            >
+              {relocationLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Navigation className="w-3.5 h-3.5" />
+              )}
+            </Button>
           </div>
+
+          {/* ── Inline relocation result ── */}
+          {relocationData && relocationExpanded && (
+            <div className="mt-3 p-3 rounded-lg bg-blue-50/60 border border-blue-100 space-y-2 text-xs">
+              <div className="flex items-center gap-2">
+                <RelocationScoreBadge
+                  recommendation={relocationData.relocationRecommendation as RelocationRecommendation}
+                  score={relocationData.relocationScore}
+                />
+                {relocationData.estimatedMonthlySurplus !== null && (
+                  <span className={`font-medium ${relocationData.estimatedMonthlySurplus > 0 ? "text-green-700" : "text-red-600"}`}>
+                    {relocationData.estimatedMonthlySurplus > 0 ? "+" : ""}
+                    ${Math.round(Math.abs(relocationData.estimatedMonthlySurplus)).toLocaleString()}/mo est.
+                  </span>
+                )}
+              </div>
+              <p className="text-foreground/75 leading-relaxed">{relocationData.aiSummary.summary}</p>
+              {relocationData.aiSummary.candidateAdvice && (
+                <p className="text-muted-foreground italic">{relocationData.aiSummary.candidateAdvice}</p>
+              )}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
