@@ -179,6 +179,11 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
   // ── Determine Pro status and enforce quota ───────────────────────────────────
   const isPro = await checkIsPro(userId);
 
+  // Hoist quota counters so they're accessible throughout this handler
+  // (e.g. to build accurate credit info in early-exit responses).
+  let proRunsToday = 0;
+  let freeCredits = 0;
+
   if (isPro) {
     if (!applicationId) {
       res.status(422).json({
@@ -187,20 +192,20 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
       });
       return;
     }
-    const runsToday = await countCvRunsToday(userId, applicationId);
-    if (runsToday >= PRO_DAILY_LIMIT_PER_CV) {
+    proRunsToday = await countCvRunsToday(userId, applicationId);
+    if (proRunsToday >= PRO_DAILY_LIMIT_PER_CV) {
       res.status(429).json({
         error: `You've used all ${PRO_DAILY_LIMIT_PER_CV} searches for this CV today. Try again tomorrow or select a different CV.`,
         code: "CV_DAILY_LIMIT_REACHED",
         remainingForCv: 0,
-        runsUsedTodayForCv: runsToday,
+        runsUsedTodayForCv: proRunsToday,
       });
       return;
     }
   } else {
     // Non-Pro: check global job rec credits (from unlock purchases)
-    const credits = await getJobRecCredits(userId);
-    if (credits < 1) {
+    freeCredits = await getJobRecCredits(userId);
+    if (freeCredits < 1) {
       res.status(402).json({
         error: "No job recommendation credits. Unlock a CV analysis ($6.99) to receive 10 searches.",
         code: "NO_JOB_REC_CREDITS",
@@ -273,6 +278,33 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
 
   const preferences = { preferredLocation, country, remotePreference, roleType };
 
+  // ── Early exit: unsupported country ─────────────────────────────────────────
+  // Check BEFORE saving the profile so no quota is consumed for countries we
+  // can't serve. Adzuna doesn't support every country and The Muse has no
+  // country filter, so there is no source that can serve a country-specific
+  // result for unsupported codes.
+  const ADZUNA_SUPPORTED_EARLY = new Set([
+    "at", "au", "be", "br", "ca", "ch", "de", "es", "fr",
+    "gb", "in", "it", "mx", "nl", "nz", "pl", "sg", "us", "za",
+  ]);
+  if (country && !ADZUNA_SUPPORTED_EARLY.has(country)) {
+    const noResultsReason = `No jobs available for the selected country (${country.toUpperCase()}). Our job boards don't cover this market yet — try selecting a different country or removing the country filter.`;
+    logger.info({ requestedCountry: country, userId }, "Unsupported country — returning empty results without consuming quota");
+    res.status(200).json({
+      recommendations: [],
+      totalJobsFetched: 0,
+      profileId: "",
+      candidateName: normalizedProfile.name ?? "",
+      targetRoles: normalizedProfile.target_roles ?? [],
+      noResults: true,
+      noResultsReason,
+      ...(isPro
+        ? { isProUser: true, runsUsedTodayForCv: proRunsToday, remainingForCv: PRO_DAILY_LIMIT_PER_CV - proRunsToday }
+        : { isProUser: false, remainingCredits: freeCredits }),
+    });
+    return;
+  }
+
   // ── Persist candidate profile (this also records the run for quota tracking) ─
   const [savedProfile] = await db
     .insert(candidateProfilesTable)
@@ -291,15 +323,8 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
     ? topRoles
     : [normalizedProfile.keywords.slice(0, 2).join(" ") || "software engineer"];
 
-  // Adzuna only supports a fixed set of country codes.
-  const ADZUNA_SUPPORTED = new Set([
-    "at", "au", "be", "br", "ca", "ch", "de", "es", "fr",
-    "gb", "in", "it", "mx", "nl", "nz", "pl", "sg", "us", "za",
-  ]);
-  const adzunaCountry = ADZUNA_SUPPORTED.has(country) ? country : "gb";
-  if (adzunaCountry !== country) {
-    logger.info({ requestedCountry: country, fallbackCountry: adzunaCountry }, "Country not supported by Adzuna — falling back to gb");
-  }
+  // All unsupported countries are caught by the early exit above.
+  // Any country reaching this point is guaranteed to be in the Adzuna supported set.
 
   // Map country codes to the country name strings Adzuna returns in location.area[0].
   const ADZUNA_COUNTRY_NAMES: Record<string, string[]> = {
@@ -323,31 +348,36 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
     us: ["us", "usa", "united states"],
     za: ["south africa"],
   };
-  const validCountryNames = ADZUNA_COUNTRY_NAMES[adzunaCountry] ?? [];
 
   const rawJobs: ReturnType<typeof normalizeAdzunaJob>[] = [];
 
-  for (const term of searchTerms) {
-    try {
-      const results = await fetchAdzunaJobs({ what: term, where: preferredLocation, country: adzunaCountry, resultsPerPage: 20 });
-      // Post-filter: Adzuna sometimes returns multinational listings even when
-      // querying a country-specific endpoint. location.area[0] is the country
-      // NAME (e.g. "Belgium") — compare against mapped names, not the code.
-      const countryFiltered = results.filter((job) => {
-        const areaCountry = (job.location?.area?.[0] ?? "").toLowerCase();
-        if (!areaCountry) return true;
-        return validCountryNames.some((name) => areaCountry.includes(name) || name.includes(areaCountry));
-      });
-      rawJobs.push(...countryFiltered.map(normalizeAdzunaJob));
-    } catch (err) {
-      logger.warn({ err, term }, "Adzuna fetch failed for term — skipping");
+  {
+    const validCountryNames = ADZUNA_COUNTRY_NAMES[country] ?? [];
+    for (const term of searchTerms) {
+      try {
+        const results = await fetchAdzunaJobs({ what: term, where: preferredLocation, country, resultsPerPage: 20 });
+        // Post-filter: Adzuna sometimes returns multinational listings even when
+        // querying a country-specific endpoint. location.area[0] is the country
+        // NAME (e.g. "Belgium") — compare against mapped names, not the code.
+        const countryFiltered = results.filter((job) => {
+          const areaCountry = (job.location?.area?.[0] ?? "").toLowerCase();
+          if (!areaCountry) return true;
+          return validCountryNames.some((name) => areaCountry.includes(name) || name.includes(areaCountry));
+        });
+        rawJobs.push(...countryFiltered.map(normalizeAdzunaJob));
+      } catch (err) {
+        logger.warn({ err, term }, "Adzuna fetch failed for term — skipping");
+      }
     }
   }
 
-  // The Muse is a last-resort fallback ONLY when Adzuna returns nothing at all.
-  // Do NOT mix Muse jobs in with Adzuna results — Muse has no country filter
-  // and would contaminate country-specific searches with global (often US) jobs.
-  if (rawJobs.length === 0) {
+  // The Muse is a last-resort fallback ONLY when:
+  //   1. Adzuna returned nothing, AND
+  //   2. No specific country was requested (The Muse has no country filter and
+  //      would return US/global jobs — injecting them into a country-specific
+  //      search would be misleading).
+  const hasCountryFilter = Boolean(country);
+  if (rawJobs.length === 0 && !hasCountryFilter) {
     const museCategory = mapRoleToMuseCategory(topRoles[0] ?? "");
     for (const page of [1, 2]) {
       try {
@@ -357,7 +387,6 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
         logger.warn({ err, page, museCategory }, "The Muse fetch failed — skipping");
       }
     }
-    // If category-filtered still empty, fetch general recent jobs from The Muse
     if (rawJobs.length === 0) {
       try {
         const museResults = await fetchMuseJobs({ page: 1 });
@@ -369,9 +398,18 @@ router.post("/jobs/recommend", authMiddleware, async (req, res) => {
   }
 
   if (rawJobs.length === 0) {
-    res.status(502).json({
-      error: "Could not fetch any jobs from the job boards. Please try again.",
-      code: "NO_JOBS_FETCHED",
+    const noResultsReason = "No matching jobs found for your profile at this time. Try adjusting your search preferences or check back later.";
+    res.status(200).json({
+      recommendations: [],
+      totalJobsFetched: 0,
+      profileId: savedProfile?.id ?? "",
+      candidateName: normalizedProfile.name ?? "",
+      targetRoles: normalizedProfile.target_roles ?? [],
+      noResults: true,
+      noResultsReason,
+      ...(isPro
+        ? { isProUser: true, runsUsedTodayForCv: proRunsToday + 1, remainingForCv: PRO_DAILY_LIMIT_PER_CV - proRunsToday - 1 }
+        : { isProUser: false, remainingCredits: freeCredits }),
     });
     return;
   }

@@ -202,9 +202,37 @@ const CITY_OVERRIDES: Record<string, string> = {
   // Scandinavia / Baltic
   reykjavik: "is",          // Iceland capital — missing from dataset
   ulaanbaatar: "mn",        // Mongolia capital — missing from dataset
+  // Sweden
+  stockholm: "se",
   gothenburg: "se",         // English name; dataset has "göteborg"
   malmo: "se",              // vs "malmö"
-  copenhagen: "dk",         // check — dataset may have it
+  "göteborg": "se",
+  "malmö": "se",
+  uppsala: "se",
+  linköping: "se",
+  linkoping: "se",
+  örebro: "se", orebro: "se",
+  västerås: "se", vasteras: "se",
+  helsingborg: "se",
+  norrköping: "se", norrkoping: "se",
+  jönköping: "se", jonkoping: "se",
+  umeå: "se", umea: "se",
+  lund: "se",
+  // Norway
+  oslo: "no",
+  bergen: "no",
+  trondheim: "no",
+  stavanger: "no",
+  // Finland
+  helsinki: "fi",
+  tampere: "fi",
+  turku: "fi",
+  espoo: "fi",
+  vantaa: "fi",
+  // Denmark
+  copenhagen: "dk",
+  aarhus: "dk",
+  odense: "dk",
 
   // Eastern Europe
   bucharest: "ro",

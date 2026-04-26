@@ -486,16 +486,24 @@ export default function JobRecommendations() {
           runsUsedTodayForCv: res.runsUsedTodayForCv,
           remainingForCv: res.remainingForCv,
         });
-        toast({
-          title: `${res.recommendations.length} jobs matched`,
-          description: `${res.remainingForCv} of 10 searches remaining for this CV today`,
-        });
+        if (res.noResults) {
+          toast({ variant: "destructive", title: "No jobs found", description: res.noResultsReason ?? "No jobs available for the selected filters." });
+        } else {
+          toast({
+            title: `${res.recommendations.length} jobs matched`,
+            description: `${res.remainingForCv} of 10 searches remaining for this CV today`,
+          });
+        }
       } else {
         setCreditsInfo({ isProUser: false, jobRecCredits: res.remainingCredits });
-        toast({
-          title: `${res.recommendations.length} jobs matched`,
-          description: `${res.remainingCredits} search${res.remainingCredits === 1 ? "" : "es"} remaining`,
-        });
+        if (res.noResults) {
+          toast({ variant: "destructive", title: "No jobs found", description: res.noResultsReason ?? "No jobs available for the selected filters." });
+        } else {
+          toast({
+            title: `${res.recommendations.length} jobs matched`,
+            description: `${res.remainingCredits} search${res.remainingCredits === 1 ? "" : "es"} remaining`,
+          });
+        }
       }
     } catch (err: any) {
       const raw = err?.message ?? "Something went wrong";
@@ -761,48 +769,60 @@ export default function JobRecommendations() {
 
         {result && (
           <div className="mt-8">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h2 className="text-lg font-semibold">
-                  {result.recommendations.length} Jobs Matched
-                  {result.candidateName && (
-                    <span className="text-muted-foreground font-normal ml-2 text-base">
-                      for {result.candidateName}
-                    </span>
-                  )}
-                </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Searched across {result.totalJobsFetched} live openings ·{" "}
-                  {result.targetRoles.slice(0, 3).join(", ")}
-                </p>
+            {result.noResults ? (
+              <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+                <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-amber-800">No jobs found</p>
+                  <p className="text-amber-700 mt-0.5">{result.noResultsReason}</p>
+                </div>
               </div>
-
-              <div className="flex items-center gap-2">
-                <label className="text-xs text-muted-foreground">Min score</label>
-                <Select value={String(minScore)} onValueChange={(v) => setMinScore(Number(v))}>
-                  <SelectTrigger className="w-24 h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">All</SelectItem>
-                    <SelectItem value="30">30%+</SelectItem>
-                    <SelectItem value="50">50%+</SelectItem>
-                    <SelectItem value="70">70%+</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {filtered.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8 text-sm">
-                No jobs above {minScore}% match. Try lowering the filter.
-              </p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filtered.map((rec) => (
-                  <JobCard key={rec.id} rec={rec} onTailor={handleTailor} />
-                ))}
-              </div>
+              <>
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h2 className="text-lg font-semibold">
+                      {result.recommendations.length} Jobs Matched
+                      {result.candidateName && (
+                        <span className="text-muted-foreground font-normal ml-2 text-base">
+                          for {result.candidateName}
+                        </span>
+                      )}
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Searched across {result.totalJobsFetched} live openings ·{" "}
+                      {result.targetRoles.slice(0, 3).join(", ")}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-muted-foreground">Min score</label>
+                    <Select value={String(minScore)} onValueChange={(v) => setMinScore(Number(v))}>
+                      <SelectTrigger className="w-24 h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">All</SelectItem>
+                        <SelectItem value="30">30%+</SelectItem>
+                        <SelectItem value="50">50%+</SelectItem>
+                        <SelectItem value="70">70%+</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {filtered.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8 text-sm">
+                    No jobs above {minScore}% match. Try lowering the filter.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filtered.map((rec) => (
+                      <JobCard key={rec.id} rec={rec} onTailor={handleTailor} />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

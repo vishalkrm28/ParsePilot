@@ -71,6 +71,8 @@ export interface RecommendResponseBase {
   targetRoles: string[];
   recommendations: JobResult[];
   totalJobsFetched: number;
+  noResults?: boolean;
+  noResultsReason?: string;
 }
 
 export interface RecommendResponsePro extends RecommendResponseBase {
