@@ -156,137 +156,403 @@ const CITY_INDEX = new Map<string, string>(
   Object.entries(_citiesJson as Record<string, string>)
 );
 
-// Supplemental overrides: aliases or high-value phrases not in the GeoNames dataset,
+// Supplemental overrides: aliases and high-value phrases not in the GeoNames dataset,
 // or where the dataset's max-population winner is wrong for job-listing context.
+// Organised by region; entries here take precedence over the 119K city index.
 const CITY_OVERRIDES: Record<string, string> = {
-  // ── Truly global remote signals (location explicitly says "no country restriction")
-  // Note: "remote", "wfh", "work from home" are NOT here — those are work styles,
-  // not geographic scope. A US remote job is still US-only.
+
+  // ── Global remote signals ────────────────────────────────────────────────────
+  // Only truly stateless listings qualify — "Remote, US" is still a US job.
   anywhere: "remote", worldwide: "remote",
   "globally remote": "remote", "remote worldwide": "remote",
   "remote global": "remote", "open to all locations": "remote",
 
-  // ── Anglicised spellings missing from or wrong in GeoNames ──────────────────
-  // Belgium
-  antwerp: "be",            // GeoNames has Antwerp, Ohio (US) as higher pop
-  ghent: "be",              // GeoNames only has "gent" (Flemish)
-  bruges: "be",             // GeoNames has a Bruges in France
-  liege: "be", luik: "be", // accented versions only in dataset
+  // ── Europe ───────────────────────────────────────────────────────────────────
+
+  // Belgium — GeoNames often picks small US towns over major Belgian cities
+  antwerp: "be",            // GeoNames → Antwerp, Ohio
+  ghent: "be",              // dataset only has Flemish "gent"
+  bruges: "be",             // dataset has a Bruges in France
+  liege: "be", luik: "be", lüttich: "be",
   leuven: "be", louvain: "be",
   mechelen: "be", hasselt: "be", kortrijk: "be",
   ostend: "be", ostende: "be",
-  genk: "be", aalst: "be", mons: "be",
+  genk: "be", aalst: "be", mons: "be", namur: "be",
 
   // Germany
-  cologne: "de",            // GeoNames has Cologne → Italy (small town)
-  münchen: "de",            // accented — GeoNames misses it
+  cologne: "de",            // GeoNames → small Italian town
+  münchen: "de",            // accented form missing
   nuremberg: "de",          // English vs "nürnberg"
-  dusseldorf: "de",         // unaccented
+  dusseldorf: "de",         // unaccented vs "düsseldorf"
+  frankfurt: "de",          // explicit safety net
 
   // Switzerland
-  zurich: "ch",             // GeoNames has "zürich"; "zurich" maps to somewhere else
-  geneva: "ch",             // GeoNames has Geneva, NY (US) as higher pop
+  zurich: "ch",             // GeoNames has "zürich" with accent
+  geneva: "ch",             // GeoNames → Geneva, NY (US)
   genève: "ch",
+  berne: "ch",              // alternate spelling of Bern
 
   // Netherlands
   "the hague": "nl", "den haag": "nl",
+  rotterdam: "nl",
 
   // Poland
-  krakow: "pl",             // GeoNames only has "kraków" (accented)
+  krakow: "pl",             // GeoNames only has "kraków"
   wroclaw: "pl",            // vs "wrocław"
   gdansk: "pl",             // vs "gdańsk"
+  poznan: "pl",             // vs "poznań"
+  lodz: "pl",               // vs "łódź"
 
   // Czech Republic
-  prague: "cz",             // double-check — dataset has it but just in case
+  prague: "cz",
 
-  // Scandinavia / Baltic
-  reykjavik: "is",          // Iceland capital — missing from dataset
-  ulaanbaatar: "mn",        // Mongolia capital — missing from dataset
+  // Slovakia
+  bratislava: "sk",
+
+  // Hungary
+  budapest: "hu",
+
+  // Romania
+  bucharest: "ro",
+  "cluj-napoca": "ro", cluj: "ro",
+
+  // Bulgaria
+  sofia: "bg",
+  plovdiv: "bg",
+
+  // Serbia
+  belgrade: "rs",
+  beograd: "rs",
+
+  // Croatia
+  zagreb: "hr",
+
+  // Slovenia
+  ljubljana: "si",
+
+  // Bosnia
+  sarajevo: "ba",
+
+  // North Macedonia
+  skopje: "mk",
+
+  // Albania
+  tirana: "al",
+
+  // Moldova
+  chisinau: "md", chișinău: "md",
+
+  // Ukraine
+  kyiv: "ua", kiev: "ua",
+  kharkiv: "ua", odessa: "ua", lviv: "ua",
+
+  // Belarus
+  minsk: "by",
+
+  // Baltic states (safety net — already in GeoNames but low confidence)
+  tallinn: "ee",
+  riga: "lv",
+  vilnius: "lt",
+  kaunas: "lt",
+
+  // Russia
+  moscow: "ru",
+  "saint petersburg": "ru", "st. petersburg": "ru", "st petersburg": "ru",
+  novosibirsk: "ru", yekaterinburg: "ru", ekaterinburg: "ru",
+
+  // Scandinavia / Iceland
+  reykjavik: "is",          // missing from GeoNames dataset
   // Sweden
   stockholm: "se",
-  gothenburg: "se",         // English name; dataset has "göteborg"
-  malmo: "se",              // vs "malmö"
+  gothenburg: "se",         // English name; GeoNames has "göteborg"
   "göteborg": "se",
-  "malmö": "se",
+  malmo: "se", "malmö": "se",
   uppsala: "se",
-  linköping: "se",
-  linkoping: "se",
+  linköping: "se", linkoping: "se",
   örebro: "se", orebro: "se",
   västerås: "se", vasteras: "se",
   helsingborg: "se",
   norrköping: "se", norrkoping: "se",
   jönköping: "se", jonkoping: "se",
   umeå: "se", umea: "se",
-  lund: "se",
   // Norway
   oslo: "no",
   bergen: "no",
   trondheim: "no",
   stavanger: "no",
+  kristiansand: "no",
   // Finland
   helsinki: "fi",
   tampere: "fi",
   turku: "fi",
   espoo: "fi",
   vantaa: "fi",
+  oulu: "fi",
   // Denmark
   copenhagen: "dk",
-  aarhus: "dk",
+  aarhus: "dk", "århus": "dk",
   odense: "dk",
+  aalborg: "dk",
 
-  // Eastern Europe
-  bucharest: "ro",
-  chisinau: "md",
-  kyiv: "ua", kiev: "ua",
+  // Southern / Mediterranean Europe
+  athens: "gr",
+  thessaloniki: "gr",
+  nicosia: "cy",
 
-  // Russia
-  moscow: "ru",
-  "saint petersburg": "ru", "st. petersburg": "ru",
+  // Luxembourg / Monaco / Liechtenstein
+  luxembourg: "lu",         // city name same as country
 
-  // Middle East
+  // Baltic & Caucasus
+  tbilisi: "ge",
+  yerevan: "am",
+  baku: "az",
+
+  // ── Middle East & Central Asia ────────────────────────────────────────────────
+
   "tel aviv": "il",
   "abu dhabi": "ae",
-  riyadh: "sa", jeddah: "sa",
+  dubai: "ae",
+  sharjah: "ae",
+  riyadh: "sa", jeddah: "sa", mecca: "sa",
+  "al khobar": "sa", dammam: "sa",
+  doha: "qa",
+  muscat: "om", salalah: "om",
+  manama: "bh",
+  "kuwait city": "kw",
+  amman: "jo",
+  beirut: "lb",
+  damascus: "sy",
+  baghdad: "iq",
+  tehran: "ir",
+  ankara: "tr",
+  istanbul: "tr",
 
-  // Africa
-  "ivory coast": "ci",
-  "dar es salaam": "tz",
-  "addis ababa": "et",
+  // Central Asia
+  tashkent: "uz",
+  samarkand: "uz",
+  bishkek: "kg",
+  dushanbe: "tj",
+  astana: "kz",             // Kazakhstan capital (was Nursultan 2019–2022)
+  nursultan: "kz",          // former name still used in older listings
+  almaty: "kz",
+  ashgabat: "tm",
+  ulaanbaatar: "mn",        // Mongolia capital — missing from GeoNames
 
-  // South / Southeast Asia
-  "ho chi minh city": "vn", "ho chi minh": "vn",
-  "kuala lumpur": "my",
-  "chiang mai": "th",
-  bangalore: "in",          // English name; dataset has "bengaluru"
+  // ── South Asia ────────────────────────────────────────────────────────────────
+
+  "new delhi": "in",
+  delhi: "in",
+  bangalore: "in",          // English name; GeoNames has "bengaluru"
   bombay: "in",             // old name for Mumbai
+  mumbai: "in",
+  kolkata: "in", calcutta: "in",
+  chennai: "in", madras: "in",
+  hyderabad: "in",
+  pune: "in",
+  ahmedabad: "in",
+  surat: "in",
+  jaipur: "in",
+  lucknow: "in",
+  karachi: "pk",
+  lahore: "pk",
+  islamabad: "pk",
+  dhaka: "bd",
+  chittagong: "bd",
+  kathmandu: "np",
+  colombo: "lk",
+  kabul: "af",
 
-  // East Asia
+  // ── Southeast & East Asia ─────────────────────────────────────────────────────
+
+  yangon: "mm", rangoon: "mm",
+  naypyidaw: "mm",          // Myanmar capital — missing from GeoNames
+  "ho chi minh city": "vn", "ho chi minh": "vn",
+  hanoi: "vn",
+  "kuala lumpur": "my",
+  "phnom penh": "kh",
+  vientiane: "la",
+  "chiang mai": "th",
+  bangkok: "th",
   "hong kong": "hk",
   "hong kong sar": "hk",
+  macau: "mo", macao: "mo",
+  taipei: "tw",
+  beijing: "cn",
+  shanghai: "cn",
+  shenzhen: "cn",
+  guangzhou: "cn",
+  chengdu: "cn",
+  xian: "cn",               // Xi'an — plain ASCII form missing from dataset
+  "xi'an": "cn",
+  wuhan: "cn",
+  chongqing: "cn",
+  hangzhou: "cn",
+  nanjing: "cn",
+  tianjin: "cn",
+  tokyo: "jp",
+  osaka: "jp",
+  seoul: "kr",
+  busan: "kr",
+  singapore: "sg",
+  jakarta: "id",
+  surabaya: "id",
+  manila: "ph",
 
-  // Americas
-  "new york": "us",         // GeoNames has "New York City"
+  // ── Oceania ───────────────────────────────────────────────────────────────────
+
+  sydney: "au",
+  melbourne: "au",
+  brisbane: "au",
+  perth: "au",
+  adelaide: "au",
+  canberra: "au",
+  "gold coast": "au",
+  auckland: "nz",
+  wellington: "nz",
+  christchurch: "nz",
+  suva: "fj",
+  "port moresby": "pg",
+  "port vila": "vu",        // Vanuatu capital — missing from GeoNames
+  "nuku'alofa": "to",       // Tonga capital — missing from GeoNames
+  nukualofa: "to",
+
+  // ── Africa ────────────────────────────────────────────────────────────────────
+
+  cairo: "eg",
+  alexandria: "eg",
+  casablanca: "ma",
+  rabat: "ma",
+  algiers: "dz",
+  tunis: "tn",
+  tripoli: "ly",
+  khartoum: "sd",
+  juba: "ss",
+  "addis ababa": "et",
+  asmara: "er",
+  djibouti: "dj",
+  nairobi: "ke",
+  mombasa: "ke",
+  kampala: "ug",
+  kigali: "rw",
+  bujumbura: "bi",
+  "dar es salaam": "tz",
+  dodoma: "tz",
+  lusaka: "zm",
+  harare: "zw",
+  maputo: "mz",
+  lilongwe: "mw",
+  antananarivo: "mg",
+  johannesburg: "za",
+  "cape town": "za",
+  pretoria: "za",
+  durban: "za",
+  windhoek: "na",
+  gaborone: "bw",
+  maseru: "ls",
+  mbabane: "sz",
+  luanda: "ao",
+  kinshasa: "cd",
+  brazzaville: "cg",
+  abidjan: "ci",
+  yamoussoukro: "ci",
+  "ivory coast": "ci",
+  accra: "gh",
+  lagos: "ng",
+  abuja: "ng",
+  kano: "ng",
+  dakar: "sn",
+  conakry: "gn",
+  freetown: "sl",
+  monrovia: "lr",
+  bamako: "ml",
+  ouagadougou: "bf",
+  niamey: "ne",
+  "n'djamena": "td",
+  bangui: "cf",
+  yaounde: "cm",            // Yaoundé — plain ASCII missing from GeoNames
+  "yaoundé": "cm",
+  douala: "cm",
+  libreville: "ga",
+  lome: "tg",               // Lomé — plain ASCII missing from GeoNames
+  "lomé": "tg",
+  "porto-novo": "bj",
+  cotonou: "bj",
+  malabo: "gq",
+  moroni: "km",
+  "port louis": "mu",
+  victoria: "sc",           // Seychelles capital (context-dependent — also Victoria, BC)
+
+  // ── Americas ─────────────────────────────────────────────────────────────────
+
+  // USA multi-word cities (GeoNames omits spaces or misses plain forms)
+  "new york": "us",
   "new york city": "us",
-  "san francisco": "us",
   "los angeles": "us",
+  "san francisco": "us",
   "las vegas": "us",
   "salt lake city": "us",
   "kansas city": "us",
   "new orleans": "us",
-  "san jose": "us",         // overrides Costa Rica small-city hit
-  "new delhi": "in",
+  "san jose": "us",         // San Jose CA (1M) > San José CR (340K)
 
-  // Brazil
-  "rio de janeiro": "br",
-  "sao paulo": "br", "são paulo": "br",
-  "belo horizonte": "br",
+  // Canada
+  toronto: "ca",
+  montreal: "ca",           // "montréal" is correct in GeoNames; plain ASCII missing
+  "montréal": "ca",
+  vancouver: "ca",
+  calgary: "ca",
+  edmonton: "ca",
+  ottawa: "ca",
+  winnipeg: "ca",
+  "quebec city": "ca",
 
-  // Misc
-  "buenos aires": "ar",     // ensure AR wins over MX/CO duplicates
+  // Mexico
   "mexico city": "mx",
-  "cape town": "za",
-  "gold coast": "au",
+  guadalajara: "mx",
+  monterrey: "mx",
+
+  // Caribbean
+  havana: "cu",
+  "santo domingo": "do",
+  "port-au-prince": "ht",
+
+  // Central America
+  "guatemala city": "gt",
+  "san salvador": "sv",
+  managua: "ni",
+  tegucigalpa: "hn",
+  "panama city": "pa",      // Panama City, Panama (1.5M) > Panama City, FL (36K)
+
+  // South America
+  "buenos aires": "ar",
+  cordoba: "ar",            // Córdoba, AR (1.3M) — missing from GeoNames
+  "córdoba": "ar",
+  rosario: "ar",
+  bogota: "co",             // GeoNames maps "bogota" → US (Bogota, NJ); Bogotá CO has 10M
+  "bogotá": "co",
+  medellin: "co",           // GeoNames maps "medellin" → PH; Medellín CO has 2.5M
+  "medellín": "co",
+  cali: "co",
+  caracas: "ve",
+  lima: "pe",
+  santiago: "cl",
+  quito: "ec",
   "la paz": "bo",
+  asuncion: "py",           // Asunción — plain ASCII missing from GeoNames
+  "asunción": "py",
+  montevideo: "uy",
+  "sao paulo": "br",
+  "são paulo": "br",
+  brasilia: "br",           // Brasília — plain ASCII missing from GeoNames
+  "brasília": "br",
+  "rio de janeiro": "br",
+  "belo horizonte": "br",
+  salvador: "br",           // Salvador, Bahia — but also "salvador" elsewhere; low confidence
+  paramaribo: "sr",
+  georgetown: "gy",
+
+  // San Marino (the country) — GeoNames "san marino" maps to a US city
+  "san marino": "sm",
 };
 
 // US state abbreviations regex ("Jacksonville, FL" → "us")
