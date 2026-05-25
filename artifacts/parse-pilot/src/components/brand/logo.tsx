@@ -13,30 +13,13 @@ export function LogoBrand({ size = "md", className }: LogoBrandProps) {
       className={className}
       style={{ display: "inline-flex", alignItems: "center", gap, lineHeight: 1 }}
     >
-      {/* Icon mark — dark bg ensures white strokes are always visible */}
-      <div
-        style={{
-          width: iconPx,
-          height: iconPx,
-          borderRadius: "6px",
-          background: "#0f0a1e",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-          overflow: "hidden",
-        }}
-      >
-        <img
-          src="/images/resuone-icon.png"
-          alt="ResuOne"
-          width={iconPx}
-          height={iconPx}
-          style={{ objectFit: "contain", display: "block" }}
-        />
-      </div>
-
-      {/* Wordmark text — adapts to dark/light via currentColor */}
+      <img
+        src="/images/resuone-icon.png"
+        alt="ResuOne"
+        width={iconPx}
+        height={iconPx}
+        style={{ objectFit: "contain", flexShrink: 0 }}
+      />
       <span
         style={{
           fontFamily: "'Inter', sans-serif",
