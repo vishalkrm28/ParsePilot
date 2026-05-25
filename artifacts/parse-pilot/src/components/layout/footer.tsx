@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { LogoBrand } from "@/components/brand/logo";
+import { LogoWordmark } from "@/components/brand/logo";
 
 export function Footer() {
   return (
@@ -7,7 +7,7 @@ export function Footer() {
       <div className="max-w-4xl mx-auto px-6 py-16 text-center">
 
         <div className="flex items-center justify-center mb-10">
-          <LogoBrand size="lg" />
+          <LogoWordmark height={48} />
         </div>
 
         <p className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground leading-tight mb-4">
