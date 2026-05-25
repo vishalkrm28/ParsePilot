@@ -4,9 +4,9 @@ interface LogoBrandProps {
 }
 
 export function LogoBrand({ size = "md", className }: LogoBrandProps) {
-  const iconPx = size === "sm" ? 22 : size === "lg" ? 36 : 28;
-  const wordmarkH = size === "sm" ? 16 : size === "lg" ? 26 : 20;
-  const gap = size === "sm" ? "7px" : size === "lg" ? "10px" : "8px";
+  const iconPx  = size === "sm" ? 20 : size === "lg" ? 30 : 24;
+  const wordmarkH = size === "sm" ? 28 : size === "lg" ? 42 : 34;
+  const gap = size === "sm" ? "6px" : size === "lg" ? "10px" : "8px";
 
   return (
     <div
@@ -16,28 +16,39 @@ export function LogoBrand({ size = "md", className }: LogoBrandProps) {
       <img
         src="/images/resuone-icon.png"
         alt=""
-        width={iconPx}
-        height={iconPx}
-        style={{ objectFit: "contain", flexShrink: 0 }}
+        style={{
+          width: `${iconPx}px`,
+          height: `${iconPx}px`,
+          objectFit: "contain",
+          flexShrink: 0,
+          display: "block",
+        }}
       />
       <img
         src="/images/resuone-wordmark.png"
         alt="ResuOne"
-        height={wordmarkH}
-        style={{ objectFit: "contain", flexShrink: 0 }}
+        style={{
+          height: `${wordmarkH}px`,
+          width: "auto",
+          flexShrink: 0,
+          display: "block",
+        }}
       />
     </div>
   );
 }
 
-export function LogoWordmark({ className, height = 40 }: { className?: string; height?: number }) {
+export function LogoWordmark({ className, height = 48 }: { className?: string; height?: number }) {
   return (
     <img
       src="/images/resuone-wordmark.png"
       alt="ResuOne — Reimagine. Resolve. Rise."
-      height={height}
       className={className}
-      style={{ objectFit: "contain" }}
+      style={{
+        height: `${height}px`,
+        width: "auto",
+        display: "block",
+      }}
     />
   );
 }
