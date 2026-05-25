@@ -4,9 +4,9 @@ interface LogoBrandProps {
 }
 
 export function LogoBrand({ size = "md", className }: LogoBrandProps) {
-  const iconPx = size === "sm" ? 22 : size === "lg" ? 32 : 28;
-  const fontSize = size === "sm" ? "13.5px" : size === "lg" ? "18px" : "15.5px";
-  const gap = size === "sm" ? "8px" : size === "lg" ? "10px" : "9px";
+  const iconPx = size === "sm" ? 22 : size === "lg" ? 36 : 28;
+  const wordmarkH = size === "sm" ? 16 : size === "lg" ? 26 : 20;
+  const gap = size === "sm" ? "7px" : size === "lg" ? "10px" : "8px";
 
   return (
     <div
@@ -15,21 +15,17 @@ export function LogoBrand({ size = "md", className }: LogoBrandProps) {
     >
       <img
         src="/images/resuone-icon.png"
-        alt="ResuOne"
+        alt=""
         width={iconPx}
         height={iconPx}
         style={{ objectFit: "contain", flexShrink: 0 }}
       />
-      <span
-        style={{
-          fontFamily: "'Inter', sans-serif",
-          fontSize,
-          fontWeight: 700,
-          letterSpacing: "-0.025em",
-        }}
-      >
-        Resu<span style={{ color: "hsl(255 85% 60%)" }}>One</span>
-      </span>
+      <img
+        src="/images/resuone-wordmark.png"
+        alt="ResuOne"
+        height={wordmarkH}
+        style={{ objectFit: "contain", flexShrink: 0 }}
+      />
     </div>
   );
 }
